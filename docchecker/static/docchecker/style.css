@@ -169,6 +169,35 @@ main {
 .status-ok { background: var(--ok-bg); color: var(--ok); }
 .status-fail { background: var(--fail-bg); color: var(--mts-red-dark); }
 
+.report-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.download-form { margin: 0; }
+
+.btn-secondary {
+    background: #fff;
+    color: var(--black);
+    border: 2px solid var(--black);
+    padding: 0.55rem 1.2rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--black);
+    color: #fff;
+}
+
 table {
     width: 100%;
     border-collapse: collapse;

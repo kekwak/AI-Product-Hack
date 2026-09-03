@@ -109,3 +109,55 @@ def check_document(markdown_text: str, rules) -> CheckReport:
         )
 
     return report
+
+
+def _rule_level_label(level: int | None) -> str:
+    return f"H{level}" if level else "любой уровень"
+
+
+def build_annotated_markdown(original_text: str, report: CheckReport) -> str:
+    """Return the document with an inline check report and per-line markers."""
+
+    matched_lines: dict[int, list[bool]] = {}
+    for result in report.results:
+        if result.matched and result.matched_heading is not None:
+            matched_lines.setdefault(result.matched_heading.line, []).append(result.is_required)
+
+    lines = original_text.splitlines()
+    annotated_lines = []
+    for idx, line in enumerate(lines, start=1):
+        if idx in matched_lines:
+            marker = "✅" if any(matched_lines[idx]) else "ℹ️"
+            annotated_lines.append(f"{line}  <!-- {marker} заголовок найден -->")
+        else:
+            annotated_lines.append(line)
+
+    missing_required = [r for r in report.results if r.is_required and not r.matched]
+    missing_optional = [r for r in report.results if not r.is_required and not r.matched]
+
+    status = (
+        "✅ Все обязательные заголовки найдены"
+        if report.is_valid
+        else "❌ Отсутствуют обязательные заголовки"
+    )
+
+    report_block = ["> ## Отчёт проверки формата", f"> **Статус:** {status}", ">"]
+
+    if missing_required:
+        report_block.append("> **❌ Отсутствуют обязательные заголовки:**")
+        for r in missing_required:
+            report_block.append(f"> - ❌ **{r.rule_title}** ({_rule_level_label(r.rule_level)})")
+        report_block.append(">")
+
+    if missing_optional:
+        report_block.append("> **⚠️ Отсутствуют опциональные заголовки:**")
+        for r in missing_optional:
+            report_block.append(f"> - ⚠️ {r.rule_title} ({_rule_level_label(r.rule_level)})")
+        report_block.append(">")
+
+    if not missing_required and not missing_optional:
+        report_block.append("> Все проверяемые заголовки на месте.")
+
+    report_block += ["", "---", ""]
+
+    return "\n".join(report_block) + "\n".join(annotated_lines) + "\n"

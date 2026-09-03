@@ -20,11 +20,20 @@
 <section class="report-card {% if report.is_valid %}report-ok{% else %}report-fail{% endif %}">
     <h2>Результат проверки: {{ filename }}</h2>
 
-    {% if report.is_valid %}
-        <p class="status status-ok">Все обязательные заголовки найдены</p>
-    {% else %}
-        <p class="status status-fail">Отсутствуют обязательные заголовки</p>
-    {% endif %}
+    <div class="report-status-row">
+        {% if report.is_valid %}
+            <p class="status status-ok">Все обязательные заголовки найдены</p>
+        {% else %}
+            <p class="status status-fail">Отсутствуют обязательные заголовки</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'docchecker:download' %}" class="download-form">
+            {% csrf_token %}
+            <input type="hidden" name="content_b64" value="{{ content_b64 }}">
+            <input type="hidden" name="filename" value="{{ filename }}">
+            <button type="submit" class="btn-secondary">Скачать файл с пометками</button>
+        </form>
+    </div>
 
     <table>
         <thead>
