@@ -1,0 +1,162 @@
+{
+  "schema_version": "1.0",
+  "document_id": "case_026",
+  "document_file": "corrupted/case_026.md",
+  "clean_document_id": "clean_06",
+  "clean_document_file": "clean/clean_06.md",
+  "generator_seed": 2026090326,
+  "generator_version": "synthetic-tz-v1",
+  "document_sha256": "45b2e78eb6ed70e3b1604df511d178713d9ac7db1426fdf2da828673c1ba0845",
+  "clean_document_sha256": "f01b9c94373ff9a65c5aae098dbe3a4c2e09afc28e88e64fd605e5e79330ab55",
+  "expected_error_count": 6,
+  "counts_by_source_type": {
+    "1": 2,
+    "2": 1,
+    "3": 3
+  },
+  "counts_by_difficulty": {
+    "low": 4,
+    "medium": 0,
+    "high": 2
+  },
+  "counts_by_error_type": {
+    "D02": 1,
+    "D07": 1,
+    "T01": 1,
+    "U01": 1,
+    "U09": 1,
+    "U18": 1
+  },
+  "errors": [
+    {
+      "instance_id": "case_026-E01",
+      "mutation_id": "D07_MISSING_HDFS_PATH",
+      "error_type_id": "D07",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "HDFS; путь не указан",
+      "evidence_relation": "at",
+      "title": "Не указан полный путь файлового приемника",
+      "problem": "Для одного HDFS-приемника удален полный путь хранения.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Указать кластер, полный HDFS-путь и формат хранения.",
+      "affected_sections": [
+        "Приемники данных"
+      ],
+      "injected_change": "Для одного HDFS-приемника удален полный путь хранения."
+    },
+    {
+      "instance_id": "case_026-E02",
+      "mutation_id": "D02_MISSING_CATALOG_LINK",
+      "error_type_id": "D02",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "Data Catalog: ссылка отсутствует",
+      "evidence_relation": "at",
+      "title": "Нет прямой ссылки на Data Catalog",
+      "problem": "У одного источника удалена прямая ссылка на карточку каталога.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Добавить точную ссылку на объект источника в Data Catalog.",
+      "affected_sections": [
+        "Источники данных"
+      ],
+      "injected_change": "У одного источника удалена прямая ссылка на карточку каталога."
+    },
+    {
+      "instance_id": "case_026-E03",
+      "mutation_id": "U18_VAGUE_ACCEPTANCE",
+      "error_type_id": "U18",
+      "source_type": 3,
+      "difficulty": "low",
+      "evidence_quote": "Дополнительная метрика: качество результата должно быть высоким.",
+      "evidence_relation": "at",
+      "title": "Непроверяемый критерий качества",
+      "problem": "Добавлена метрика без формулы, порога и периода измерения.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Задать формулу, измеримый порог, период и источник проверки.",
+      "affected_sections": [
+        "Продуктовые метрики"
+      ],
+      "injected_change": "Добавлена метрика без формулы, порога и периода измерения."
+    },
+    {
+      "instance_id": "case_026-E04",
+      "mutation_id": "U09_NONDETERMINISTIC_LAST",
+      "error_type_id": "U09",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Если несколько последних записей имеют одинаковое время, сохраняется любая из них.",
+      "evidence_relation": "at",
+      "title": "Недетерминирован выбор последней записи",
+      "problem": "При одинаковом времени выбор оставлен произвольным.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Задать дополнительный уникальный tie-break и полный порядок сортировки.",
+      "affected_sections": [
+        "Шаг 3"
+      ],
+      "injected_change": "При одинаковом времени выбор оставлен произвольным."
+    },
+    {
+      "instance_id": "case_026-E05",
+      "mutation_id": "U01_SCOPE_OUTPUT_GAP",
+      "error_type_id": "U01",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Результат также должен обеспечивать прогноз значений на следующие 30 дней.",
+      "evidence_relation": "at",
+      "title": "Заявленный результат не обеспечен контрактом",
+      "problem": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Уточнить, входит ли прогноз в скоуп, и описать его выход и расчет либо исключить обещание.",
+      "affected_sections": [
+        "Решаемая проблема"
+      ],
+      "injected_change": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме."
+    },
+    {
+      "instance_id": "case_026-E06",
+      "mutation_id": "T01_RENAME_FLOW",
+      "error_type_id": "T01",
+      "source_type": 2,
+      "difficulty": "low",
+      "evidence_quote": "Общая архитектура",
+      "evidence_relation": "at",
+      "title": "Нарушен обязательный шаблон",
+      "problem": "Обязательный раздел схемы потока переименован.",
+      "roles": [
+        "Data Analyst",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Вернуть точное название «Схема потоков данных».",
+      "affected_sections": [
+        "Нарушен обязательный шаблон"
+      ],
+      "injected_change": "Обязательный раздел схемы потока переименован."
+    }
+  ]
+}

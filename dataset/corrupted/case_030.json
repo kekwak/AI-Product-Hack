@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "document_id": "case_030",
+  "document_file": "corrupted/case_030.md",
+  "clean_document_id": "clean_06",
+  "clean_document_file": "clean/clean_06.md",
+  "generator_seed": 2026090330,
+  "generator_version": "synthetic-tz-v1",
+  "document_sha256": "45fc5331c6cb3af3e65099f6169676a1e0f8165098c045cbe1882420194fdfe2",
+  "clean_document_sha256": "f01b9c94373ff9a65c5aae098dbe3a4c2e09afc28e88e64fd605e5e79330ab55",
+  "expected_error_count": 1,
+  "counts_by_source_type": {
+    "1": 0,
+    "2": 0,
+    "3": 1
+  },
+  "counts_by_difficulty": {
+    "low": 0,
+    "medium": 1,
+    "high": 0
+  },
+  "counts_by_error_type": {
+    "U16": 1
+  },
+  "errors": [
+    {
+      "instance_id": "case_030-E01",
+      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
+      "error_type_id": "U16",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
+      "evidence_relation": "at",
+      "title": "Задано нереализуемое требование задержки",
+      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
+      "affected_sections": [
+        "Нефункциональные требования"
+      ],
+      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
+    }
+  ]
+}

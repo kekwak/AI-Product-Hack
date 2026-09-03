@@ -1,0 +1,410 @@
+{
+  "schema_version": "1.0",
+  "document_id": "case_022",
+  "document_file": "corrupted/case_022.md",
+  "clean_document_id": "clean_05",
+  "clean_document_file": "clean/clean_05.md",
+  "generator_seed": 2026090322,
+  "generator_version": "synthetic-tz-v1",
+  "document_sha256": "8dae13cc106d26ee09c56729805251624e8ab0f3b64b15182f9e56736721a4c8",
+  "clean_document_sha256": "efe0faac7c4133381247f2441c1462822930cebc6bcb95e97c1b4a3cf8806911",
+  "expected_error_count": 17,
+  "counts_by_source_type": {
+    "1": 5,
+    "2": 1,
+    "3": 11
+  },
+  "counts_by_difficulty": {
+    "low": 7,
+    "medium": 5,
+    "high": 5
+  },
+  "counts_by_error_type": {
+    "D03": 1,
+    "D04": 1,
+    "D05": 1,
+    "D06": 1,
+    "D07": 1,
+    "T01": 1,
+    "U02": 1,
+    "U03": 1,
+    "U06": 1,
+    "U07": 1,
+    "U10": 1,
+    "U11": 1,
+    "U15": 1,
+    "U16": 1,
+    "U17": 1,
+    "U18": 1,
+    "U19": 1
+  },
+  "errors": [
+    {
+      "instance_id": "case_022-E01",
+      "mutation_id": "D05_UNSPECIFIED_ENRICHMENT_STAGE",
+      "error_type_id": "D05",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "Описание этого этапа будет согласовано после начала разработки.",
+      "evidence_relation": "at",
+      "title": "Этап не заполнен и не отмечен как неприменимый",
+      "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо».",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Описать обогащение либо явно указать, что оно не применяется.",
+      "affected_sections": [
+        "Шаг 2. Обогащение данных"
+      ],
+      "injected_change": "Раздел обогащения оставлен без алгоритма и без явного «не применимо»."
+    },
+    {
+      "instance_id": "case_022-E02",
+      "mutation_id": "D07_MISSING_HDFS_PATH",
+      "error_type_id": "D07",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "HDFS; путь не указан",
+      "evidence_relation": "at",
+      "title": "Не указан полный путь файлового приемника",
+      "problem": "Для одного HDFS-приемника удален полный путь хранения.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Указать кластер, полный HDFS-путь и формат хранения.",
+      "affected_sections": [
+        "Приемники данных"
+      ],
+      "injected_change": "Для одного HDFS-приемника удален полный путь хранения."
+    },
+    {
+      "instance_id": "case_022-E03",
+      "mutation_id": "D03_MISSING_NULLABILITY",
+      "error_type_id": "D03",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "| site_id | string | Идентификатор площадки | DICT_SITE_ENERGY_METER_SCD2 | site_id | string | Часть бизнес-ключа |",
+      "evidence_relation": "at",
+      "title": "Не указана обязательность поля",
+      "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать обязательность поля и согласовать ее с алгоритмом.",
+      "affected_sections": [
+        "Структура данных"
+      ],
+      "injected_change": "Для одного целевого поля удален признак NOT NULL/NULLABLE."
+    },
+    {
+      "instance_id": "case_022-E04",
+      "mutation_id": "D04_VAGUE_FILTER",
+      "error_type_id": "D04",
+      "source_type": 1,
+      "difficulty": "medium",
+      "evidence_quote": "В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.",
+      "evidence_relation": "at",
+      "title": "Не описаны точные фильтры",
+      "problem": "Точные условия отбора заменены субъективным требованием о корректности записей.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Перечислить проверяемые условия включения и исключения данных.",
+      "affected_sections": [
+        "Шаг 1. Фильтрация данных"
+      ],
+      "injected_change": "Точные условия отбора заменены субъективным требованием о корректности записей."
+    },
+    {
+      "instance_id": "case_022-E05",
+      "mutation_id": "D06_MISSING_KAFKA_CLUSTER",
+      "error_type_id": "D06",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "Kafka; кластер не указан",
+      "evidence_relation": "at",
+      "title": "Не указан Kafka-кластер",
+      "problem": "Для одного Kafka-источника удалено имя кластера.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Указать точное имя Kafka-кластера.",
+      "affected_sections": [
+        "Источники данных"
+      ],
+      "injected_change": "Для одного Kafka-источника удалено имя кластера."
+    },
+    {
+      "instance_id": "case_022-E06",
+      "mutation_id": "U03_CONFLICTING_SOURCES",
+      "error_type_id": "U03",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "При расхождении значений между источниками допускается использовать значение любого из них.",
+      "evidence_relation": "at",
+      "title": "Не задан источник истины",
+      "problem": "При конфликте источников разрешен произвольный выбор.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Назначить авторитетный источник и детерминированное правило разрешения конфликтов.",
+      "affected_sections": [
+        "Системы-источники"
+      ],
+      "injected_change": "При конфликте источников разрешен произвольный выбор."
+    },
+    {
+      "instance_id": "case_022-E07",
+      "mutation_id": "U17_DDL_TYPE_CONFLICT",
+      "error_type_id": "U17",
+      "source_type": 3,
+      "difficulty": "low",
+      "evidence_quote": "site_id                         BIGINT          NOT NULL,",
+      "evidence_relation": "at",
+      "title": "Тип поля расходится с DDL",
+      "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Согласовать тип поля во всех частях документа.",
+      "affected_sections": [
+        "Структура данных",
+        "DDL"
+      ],
+      "injected_change": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры."
+    },
+    {
+      "instance_id": "case_022-E08",
+      "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
+      "error_type_id": "U06",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.",
+      "evidence_relation": "at",
+      "title": "Не определен порядок операций",
+      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
+      "affected_sections": [
+        "Алгоритм обработки потока"
+      ],
+      "injected_change": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
+    },
+    {
+      "instance_id": "case_022-E09",
+      "mutation_id": "U02_UNDEFINED_ACTIVE",
+      "error_type_id": "U02",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Во всех расчетах используются только активные записи источников.",
+      "evidence_relation": "at",
+      "title": "Не определен термин «активная запись»",
+      "problem": "Введен влияющий на выборку термин без формального определения.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Определить проверяемые признаки активной записи.",
+      "affected_sections": [
+        "Алгоритм обработки потока"
+      ],
+      "injected_change": "Введен влияющий на выборку термин без формального определения."
+    },
+    {
+      "instance_id": "case_022-E10",
+      "mutation_id": "U19_UNMASKED_SENSITIVE_LOG",
+      "error_type_id": "U19",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.",
+      "evidence_relation": "at",
+      "title": "Чувствительные данные сохраняются без ограничений",
+      "problem": "Полный payload с идентификаторами разрешено бессрочно писать в журнал.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Уточнить маскирование, состав логов, права доступа и срок хранения.",
+      "affected_sections": [
+        "FAQ"
+      ],
+      "injected_change": "Полный payload с идентификаторами разрешено бессрочно писать в журнал."
+    },
+    {
+      "instance_id": "case_022-E11",
+      "mutation_id": "U18_VAGUE_ACCEPTANCE",
+      "error_type_id": "U18",
+      "source_type": 3,
+      "difficulty": "low",
+      "evidence_quote": "Дополнительная метрика: качество результата должно быть высоким.",
+      "evidence_relation": "at",
+      "title": "Непроверяемый критерий качества",
+      "problem": "Добавлена метрика без формулы, порога и периода измерения.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Задать формулу, измеримый порог, период и источник проверки.",
+      "affected_sections": [
+        "Продуктовые метрики"
+      ],
+      "injected_change": "Добавлена метрика без формулы, порога и периода измерения."
+    },
+    {
+      "instance_id": "case_022-E12",
+      "mutation_id": "U11_TIMEZONE_AMBIGUITY",
+      "error_type_id": "U11",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.",
+      "evidence_relation": "at",
+      "title": "Не определен часовой пояс",
+      "problem": "Один timestamp разрешено интерпретировать в двух часовых поясах.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Зафиксировать timezone источника, результата и правила преобразования.",
+      "affected_sections": [
+        "Алгоритм обработки потока"
+      ],
+      "injected_change": "Один timestamp разрешено интерпретировать в двух часовых поясах."
+    },
+    {
+      "instance_id": "case_022-E13",
+      "mutation_id": "U07_OPEN_TIME_BOUNDARY",
+      "error_type_id": "U07",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Дополнительно учитываются события только за последние 7 дней.",
+      "evidence_relation": "at",
+      "title": "Не определены границы периода",
+      "problem": "Относительный период не задает опорное время и включение граничных значений.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать опорное время и точный полуинтервал отбора.",
+      "affected_sections": [
+        "Шаг 1. Фильтрация данных"
+      ],
+      "injected_change": "Относительный период не задает опорное время и включение граничных значений."
+    },
+    {
+      "instance_id": "case_022-E14",
+      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
+      "error_type_id": "U16",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
+      "evidence_relation": "at",
+      "title": "Задано нереализуемое требование задержки",
+      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
+      "affected_sections": [
+        "Нефункциональные требования"
+      ],
+      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
+    },
+    {
+      "instance_id": "case_022-E15",
+      "mutation_id": "U10_CONFLICTING_ZERO_RULES",
+      "error_type_id": "U10",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.",
+      "evidence_relation": "at",
+      "title": "Конфликтуют правила для нулевого значения",
+      "problem": "Для одного состояния одновременно заданы два разных результата.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Определить единственный результат и приоритет правил для нуля.",
+      "affected_sections": [
+        "Шаг 3"
+      ],
+      "injected_change": "Для одного состояния одновременно заданы два разных результата."
+    },
+    {
+      "instance_id": "case_022-E16",
+      "mutation_id": "U15_UNVERSIONED_SCHEMA_CHANGE",
+      "error_type_id": "U15",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.",
+      "evidence_relation": "at",
+      "title": "Допущено несовместимое изменение схемы",
+      "problem": "Тип поля разрешено менять без новой версии контракта.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Определить правила версионирования, совместимости и миграции потребителей.",
+      "affected_sections": [
+        "FAQ"
+      ],
+      "injected_change": "Тип поля разрешено менять без новой версии контракта."
+    },
+    {
+      "instance_id": "case_022-E17",
+      "mutation_id": "T01_RENAME_KEYS",
+      "error_type_id": "T01",
+      "source_type": 2,
+      "difficulty": "low",
+      "evidence_quote": "Технические параметры размещения",
+      "evidence_relation": "at",
+      "title": "Нарушен обязательный шаблон",
+      "problem": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию.",
+      "roles": [
+        "Data Analyst",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Вернуть обязательное название раздела ключа и партиции.",
+      "affected_sections": [
+        "Нарушен обязательный шаблон"
+      ],
+      "injected_change": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию."
+    }
+  ]
+}

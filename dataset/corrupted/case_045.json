@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "document_id": "case_045",
+  "document_file": "corrupted/case_045.md",
+  "clean_document_id": "clean_09",
+  "clean_document_file": "clean/clean_09.md",
+  "generator_seed": 2026090345,
+  "generator_version": "synthetic-tz-v1",
+  "document_sha256": "587ef1be45d3041c86d8c9cd38815c1f4931c1a6eb8995f173a77aab2e4be556",
+  "clean_document_sha256": "829b3c19c3b14ad4fa92a43113e771ce06bb58393d99a67764aa1721189a3085",
+  "expected_error_count": 2,
+  "counts_by_source_type": {
+    "1": 1,
+    "2": 0,
+    "3": 1
+  },
+  "counts_by_difficulty": {
+    "low": 1,
+    "medium": 1,
+    "high": 0
+  },
+  "counts_by_error_type": {
+    "D03": 1,
+    "U05": 1
+  },
+  "errors": [
+    {
+      "instance_id": "case_045-E01",
+      "mutation_id": "D03_MISSING_NULLABILITY",
+      "error_type_id": "D03",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "| FIELD_MONTH | DATE | Первое число месяца UTC | Параметр DAG | `month_start` | DATE | Всегда day=1 |",
+      "evidence_relation": "at",
+      "title": "Не указана обязательность поля",
+      "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать обязательность поля и согласовать ее с алгоритмом.",
+      "affected_sections": [
+        "Структура данных"
+      ],
+      "injected_change": "Для одного целевого поля удален признак NOT NULL/NULLABLE."
+    },
+    {
+      "instance_id": "case_045-E02",
+      "mutation_id": "U05_AMBIGUOUS_MAPPING",
+      "error_type_id": "U05",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.",
+      "evidence_relation": "at",
+      "title": "Неоднозначен маппинг поля",
+      "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать точный источник и атрибут каждого целевого поля.",
+      "affected_sections": [
+        "Структура данных"
+      ],
+      "injected_change": "Разрешено брать значение из любого одноименного атрибута без приоритета."
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "document_id": "case_023",
+  "document_file": "corrupted/case_023.md",
+  "clean_document_id": "clean_05",
+  "clean_document_file": "clean/clean_05.md",
+  "generator_seed": 2026090323,
+  "generator_version": "synthetic-tz-v1",
+  "document_sha256": "06339e9e2248f80c5663fb48071d5cc24f49f00236e2c7b91d73e242bdcef5e4",
+  "clean_document_sha256": "efe0faac7c4133381247f2441c1462822930cebc6bcb95e97c1b4a3cf8806911",
+  "expected_error_count": 1,
+  "counts_by_source_type": {
+    "1": 0,
+    "2": 0,
+    "3": 1
+  },
+  "counts_by_difficulty": {
+    "low": 0,
+    "medium": 1,
+    "high": 0
+  },
+  "counts_by_error_type": {
+    "U02": 1
+  },
+  "errors": [
+    {
+      "instance_id": "case_023-E01",
+      "mutation_id": "U02_UNDEFINED_ACTIVE",
+      "error_type_id": "U02",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Во всех расчетах используются только активные записи источников.",
+      "evidence_relation": "at",
+      "title": "Не определен термин «активная запись»",
+      "problem": "Введен влияющий на выборку термин без формального определения.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Определить проверяемые признаки активной записи.",
+      "affected_sections": [
+        "Алгоритм обработки потока"
+      ],
+      "injected_change": "Введен влияющий на выборку термин без формального определения."
+    }
+  ]
+}

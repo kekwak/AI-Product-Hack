@@ -1,0 +1,231 @@
+{
+  "schema_version": "1.0",
+  "document_id": "case_043",
+  "document_file": "corrupted/case_043.md",
+  "clean_document_id": "clean_09",
+  "clean_document_file": "clean/clean_09.md",
+  "generator_seed": 2026090343,
+  "generator_version": "synthetic-tz-v1",
+  "document_sha256": "08e8a769c12ca06ea7d8f3dd81e90e30067708e21e79cca354c87c6baeff8ab1",
+  "clean_document_sha256": "829b3c19c3b14ad4fa92a43113e771ce06bb58393d99a67764aa1721189a3085",
+  "expected_error_count": 9,
+  "counts_by_source_type": {
+    "1": 3,
+    "2": 1,
+    "3": 5
+  },
+  "counts_by_difficulty": {
+    "low": 4,
+    "medium": 3,
+    "high": 2
+  },
+  "counts_by_error_type": {
+    "D01": 1,
+    "D02": 1,
+    "D05": 1,
+    "T01": 1,
+    "U08": 1,
+    "U09": 1,
+    "U12": 1,
+    "U16": 1,
+    "U18": 1
+  },
+  "errors": [
+    {
+      "instance_id": "case_043-E01",
+      "mutation_id": "D01_SIMPLE_SERIALIZATION",
+      "error_type_id": "D01",
+      "source_type": 1,
+      "difficulty": "medium",
+      "evidence_quote": "JSON; схема и версия не указаны",
+      "evidence_relation": "at",
+      "title": "Неполная спецификация сериализации",
+      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
+      "roles": [
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
+      "affected_sections": [
+        "Источники данных"
+      ],
+      "injected_change": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
+    },
+    {
+      "instance_id": "case_043-E02",
+      "mutation_id": "D02_MISSING_CATALOG_LINK",
+      "error_type_id": "D02",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "Data Catalog: ссылка отсутствует",
+      "evidence_relation": "at",
+      "title": "Нет прямой ссылки на Data Catalog",
+      "problem": "У одного источника удалена прямая ссылка на карточку каталога.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Добавить точную ссылку на объект источника в Data Catalog.",
+      "affected_sections": [
+        "Источники данных"
+      ],
+      "injected_change": "У одного источника удалена прямая ссылка на карточку каталога."
+    },
+    {
+      "instance_id": "case_043-E03",
+      "mutation_id": "D05_UNSPECIFIED_ENRICHMENT_STAGE",
+      "error_type_id": "D05",
+      "source_type": 1,
+      "difficulty": "low",
+      "evidence_quote": "Описание этого этапа будет согласовано после начала разработки.",
+      "evidence_relation": "at",
+      "title": "Этап не заполнен и не отмечен как неприменимый",
+      "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо».",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Описать обогащение либо явно указать, что оно не применяется.",
+      "affected_sections": [
+        "Шаг 2. Обогащение данных"
+      ],
+      "injected_change": "Раздел обогащения оставлен без алгоритма и без явного «не применимо»."
+    },
+    {
+      "instance_id": "case_043-E04",
+      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
+      "error_type_id": "U16",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
+      "evidence_relation": "at",
+      "title": "Задано нереализуемое требование задержки",
+      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
+      "affected_sections": [
+        "Нефункциональные требования"
+      ],
+      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
+    },
+    {
+      "instance_id": "case_043-E05",
+      "mutation_id": "U12_UNSPECIFIED_UNITS",
+      "error_type_id": "U12",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.",
+      "evidence_relation": "at",
+      "title": "Не определены единицы числовых полей",
+      "problem": "Единицы значимых показателей переданы на усмотрение потребителя.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Зафиксировать единицу измерения и преобразование для каждого числового поля.",
+      "affected_sections": [
+        "Структура данных"
+      ],
+      "injected_change": "Единицы значимых показателей переданы на усмотрение потребителя."
+    },
+    {
+      "instance_id": "case_043-E06",
+      "mutation_id": "U08_JOIN_CARDINALITY_GAP",
+      "error_type_id": "U08",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "При нескольких совпадениях со справочником в результат передаются все найденные варианты.",
+      "evidence_relation": "at",
+      "title": "Не определена кардинальность обогащения",
+      "problem": "При нескольких совпадениях сохраняются все строки, что может размножить результат.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Указать полный ключ, ожидаемую кардинальность и правило для нуля и нескольких совпадений.",
+      "affected_sections": [
+        "Шаг 2. Обогащение данных"
+      ],
+      "injected_change": "При нескольких совпадениях сохраняются все строки, что может размножить результат."
+    },
+    {
+      "instance_id": "case_043-E07",
+      "mutation_id": "U18_VAGUE_ACCEPTANCE",
+      "error_type_id": "U18",
+      "source_type": 3,
+      "difficulty": "low",
+      "evidence_quote": "Дополнительная метрика: качество результата должно быть высоким.",
+      "evidence_relation": "at",
+      "title": "Непроверяемый критерий качества",
+      "problem": "Добавлена метрика без формулы, порога и периода измерения.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Задать формулу, измеримый порог, период и источник проверки.",
+      "affected_sections": [
+        "Продуктовые метрики"
+      ],
+      "injected_change": "Добавлена метрика без формулы, порога и периода измерения."
+    },
+    {
+      "instance_id": "case_043-E08",
+      "mutation_id": "U09_NONDETERMINISTIC_LAST",
+      "error_type_id": "U09",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Если несколько последних записей имеют одинаковое время, сохраняется любая из них.",
+      "evidence_relation": "at",
+      "title": "Недетерминирован выбор последней записи",
+      "problem": "При одинаковом времени выбор оставлен произвольным.",
+      "roles": [
+        "Data Analyst",
+        "Data Engineer",
+        "QA"
+      ],
+      "priority": "P0",
+      "clarification_needed": "Задать дополнительный уникальный tie-break и полный порядок сортировки.",
+      "affected_sections": [
+        "Шаг 3"
+      ],
+      "injected_change": "При одинаковом времени выбор оставлен произвольным."
+    },
+    {
+      "instance_id": "case_043-E09",
+      "mutation_id": "T01_STEP3_PLACEHOLDER",
+      "error_type_id": "T01",
+      "source_type": 2,
+      "difficulty": "low",
+      "evidence_quote": "Шаг 3. <Наименование шага 3>",
+      "evidence_relation": "at",
+      "title": "В шаблоне остался плейсхолдер",
+      "problem": "Название третьего шага заменено незаполненной подсказкой шаблона.",
+      "roles": [
+        "Data Analyst",
+        "QA"
+      ],
+      "priority": "P1",
+      "clarification_needed": "Указать фактическое название третьего шага.",
+      "affected_sections": [
+        "В шаблоне остался плейсхолдер"
+      ],
+      "injected_change": "Название третьего шага заменено незаполненной подсказкой шаблона."
+    }
+  ]
+}
