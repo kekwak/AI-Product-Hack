@@ -190,19 +190,59 @@ def rename_heading(text: str, heading: str, replacement: str, *, prefix: bool = 
     return "\n".join(lines) + "\n", replacement
 
 
-def drop_structure_comment_column(text: str) -> tuple[str, str]:
+def rename_intro_field(text: str, label: str, replacement: str) -> tuple[str, str]:
     lines = text.splitlines()
-    heading_index = find_heading(lines, "Структура данных", prefix=True)
-    table_start = next(index for index in range(heading_index + 1, len(lines)) if lines[index].strip().startswith("|"))
-    table_end = table_start
-    while table_end < len(lines) and lines[table_end].strip().startswith("|"):
-        cells = split_row(lines[table_end])
-        if len(cells) >= 7:
-            cells.pop()
-            lines[table_end] = join_row(cells)
-        table_end += 1
+    pattern = re.compile(rf"^\|\s*\*\*{re.escape(label)}\*\*\s*\|")
+    matches = [index for index, line in enumerate(lines) if pattern.match(line)]
+    if len(matches) != 1:
+        raise ValueError(f"expected one intro field {label!r}, found {len(matches)}")
+    index = matches[0]
+    cells = split_row(lines[index])
+    cells[0] = f"**{replacement}**"
+    lines[index] = join_row(cells)
+    return "\n".join(lines) + "\n", replacement
 
-    evidence = lines[table_start]
+
+def rename_table_column(
+    text: str,
+    heading: str,
+    column_name: str,
+    replacement: str,
+) -> tuple[str, str]:
+    lines = text.splitlines()
+    heading_index = find_heading(lines, heading, prefix=heading == "Структура данных")
+    table_start = next(
+        (index for index in range(heading_index + 1, len(lines)) if lines[index].strip().startswith("|")),
+        None,
+    )
+    if table_start is None:
+        raise ValueError(f"table not found after {heading!r}")
+    table_indices: list[int] = []
+    for index in range(table_start, len(lines)):
+        if not lines[index].strip().startswith("|"):
+            break
+        table_indices.append(index)
+
+    for index in table_indices:
+        normalized_cells = [cell.replace("**", "").strip() for cell in split_row(lines[index])]
+        if column_name not in normalized_cells:
+            continue
+        cells = split_row(lines[index])
+        column_index = normalized_cells.index(column_name)
+        bold = cells[column_index].startswith("**") and cells[column_index].endswith("**")
+        cells[column_index] = f"**{replacement}**" if bold else replacement
+        lines[index] = join_row(cells)
+        return "\n".join(lines) + "\n", replacement
+    raise ValueError(f"column {column_name!r} not found in table after {heading!r}")
+
+
+def remove_last_example_row(text: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    candidates = table_data_row_indices(lines, "Пример данных")
+    if len(candidates) != 10:
+        raise ValueError(f"expected 10 example rows, found {len(candidates)}")
+    lines.pop(candidates[-1])
+    evidence = "### Пример данных"
     return "\n".join(lines) + "\n", evidence
 
 
@@ -301,22 +341,36 @@ DOMAIN_MUTATIONS = [
 
 
 TEMPLATE_MUTATIONS = [
-    Mutation("T01_RENAME_FAQ", "T01", 2, "low", "Нарушен обязательный шаблон", "Обязательный раздел FAQ переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "FAQ", "Прочие сведения для пользователя")),
-    Mutation("T01_RENAME_SOURCES", "T01", 2, "low", "Нарушен обязательный шаблон", "Обязательный раздел источников переименован.", lambda text: rename_heading(text, "Источники данных", "Входные сущности проекта")),
-    Mutation("T01_RENAME_RECEIVERS", "T01", 2, "low", "Нарушен обязательный шаблон", "Обязательный раздел приемников переименован.", lambda text: rename_heading(text, "Приемники данных", "Итоговые объекты проекта")),
-    Mutation("T01_RENAME_FLOW", "T01", 2, "low", "Нарушен обязательный шаблон", "Обязательный раздел схемы потока переименован.", lambda text: rename_heading(text, "Схема потоков данных", "Общая архитектура")),
-    Mutation("T01_STEP3_PLACEHOLDER", "T01", 2, "low", "В шаблоне остался плейсхолдер", "Название третьего шага заменено незаполненной подсказкой шаблона.", lambda text: rename_heading(text, "Шаг 3.", "Шаг 3. <Наименование шага 3>", prefix=True)),
-    Mutation("T01_RENAME_KEYS", "T01", 2, "low", "Нарушен обязательный шаблон", "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию.", lambda text: rename_heading(text, "Формирование ключа (kafka) / партиции (hdfs)", "Технические параметры размещения")),
-    Mutation("T01_RENAME_EXAMPLE", "T01", 2, "low", "Нарушен обязательный шаблон", "Раздел примера данных переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Пример данных", "Демонстрационный фрагмент")),
-    Mutation("T01_DROP_STRUCTURE_COLUMN", "T01", 2, "medium", "Нарушена таблица обязательного шаблона", "Из таблицы маппинга удалена обязательная колонка комментариев.", drop_structure_comment_column),
-    Mutation("T01_RENAME_SOURCE_AND_RECEIVER", "T01", 2, "medium", "Не распознаются входы и выходы", "Одновременно переименованы два обязательных раздела шаблона: источники и приемники.", sequence(rename_edit("Источники данных", "Входной контур"), rename_edit("Приемники данных", "Выходной контур"))),
-    Mutation("T01_RENAME_FLOW_AND_ALGORITHM", "T01", 2, "medium", "Нарушена структура описания обработки", "Схема потока и алгоритм обработки одновременно вынесены под нестандартные заголовки.", sequence(rename_edit("Схема потоков данных", "Архитектурный набросок"), rename_edit("Алгоритм обработки потока", "Внутренняя реализация"))),
-    Mutation("T01_RENAME_STRUCTURE_AND_EXAMPLE", "T01", 2, "medium", "Не распознаются контракт и пример", "Обязательные разделы структуры результата и примера данных получили несопоставимые названия.", sequence(rename_edit("Структура данных", "Описание колонок", prefix=True), rename_edit("Пример данных", "Тестовая выборка"))),
-    Mutation("T01_RENAME_DDL_AND_FAQ", "T01", 2, "medium", "Потеряны два обязательных раздела", "DDL и FAQ присутствуют по содержанию, но их обязательные заголовки заменены произвольными.", sequence(rename_edit("DDL", "Физическая реализация"), rename_edit("FAQ", "Заметки команды"))),
-    Mutation("T01_ALL_STEPS_AS_PLACEHOLDERS", "T01", 2, "high", "Не заполнены названия этапов алгоритма", "Все три обязательных шага сохранены как шаблонные плейсхолдеры вместо фактических названий.", sequence(rename_edit("Шаг 1.", "Шаг 1. <Наименование шага 1>", prefix=True), rename_edit("Шаг 2.", "Шаг 2. <Наименование шага 2>", prefix=True), rename_edit("Шаг 3.", "Шаг 3. <Наименование шага 3>", prefix=True))),
-    Mutation("T01_RENAME_KEYS_AND_HISTORY", "T01", 2, "medium", "Нарушены технический и служебный разделы", "Раздел ключей/партиций и история изменений переименованы так, что не сопоставляются с шаблоном.", sequence(rename_edit("Формирование ключа (kafka) / партиции (hdfs)", "Размещение результата"), rename_edit("История изменений", "Журнал документа"))),
-    Mutation("T01_RENAME_THREE_DATA_SECTIONS", "T01", 2, "high", "Нарушен блок описания данных", "Сразу три обязательных раздела источников, справочников и приемников заменены внутренними названиями.", sequence(rename_edit("Источники данных", "Поставщики"), rename_edit("Источники обогащения данных", "Lookup-объекты"), rename_edit("Приемники данных", "Публикации"))),
-    Mutation("T01_DROP_COLUMN_AND_RENAME_HISTORY", "T01", 2, "high", "Одновременно нарушены таблица и служебный раздел", "У таблицы структуры удалена обязательная колонка, а история изменений переименована.", sequence(drop_structure_comment_column, rename_edit("История изменений", "Журнал документа"))),
+    Mutation("T01_RENAME_DOCUMENT_TITLE", "T01", 2, "low", "Отсутствует заголовок документа", "Заголовок документа о потоковых данных или витрине заменен несопоставимым служебным заголовком.", lambda text: rename_heading(text, "Потоковые данные/витрины", "Служебный документ проекта")),
+    Mutation("T01_RENAME_GENERAL_INFO", "T01", 2, "low", "Отсутствует поле «Общие сведения»", "Название обязательного поля «Общие сведения» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Общие сведения", "Служебное поле 01")),
+    Mutation("T01_RENAME_PROBLEM", "T01", 2, "low", "Отсутствует поле «Решаемая проблема»", "Название обязательного поля «Решаемая проблема» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Решаемая проблема", "Служебное поле 02")),
+    Mutation("T01_RENAME_PRODUCT_METRICS", "T01", 2, "low", "Отсутствует поле «Продуктовые метрики»", "Название обязательного поля «Продуктовые метрики» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Продуктовые метрики", "Служебное поле 03")),
+    Mutation("T01_RENAME_CUSTOMERS", "T01", 2, "low", "Отсутствует поле «Заказчики»", "Название обязательного поля «Заказчики» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Заказчики", "Служебное поле 04")),
+    Mutation("T01_RENAME_NFR", "T01", 2, "low", "Отсутствует поле «Нефункциональные требования»", "Название обязательного поля «Нефункциональные требования» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Нефункциональные требования", "Служебное поле 05")),
+    Mutation("T01_RENAME_SOURCE_SYSTEMS", "T01", 2, "low", "Отсутствует поле «Системы-источники»", "Название обязательного поля «Системы-источники» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Системы-источники", "Служебное поле 06")),
+    Mutation("T01_RENAME_DATA_CATALOG", "T01", 2, "low", "Отсутствует поле «Data Catalog»", "Название обязательного поля «Data Catalog» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Data Catalog", "Служебное поле 07")),
+    Mutation("T01_RENAME_PROJECT_SOURCES", "T01", 2, "low", "Отсутствует поле «Исходники проекта»", "Название обязательного поля «Исходники проекта» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Исходники проекта", "Служебное поле 08")),
+    Mutation("T01_RENAME_TEAM", "T01", 2, "low", "Отсутствует поле «Команда»", "Название обязательного поля «Команда» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Команда", "Служебное поле 09")),
+    Mutation("T01_RENAME_JIRA", "T01", 2, "low", "Отсутствует поле «JIRA»", "Название обязательного поля «JIRA» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "JIRA", "Служебное поле 10")),
+    Mutation("T01_RENAME_SOURCES", "T01", 2, "low", "Отсутствует раздел «Источники данных»", "Обязательный раздел «Источники данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Источники данных", "Входные материалы проекта")),
+    Mutation("T01_RENAME_SOURCES_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы источников", "Обязательная колонка «Описание источника» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Источники данных", "Описание источника", "Служебная колонка 01")),
+    Mutation("T01_RENAME_ENRICHMENT_SOURCES", "T01", 2, "low", "Отсутствует раздел «Источники обогащения данных»", "Обязательный раздел «Источники обогащения данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Источники обогащения данных", "Дополнительные материалы проекта")),
+    Mutation("T01_RENAME_ENRICHMENT_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы источников обогащения", "Обязательная колонка «Описание» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Источники обогащения данных", "Описание", "Служебная колонка 02")),
+    Mutation("T01_RENAME_RECEIVERS", "T01", 2, "low", "Отсутствует раздел «Приемники данных»", "Обязательный раздел «Приемники данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Приемники данных", "Результаты проекта")),
+    Mutation("T01_RENAME_RECEIVERS_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы приемников", "Обязательная колонка «Сериализация» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Приемники данных", "Сериализация", "Служебная колонка 03")),
+    Mutation("T01_RENAME_FLOW", "T01", 2, "low", "Отсутствует раздел «Схема потоков данных»", "Обязательный раздел «Схема потоков данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Схема потоков данных", "Иллюстрации проекта")),
+    Mutation("T01_RENAME_ALGORITHM", "T01", 2, "low", "Отсутствует раздел «Алгоритм обработки потока»", "Обязательный раздел «Алгоритм обработки потока» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Алгоритм обработки потока", "Рабочие заметки")),
+    Mutation("T01_RENAME_FILTER_STEP", "T01", 2, "low", "Отсутствует шаг фильтрации данных", "Обязательный шаг 1 с описанием фильтрации переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Шаг 1. Фильтрация данных", "Этап A. Подготовка", prefix=True)),
+    Mutation("T01_RENAME_ENRICHMENT_STEP", "T01", 2, "low", "Отсутствует шаг обогащения данных", "Обязательный шаг 2 с описанием обогащения переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Шаг 2. Обогащение данных", "Этап B. Подготовка", prefix=True)),
+    Mutation("T01_STEP3_PLACEHOLDER", "T01", 2, "low", "Не указан третий шаг преобразования", "Название обязательного третьего шага заменено незаполненным плейсхолдером.", lambda text: rename_heading(text, "Шаг 3.", "Шаг 3. <Наименование шага 3>", prefix=True)),
+    Mutation("T01_RENAME_KEYS", "T01", 2, "low", "Отсутствует раздел формирования ключа или партиции", "Обязательный раздел формирования Kafka key или HDFS partition переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Формирование ключа (kafka) / партиции (hdfs)", "Параметры выполнения")),
+    Mutation("T01_RENAME_STRUCTURE", "T01", 2, "low", "Отсутствует раздел «Структура данных»", "Обязательный раздел «Структура данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Структура данных", "Технические материалы")),
+    Mutation("T01_RENAME_STRUCTURE_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы структуры данных", "Обязательная колонка «Комментарий» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Структура данных", "Комментарий", "Служебная колонка 04")),
+    Mutation("T01_RENAME_EXAMPLE", "T01", 2, "low", "Отсутствует раздел «Пример данных»", "Обязательный раздел «Пример данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Пример данных", "Контрольный фрагмент")),
+    Mutation("T01_SHORT_EXAMPLE", "T01", 2, "low", "В примере данных меньше десяти строк", "Из обязательного примера данных удалена одна строка, поэтому вместо десяти строк осталось девять.", remove_last_example_row),
+    Mutation("T01_RENAME_DDL", "T01", 2, "low", "Отсутствует раздел «DDL»", "Обязательный раздел «DDL» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "DDL", "Техническое приложение")),
+    Mutation("T01_RENAME_FAQ", "T01", 2, "low", "Отсутствует раздел «FAQ»", "Обязательный раздел «FAQ» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "FAQ", "Прочие материалы")),
+    Mutation("T01_RENAME_CHANGE_HISTORY", "T01", 2, "low", "Отсутствует раздел «История изменений»", "Обязательный раздел «История изменений» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "История изменений", "Архив проекта")),
 ]
 
 
@@ -484,8 +538,6 @@ def main() -> None:
         findings = []
 
         def mutation_phase(item: Mutation) -> int:
-            if "DROP_COLUMN" in item.mutation_id:
-                return 0
             if item.error_type_id in {"D04", "D05"}:
                 return 1
             return {1: 2, 3: 3, 2: 4}[item.source_type]
