@@ -7,4 +7,8 @@ authors = [
     { name = "kekwak", email = "kekwak@mail.ru" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "django>=5.1,<5.2",
+    "python-dotenv>=1.0",
+    "gunicorn>=23.0",
+]

@@ -1,0 +1,29 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Проверка документации{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'docchecker/style.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="brand-bar">
+            <span class="brand-mark" aria-hidden="true">✓</span>
+            <span class="brand-name">DOC CHECK</span>
+        </div>
+        <h1>Проверка формата документации</h1>
+        <p class="subtitle">Загрузите .md файл — проверим наличие обязательных заголовков</p>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="site-footer">
+        <span class="footer-dot" aria-hidden="true"></span>
+        Doc Checker
+    </footer>
+</body>
+</html>

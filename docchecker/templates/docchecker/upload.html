@@ -1,0 +1,70 @@
+{% extends "docchecker/base.html" %}
+
+{% block content %}
+<section class="upload-card">
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        <label for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+        {{ form.file }}
+        {% if form.file.errors %}
+            <ul class="errors">
+                {% for error in form.file.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+        {% endif %}
+        <p class="hint">{{ form.file.help_text }}</p>
+        <button type="submit">Проверить</button>
+    </form>
+</section>
+
+{% if report %}
+<section class="report-card {% if report.is_valid %}report-ok{% else %}report-fail{% endif %}">
+    <h2>Результат проверки: {{ filename }}</h2>
+
+    {% if report.is_valid %}
+        <p class="status status-ok">Все обязательные заголовки найдены</p>
+    {% else %}
+        <p class="status status-fail">Отсутствуют обязательные заголовки</p>
+    {% endif %}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Заголовок</th>
+                <th>Уровень</th>
+                <th>Обязательный</th>
+                <th>Найден</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for result in report.results %}
+            <tr class="{% if result.matched %}row-ok{% elif result.is_required %}row-fail{% else %}row-warn{% endif %}">
+                <td>{{ result.rule_title }}</td>
+                <td>{% if result.rule_level %}H{{ result.rule_level }}{% else %}любой{% endif %}</td>
+                <td>{% if result.is_required %}да{% else %}нет{% endif %}</td>
+                <td>
+                    {% if result.matched %}
+                        да (строка {{ result.matched_heading.line }})
+                    {% else %}
+                        нет
+                    {% endif %}
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="4">Нет активных правил проверки. Добавьте их в <a href="/admin/">админке</a>.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>Все заголовки, найденные в документе</h3>
+    {% if report.headings %}
+    <ul class="headings-list">
+        {% for h in report.headings %}
+        <li>строка {{ h.line }}: H{{ h.level }}{% if h.implicit %} (без "#"){% endif %} — {{ h.title }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <p>В документе не найдено ни одного заголовка markdown.</p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}

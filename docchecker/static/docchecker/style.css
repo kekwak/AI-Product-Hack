@@ -1,0 +1,234 @@
+:root {
+    --mts-red: #ff0032;
+    --mts-red-dark: #e0002c;
+    --black: #0b0b0c;
+    --bg: #f4f4f5;
+    --card-bg: #ffffff;
+    --border: #e6e6e9;
+    --text: #0b0b0c;
+    --muted: #6b6b70;
+    --ok: #1a7f37;
+    --ok-bg: #e8f7ec;
+    --fail: var(--mts-red);
+    --fail-bg: #ffe5ea;
+    --warn-bg: #fff5e0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+a { color: var(--mts-red-dark); }
+
+/* ---------- Header ---------- */
+
+.site-header {
+    background: var(--black);
+    color: #fff;
+    padding: 1.25rem 1.5rem 2.5rem;
+}
+
+.brand-bar {
+    max-width: 760px;
+    margin: 0 auto 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.brand-mark {
+    width: 32px;
+    height: 32px;
+    background: var(--mts-red);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.brand-name {
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+}
+
+.site-header h1 {
+    max-width: 760px;
+    margin: 0 auto 0.4rem;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+    line-height: 1.05;
+}
+
+.subtitle {
+    max-width: 760px;
+    margin: 0 auto;
+    color: #c7c7cc;
+    font-size: 1rem;
+}
+
+main {
+    max-width: 760px;
+    margin: -1.5rem auto 0;
+    padding: 0 1.5rem 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    position: relative;
+}
+
+/* ---------- Cards ---------- */
+
+.upload-card, .report-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.75rem;
+    box-shadow: 0 12px 28px -18px rgba(0, 0, 0, 0.35);
+}
+
+.upload-card {
+    border-top: 4px solid var(--mts-red);
+}
+
+.upload-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.upload-card label {
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+}
+
+.upload-card input[type="file"] {
+    font-family: inherit;
+    font-size: 0.95rem;
+    padding: 0.6rem 0;
+}
+
+.hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
+
+.upload-card button {
+    align-self: flex-start;
+    margin-top: 0.5rem;
+    background: var(--mts-red);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: background-color 0.15s ease, transform 0.05s ease;
+}
+
+.upload-card button:hover { background: var(--mts-red-dark); }
+.upload-card button:active { transform: translateY(1px); }
+
+.errors { color: var(--fail); padding-left: 1.2rem; margin: 0; font-weight: 600; }
+
+/* ---------- Report ---------- */
+
+.report-card h2 {
+    font-size: 1.2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    margin-top: 0;
+}
+
+.status {
+    font-weight: 800;
+    padding: 0.55rem 0.9rem;
+    border-radius: 3px;
+    display: inline-block;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+}
+
+.status-ok { background: var(--ok-bg); color: var(--ok); }
+.status-fail { background: var(--fail-bg); color: var(--mts-red-dark); }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1.25rem;
+}
+
+th {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 2px solid var(--black);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+}
+
+td {
+    text-align: left;
+    padding: 0.6rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+}
+
+.row-ok td:last-child { color: var(--ok); font-weight: 700; }
+.row-fail { background: var(--fail-bg); }
+.row-fail td:last-child { color: var(--mts-red-dark); font-weight: 700; }
+.row-warn { background: var(--warn-bg); }
+
+.headings-list {
+    font-size: 0.85rem;
+    color: var(--muted);
+    padding-left: 1.2rem;
+    line-height: 1.6;
+}
+
+.report-card h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+}
+
+/* ---------- Footer ---------- */
+
+.site-footer {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 1.5rem 2.5rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.footer-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--mts-red);
+    border-radius: 50%;
+    display: inline-block;
+}
