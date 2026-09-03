@@ -1,185 +1,63 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_019",
-  "document_file": "corrupted/case_019.md",
-  "clean_document_id": "clean_04",
-  "clean_document_file": "clean/clean_04.md",
-  "generator_seed": 2026090319,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "0776e74a06db22c17d27995a3deb1bc961b64d3fff401fe2c26297c30c79b602",
-  "clean_document_sha256": "65444de4e63898855a029e0eec838276984212866dd2590849fea3f415bbb3ed",
-  "expected_error_count": 7,
-  "counts_by_source_type": {
-    "1": 2,
-    "2": 1,
-    "3": 4
-  },
-  "counts_by_difficulty": {
-    "low": 4,
-    "medium": 1,
-    "high": 2
-  },
-  "counts_by_error_type": {
-    "D05": 1,
-    "D06": 1,
-    "T01": 1,
-    "U04": 1,
-    "U10": 1,
-    "U16": 1,
-    "U18": 1
-  },
+  "source_clean_document": "clean_04.md",
+  "error_count": 7,
   "errors": [
     {
-      "instance_id": "case_019-E01",
-      "mutation_id": "D05_UNSPECIFIED_ENRICHMENT_STAGE",
       "error_type_id": "D05",
       "source_type": 1,
-      "difficulty": "low",
-      "evidence_quote": "Описание этого этапа будет согласовано после начала разработки.",
-      "evidence_relation": "at",
-      "title": "Этап не заполнен и не отмечен как неприменимый",
-      "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо».",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Описать обогащение либо явно указать, что оно не применяется.",
-      "affected_sections": [
-        "Шаг 2. Обогащение данных"
-      ],
-      "injected_change": "Раздел обогащения оставлен без алгоритма и без явного «не применимо»."
+      "difficulty": "high",
+      "evidence_quote": "TBD после согласования выходного расчета.",
+      "title": "Обязательные этапы заменены TBD",
+      "problem": "Обогащение и целевая трансформация сохранены формально, но не описаны и не отмечены как неприменимые."
     },
     {
-      "instance_id": "case_019-E02",
-      "mutation_id": "D06_MISSING_KAFKA_CLUSTER",
-      "error_type_id": "D06",
+      "error_type_id": "D01",
       "source_type": 1,
-      "difficulty": "low",
-      "evidence_quote": "Kafka; кластер не указан",
-      "evidence_relation": "at",
-      "title": "Не указан Kafka-кластер",
-      "problem": "Для одного Kafka-источника удалено имя кластера.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Указать точное имя Kafka-кластера.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного Kafka-источника удалено имя кластера."
+      "difficulty": "medium",
+      "evidence_quote": "JSON; схема и версия не указаны",
+      "title": "Неполная спецификация сериализации",
+      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
     },
     {
-      "instance_id": "case_019-E03",
-      "mutation_id": "U18_VAGUE_ACCEPTANCE",
-      "error_type_id": "U18",
-      "source_type": 3,
-      "difficulty": "low",
-      "evidence_quote": "Дополнительная метрика: качество результата должно быть высоким.",
-      "evidence_relation": "at",
-      "title": "Непроверяемый критерий качества",
-      "problem": "Добавлена метрика без формулы, порога и периода измерения.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Задать формулу, измеримый порог, период и источник проверки.",
-      "affected_sections": [
-        "Продуктовые метрики"
-      ],
-      "injected_change": "Добавлена метрика без формулы, порога и периода измерения."
-    },
-    {
-      "instance_id": "case_019-E04",
-      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
       "error_type_id": "U16",
       "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
-      "evidence_relation": "at",
-      "title": "Задано нереализуемое требование задержки",
-      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
-      "affected_sections": [
-        "Нефункциональные требования"
-      ],
-      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
+      "difficulty": "high",
+      "evidence_quote": "Автоматический replay гарантирован для любых периодов за последние 90 суток.",
+      "title": "Горизонт replay превышает retention",
+      "problem": "Документ обещает автоматический пересчет периода, для которого исходные данные уже гарантированно удалены."
     },
     {
-      "instance_id": "case_019-E05",
-      "mutation_id": "U10_CONFLICTING_ZERO_RULES",
+      "error_type_id": "U14",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.",
+      "title": "Не определена семантика повторного запуска",
+      "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк."
+    },
+    {
       "error_type_id": "U10",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.",
-      "evidence_relation": "at",
-      "title": "Конфликтуют правила для нулевого значения",
-      "problem": "Для одного состояния одновременно заданы два разных результата.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить единственный результат и приоритет правил для нуля.",
-      "affected_sections": [
-        "Шаг 3"
-      ],
-      "injected_change": "Для одного состояния одновременно заданы два разных результата."
+      "evidence_quote": "Если score <= 80, установить статус ACCEPT; приоритет при 50..80 не задан.",
+      "title": "Пересекающиеся правила не имеют приоритета",
+      "problem": "Для одной записи могут одновременно сработать две ветки с разными результатами, а порядок применения не определен."
     },
     {
-      "instance_id": "case_019-E06",
-      "mutation_id": "U04_GRAIN_CONTRADICTION",
-      "error_type_id": "U04",
+      "error_type_id": "U09",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.",
-      "evidence_relation": "at",
-      "title": "Противоречиво определена гранулярность",
-      "problem": "Одна строка одновременно названа событием и агрегатом за период.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать одну единицу строки и полный бизнес-ключ.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Одна строка одновременно названа событием и агрегатом за период."
+      "evidence_quote": "Если несколько последних записей имеют одинаковое время, сохраняется любая из них.",
+      "title": "Недетерминирован выбор последней записи",
+      "problem": "При одинаковом времени выбор оставлен произвольным."
     },
     {
-      "instance_id": "case_019-E07",
-      "mutation_id": "T01_RENAME_SOURCES",
       "error_type_id": "T01",
       "source_type": 2,
-      "difficulty": "low",
-      "evidence_quote": "Входные сущности проекта",
-      "evidence_relation": "at",
-      "title": "Нарушен обязательный шаблон",
-      "problem": "Обязательный раздел источников переименован.",
-      "roles": [
-        "Data Analyst",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Вернуть точное название «Источники данных».",
-      "affected_sections": [
-        "Нарушен обязательный шаблон"
-      ],
-      "injected_change": "Обязательный раздел источников переименован."
+      "difficulty": "medium",
+      "evidence_quote": "Выходной контур",
+      "title": "Не распознаются входы и выходы",
+      "problem": "Одновременно переименованы два обязательных раздела шаблона: источники и приемники."
     }
   ]
 }

@@ -1,138 +1,47 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_049",
-  "document_file": "corrupted/case_049.md",
-  "clean_document_id": "clean_10",
-  "clean_document_file": "clean/clean_10.md",
-  "generator_seed": 2026090349,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "06b335a098fb86ebacaceac83db29cd3dcd1e435a0fd58efe8d396ffbb2bedf0",
-  "clean_document_sha256": "bb66c5706e315127f31a0502b906d4e0ecd2e1f63ea196a0f90442d19c34c2f7",
-  "expected_error_count": 5,
-  "counts_by_source_type": {
-    "1": 1,
-    "2": 1,
-    "3": 3
-  },
-  "counts_by_difficulty": {
-    "low": 2,
-    "medium": 3,
-    "high": 0
-  },
-  "counts_by_error_type": {
-    "D01": 1,
-    "T01": 1,
-    "U16": 1,
-    "U17": 1,
-    "U19": 1
-  },
+  "source_clean_document": "clean_10.md",
+  "error_count": 5,
   "errors": [
     {
-      "instance_id": "case_049-E01",
-      "mutation_id": "D01_SIMPLE_SERIALIZATION",
-      "error_type_id": "D01",
+      "error_type_id": "D07",
       "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "JSON; схема и версия не указаны",
-      "evidence_relation": "at",
-      "title": "Неполная спецификация сериализации",
-      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
+      "difficulty": "high",
+      "evidence_quote": "Физический путь партиции формируется по внутреннему шаблону, который в документе не приведен.",
+      "title": "Не определены базовый и партиционный пути",
+      "problem": "У приемника отсутствует базовый HDFS-путь, а раздел партиционирования содержит только шаблон без физического адреса."
     },
     {
-      "instance_id": "case_049-E02",
-      "mutation_id": "U19_UNMASKED_SENSITIVE_LOG",
-      "error_type_id": "U19",
-      "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.",
-      "evidence_relation": "at",
-      "title": "Чувствительные данные сохраняются без ограничений",
-      "problem": "Полный payload с идентификаторами разрешено бессрочно писать в журнал.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить маскирование, состав логов, права доступа и срок хранения.",
-      "affected_sections": [
-        "FAQ"
-      ],
-      "injected_change": "Полный payload с идентификаторами разрешено бессрочно писать в журнал."
-    },
-    {
-      "instance_id": "case_049-E03",
-      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
       "error_type_id": "U16",
       "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
-      "evidence_relation": "at",
-      "title": "Задано нереализуемое требование задержки",
-      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
-      "affected_sections": [
-        "Нефункциональные требования"
-      ],
-      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
+      "difficulty": "high",
+      "evidence_quote": "Watermark закрывает расчет только через 30 минут после периода.",
+      "title": "SLA меньше необходимого ожидания данных",
+      "problem": "Результат требуется публиковать раньше закрытия watermark, хотя до watermark он еще может измениться."
     },
     {
-      "instance_id": "case_049-E04",
-      "mutation_id": "U17_DDL_TYPE_CONFLICT",
-      "error_type_id": "U17",
+      "error_type_id": "U19",
       "source_type": 3,
-      "difficulty": "low",
-      "evidence_quote": "FIELD_BIZ_DATE STRING NOT NULL,",
-      "evidence_relation": "at",
-      "title": "Тип поля расходится с DDL",
-      "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Согласовать тип поля во всех частях документа.",
-      "affected_sections": [
-        "Структура данных",
-        "DDL"
-      ],
-      "injected_change": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры."
+      "difficulty": "high",
+      "evidence_quote": "Чтение таблицы разрешено общей корпоративной роли без согласования цели доступа.",
+      "title": "Сырые идентификаторы публикуются без ограничений",
+      "problem": "Результат содержит прямые идентификаторы, доступ выдан всем сотрудникам, а назначение и маскирование не определены."
     },
     {
-      "instance_id": "case_049-E05",
-      "mutation_id": "T01_RENAME_FLOW",
+      "error_type_id": "U12",
+      "source_type": 3,
+      "difficulty": "medium",
+      "evidence_quote": "Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.",
+      "title": "Не определены единицы числовых полей",
+      "problem": "Единицы значимых показателей переданы на усмотрение потребителя."
+    },
+    {
       "error_type_id": "T01",
       "source_type": 2,
       "difficulty": "low",
-      "evidence_quote": "Общая архитектура",
-      "evidence_relation": "at",
+      "evidence_quote": "Входные сущности проекта",
       "title": "Нарушен обязательный шаблон",
-      "problem": "Обязательный раздел схемы потока переименован.",
-      "roles": [
-        "Data Analyst",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Вернуть точное название «Схема потоков данных».",
-      "affected_sections": [
-        "Нарушен обязательный шаблон"
-      ],
-      "injected_change": "Обязательный раздел схемы потока переименован."
+      "problem": "Обязательный раздел источников переименован."
     }
   ]
 }

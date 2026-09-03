@@ -2,11 +2,11 @@
 
 | **Общие сведения** | Поток персонализированных технических алертов о деградации качества завершённых мобильных data-сессий. Одна выходная запись соответствует одной уникальной сессии, нарушившей хотя бы один применимый порог QoE. |
 | :--- | :--- |
-| **Решаемая проблема** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |
-| **Продуктовые метрики** | P95 end-to-end задержки от `session_end_ts` до публикации < 90 секунд; не менее 99,8% валидных событий обработано; 0 дублей `(FIELD_ALERT_ID, source_revision)` среди committed сообщений и один текущий key в materialized state потребителя; доля алертов с `UNKNOWN`-регионом < 0,2%. Окно измерения — календарные сутки UTC. |
+| **Решаемая проблема** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. |
+| **Продуктовые метрики** | P95 end-to-end задержки от `session_end_ts` до публикации < 90 секунд; не менее 99,8% валидных событий обработано; 0 дублей `(FIELD_ALERT_ID, source_revision)` среди committed сообщений и один текущий key в materialized state потребителя; доля алертов с `UNKNOWN`-регионом < 0,2%. Окно измерения — календарные сутки UTC. Финальный результат публикуется не позднее чем через 2 минуты. |
 | **Заказчики** | Продукт «Проактивная забота», центр качества мобильной сети. |
-| **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. |
-| **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. |
+| **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. Watermark закрывает расчет только через 30 минут после периода. |
+| **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
 | **Data Catalog** | [Продукт QoE Degradation Alert](https://datacatalog.corp.mts.ru/products/qoe-degradation-alert) |
 | **Исходники проекта** | [GitLab: realtime/qoe-degradation-alert](https://gitlab.corp.mts.ru/bigdata/realtime/qoe-degradation-alert) |
 | **Команда** | Дмитрий Агапов — аналитик; Виктория Белова — разработчик; Роман Фомин — QA; Наталья Егорова — Product Owner. |
@@ -16,20 +16,20 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_DATA_SESSION_END_V3` | Kafka, кластер `kafka-dpi-prod-03` | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | JSON; схема и версия не указаны |
+| `TOPIC_DATA_SESSION_END_V3` | Kafka; конкретный кластер не зафиксирован | Карточка каталога не указана | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID. Kafka key — UTF-8 `session_id`; payload содержит `operation=UPSERT\|DELETE` и монотонный `source_revision`, DELETE несёт key-поля без QoE-показателей. |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| Корпоративный справочник | Ссылка отсутствует | Используется актуальная версия с необходимыми полями |
 | `CFG_QOE.QOE_THRESHOLD_SCD` | [Data Catalog: QOE_THRESHOLD_SCD](https://datacatalog.corp.mts.ru/tables/CFG_QOE/QOE_THRESHOLD_SCD) | PostgreSQL `ref-qoe-prod-01`, модель 4.2; Flink JDBC lookup по версии, сохранённой в checkpoint. Пороги по `(network_tech, region_code)`; `region_code='*'` — обязательный global fallback. UTC-интервалы `[valid_from_ts, valid_to_ts)`. |
 
-### Приемники данных
+### Итоговые объекты проекта
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_QOE_DEGRADATION_V1` | Kafka, кластер `kafka-care-prod-01` | [Data Catalog: TOPIC_QOE_DEGRADATION_V1](https://datacatalog.corp.mts.ru/kafka/kafka-care-prod-01/TOPIC_QOE_DEGRADATION_V1) | Для upsert: Protocol Buffers message `mts.care.qoe.v1.DegradationAlert`, descriptor `qoe-alert-v1.desc`, версия 1.2, Schema Registry subject `TOPIC_QOE_DEGRADATION_V1-value`, compatibility `BACKWARD_TRANSITIVE`, Confluent framing по schema ID 18427. Для retract: Kafka tombstone с тем же UTF-8 key `alert_id` и null value; это часть версии 1.2. |
+| `TOPIC_QOE_DEGRADATION_V1` | Kafka, кластер `kafka-care-prod-01` | Карточка каталога не указана для результата | Для upsert: Protocol Buffers message `mts.care.qoe.v1.DegradationAlert`, descriptor `qoe-alert-v1.desc`, версия 1.2, Schema Registry subject `TOPIC_QOE_DEGRADATION_V1-value`, compatibility `BACKWARD_TRANSITIVE`, Confluent framing по schema ID 18427. Для retract: Kafka tombstone с тем же UTF-8 key `alert_id` и null value; это часть версии 1.2. |
 
 ### Схема потоков данных
 
@@ -39,15 +39,36 @@
 
 ### Алгоритм обработки потока
 
+Гранулярность дополнительно включает канал поступления source_channel.
+
+Во всех расчетах используются только активные записи источников.
+
 Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
 
 Время события — `session_end_ts`, epoch milliseconds UTC. Processing time используется только для SLA и `FIELD_PROC_TS`. Watermark: максимальный наблюдаемый `session_end_ts` минус 15 минут.
 
 #### Шаг 1. Фильтрация данных
 
-Дополнительно учитываются события только за последние 7 дней.
+Сначала принять успешно декодированные change records с `operation IN ('UPSERT','DELETE')`, `session_id` по regex `^[A-Za-z0-9-]{16,64}$` и `source_revision >= 1`. Дедуплицировать по `session_id`: выбрать максимальный `source_revision`, затем максимальные `(kafka_partition, kafka_offset)`. Две записи с одинаковыми `session_id`, revision и разным payload блокируют Kafka-транзакцию. Winning `DELETE` формирует retract: null value по вычисленному из key `FIELD_ALERT_ID` и удаляет сохранённое состояние.
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Для winning `UPSERT` валидировать все условия:
+
+```text
+event_type = SESSION_END
+operation = UPSERT
+subscriber_segment = RETAIL
+is_test = false
+network_tech IN {LTE, NR}
+subscriber_token matches ^[0-9a-f]{64}$
+cell_id > 0
+session_start_ts <= session_end_ts
+session_end_ts <= processing_time + 2 minutes
+avg_throughput_kbps >= 0
+p95_rtt_ms BETWEEN 0 AND 60000
+packet_loss_pct BETWEEN 0.000 AND 100.000
+```
+
+Десериализационная ошибка, неизвестная schema ID, невалидная identity/revision или нарушение QoE-поля исключает запись до бизнес-логики и увеличивает отдельный счётчик причины; ранее опубликованное состояние при невалидной correction остаётся прежним до исправления источника. Валидный UPSERT, не прошедший только scope-условия `event_type`, `subscriber_segment`, `is_test` или `network_tech`, формирует retract ранее созданного key. Payload и subscriber token в журнал не пишутся. Пустой поток является штатным и не создаёт выходов. Недоступность Kafka или Schema Registry останавливает job и не продвигает committed offsets.
 
 #### Шаг 2. Обогащение данных
 
@@ -72,6 +93,8 @@
 
 #### Шаг 3. Классификация и формирование результата
 
+Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
+
 Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.
 
 Проверки порога выполняются без предварительного округления:
@@ -90,9 +113,9 @@
 
 Flink использует checkpoint 30 секунд, Kafka source offsets и Kafka sink transaction в одном checkpoint barrier. Transaction timeout — 15 минут. После сбоя незакоммиченная транзакция abort, job восстанавливает state и offsets; детерминированный ID, revision и Kafka key обеспечивают идемпотентный upsert/retract у потребителя. При недоступности справочника, порогов или sink offsets не коммитятся. Изменение уже использованного порога не пересчитывает историю автоматически; backfill периода запускается по версии конфигурации, явно заданной в заявке, и публикует upsert либо retract для каждого затронутого key.
 
-### Технические параметры размещения
+### Формирование ключа (kafka) / партиции (hdfs)
 
-При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
+При построении бизнес-ключа source_channel намеренно не учитывается.
 
 - Входной Kafka key: `session_id` UTF-8.
 - Выходной Kafka key: `FIELD_ALERT_ID` UTF-8; 96 partitions, partitioner `murmur2` стандартного Kafka producer. Порядок upsert/retract гарантирован только для одной сессии/ключа; null value означает удаление текущего состояния.
@@ -100,8 +123,6 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 - HDFS не используется: HDFS-партиция и путь — `не применимо`.
 
 ### Структура данных
-
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
 
 Ниже описан non-null upsert payload. Retract имеет только обязательный Kafka key `FIELD_ALERT_ID` и null value, поэтому nullability полей payload к нему не применяется.
 
@@ -143,7 +164,7 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 
 ```sql
 CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (
-    FIELD_ALERT_ID BIGINT NOT NULL,
+    FIELD_ALERT_ID STRING NOT NULL,
     FIELD_EVENT_TS TIMESTAMP_LTZ(3) NOT NULL,
     FIELD_EVENT_DATE DATE NOT NULL,
     FIELD_SUBSCRIBER_TOKEN STRING NOT NULL,
@@ -174,6 +195,8 @@ CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (
 Перед отправкой проверяются формат обоих токенов, enum, диапазоны метрик, непустой уникальный массив причин и соответствие класса формуле. Потребитель проверяет protobuf schema ID и выполняет upsert по Kafka key; порядок разных ключей не гарантируется.
 
 ### FAQ
+
+Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
 
 **Почему нормальная сессия отсутствует?** Поток содержит только нарушения; отсутствие записи не означает отсутствие исходной сессии.
 

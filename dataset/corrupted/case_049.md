@@ -3,20 +3,20 @@
 | **Общие сведения** | Почасовая витрина финальных исходов SMS. Одна строка описывает сообщения, получившие финальный статус в одном UTC-часе, для региона маршрута, направления и канала трафика. |
 | :--- | :--- |
 | **Решаемая проблема** | NOC и продукт Messaging должны одинаково считать доставку SMS и быстро находить деградации маршрутов. Включаются финальные статусы `DELIVERED`, `FAILED`, `EXPIRED`; промежуточные статусы, содержимое SMS и тестовый трафик исключаются. |
-| **Продуктовые метрики** | Полнота принятых финальных сообщений — 100%; час опубликован не позднее H+31 минуты; уникальность `message_id` до агрегации — 100%; `FIELD_DELIVERY_RATE_PCT` воспроизводится из счётчиков без расхождения. |
+| **Продуктовые метрики** | Полнота принятых финальных сообщений — 100%; час опубликован не позднее H+31 минуты; уникальность `message_id` до агрегации — 100%; `FIELD_DELIVERY_RATE_PCT` воспроизводится из счётчиков без расхождения. Финальный результат публикуется не позднее чем через 2 минуты. |
 | **Заказчики** | Центр управления Messaging, команда качества цифровых коммуникаций. |
-| **Нефункциональные требования** | До 300 млн сообщений/сутки, пик 25 тыс./с; event-time обработка UTC; первичный SLA H+5 минут, финальный H+31 минута; хранение результата 2 года; безопасный replay Kafka за 14 дней; RTO 60 минут. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
+| **Нефункциональные требования** | До 300 млн сообщений/сутки, пик 25 тыс./с; event-time обработка UTC; первичный SLA H+5 минут, финальный H+31 минута; хранение результата 2 года; безопасный replay Kafka за 14 дней; RTO 60 минут. Watermark закрывает расчет только через 30 минут после периода. |
 | **Системы-источники** | `SMS_STATUS_HUB` — шлюз унифицированных финальных статусов SMSC. |
 | **Data Catalog** | [Продукт SMS Delivery Hourly](https://datacatalog.corp.mts.ru/products/sms-delivery-hourly) |
 | **Исходники проекта** | [GitLab: messaging/sms-delivery-hourly](https://gitlab.corp.mts.ru/bigdata/messaging/sms-delivery-hourly) |
 | **Команда** | Кирилл Зайцев — аналитик; Лилия Фролова — разработчик; Артём Денисов — QA; Оксана Чернова — Product Owner. |
 | **JIRA** | [MSGDATA-4421 — Контроль финальных статусов SMS](https://jira.corp.mts.ru/browse/MSGDATA-4421) |
 
-### Источники данных
+### Входные сущности проекта
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_SMS_FINAL_STATUS_V2` | Kafka, кластер `kafka-messaging-prod-02` | [Data Catalog: TOPIC_SMS_FINAL_STATUS_V2](https://datacatalog.corp.mts.ru/kafka/kafka-messaging-prod-02/TOPIC_SMS_FINAL_STATUS_V2) | JSON; схема и версия не указаны |
+| `TOPIC_SMS_FINAL_STATUS_V2` | Kafka, кластер `kafka-messaging-prod-02` | [Data Catalog: TOPIC_SMS_FINAL_STATUS_V2](https://datacatalog.corp.mts.ru/kafka/kafka-messaging-prod-02/TOPIC_SMS_FINAL_STATUS_V2) | JSON Schema draft 2020-12; schema `mts.messaging.sms-final-status`, версия 2.3, Schema Registry subject `TOPIC_SMS_FINAL_STATUS_V2-value`, compatibility `BACKWARD`; Confluent JSON Schema framing с schema ID, UTF-8, десериализация registry-aware Flink format. Kafka key — UTF-8 `message_id`. Payload содержит `operation=UPSERT\|DELETE` и монотонный `status_revision`; DELETE сохраняет исходный `final_status_ts`. Неизвестные свойства разрешены и игнорируются, обязательные поля задаёт schema. |
 
 ### Источники обогащения данных
 
@@ -28,9 +28,9 @@
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `CDM_MSG.TABLE_SMS_DELIVERY_HOURLY` | HDFS/Iceberg, кластер `hadoop-msg-prod-01`, полный путь `/warehouse/cdm/messaging/sms_delivery_hourly/` | [Data Catalog: TABLE_SMS_DELIVERY_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_MSG/TABLE_SMS_DELIVERY_HOURLY) | Iceberg v2, Parquet `SNAPPY`; Hive Metastore модель версии 1.1; Flink Iceberg sink сериализует row data по field ID и коммитит checkpoint snapshot, Iceberg reader десериализует по snapshot schema. |
+| `CDM_MSG.TABLE_SMS_DELIVERY_HOURLY` | HDFS; базовый каталог будет создан при запуске | [Data Catalog: TABLE_SMS_DELIVERY_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_MSG/TABLE_SMS_DELIVERY_HOURLY) | Iceberg v2, Parquet `SNAPPY`; Hive Metastore модель версии 1.1; Flink Iceberg sink сериализует row data по field ID и коммитит checkpoint snapshot, Iceberg reader десериализует по snapshot schema. |
 
-### Общая архитектура
+### Схема потоков данных
 
 `SMS_STATUS_HUB` → `kafka-messaging-prod-02.TOPIC_SMS_FINAL_STATUS_V2` → Flink `sms-delivery-hourly-v2` → валидация/дедупликация → temporal JOIN маршрута → часовая агрегация → Iceberg `TABLE_SMS_DELIVERY_HOURLY`.
 
@@ -83,11 +83,17 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 ### Формирование ключа (kafka) / партиции (hdfs)
 
+Физический путь партиции формируется по внутреннему шаблону, который в документе не приведен.
+
 - Входной Kafka key: `message_id` UTF-8. Kafka-приёмник отсутствует.
 - HDFS/Iceberg partitions: `days(FIELD_BIZ_DATE)` и identity `FIELD_HOUR_UTC`; полный путь `/warehouse/cdm/messaging/sms_delivery_hourly/`.
 - Внутренняя сортировка: `(FIELD_REGION_CODE, FIELD_DIRECTION, FIELD_TRAFFIC_CHANNEL)`; она не является дополнительной гранулярностью.
 
 ### Структура данных
+
+Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
+
+В результат дополнительно передаются исходные персональные идентификаторы без токенизации.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -124,7 +130,7 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 ```sql
 CREATE TABLE IF NOT EXISTS CDM_MSG.TABLE_SMS_DELIVERY_HOURLY (
-    FIELD_BIZ_DATE STRING NOT NULL,
+    FIELD_BIZ_DATE DATE NOT NULL,
     FIELD_HOUR_UTC TINYINT NOT NULL,
     FIELD_REGION_CODE STRING NOT NULL,
     FIELD_DIRECTION STRING NOT NULL,
@@ -151,7 +157,7 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
+Чтение таблицы разрешено общей корпоративной роли без согласования цели доступа.
 
 **Почему час определяется по финальному статусу, а не отправке?** Продукт мониторит работу контура завершения доставки. Аналитика по часу отправки находится в отдельной витрине и не смешивается с этим SLA.
 

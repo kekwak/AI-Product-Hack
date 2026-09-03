@@ -1,389 +1,135 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_001",
-  "document_file": "corrupted/case_001.md",
-  "clean_document_id": "clean_01",
-  "clean_document_file": "clean/clean_01.md",
-  "generator_seed": 2026090301,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "93cf8fde3d68f81e0edbb148372f12cce9a769779970d3dc086a2cf4b19edcc7",
-  "clean_document_sha256": "c7b2f48bb780e73c26df4432aa513746392e736d364e6dbb84f1706814d3108d",
-  "expected_error_count": 16,
-  "counts_by_source_type": {
-    "1": 5,
-    "2": 1,
-    "3": 10
-  },
-  "counts_by_difficulty": {
-    "low": 6,
-    "medium": 6,
-    "high": 4
-  },
-  "counts_by_error_type": {
-    "D01": 1,
-    "D03": 1,
-    "D05": 1,
-    "D06": 1,
-    "D08": 1,
-    "T01": 1,
-    "U01": 1,
-    "U03": 1,
-    "U05": 1,
-    "U07": 1,
-    "U09": 1,
-    "U12": 1,
-    "U15": 1,
-    "U16": 1,
-    "U17": 1,
-    "U18": 1
-  },
+  "source_clean_document": "clean_01.md",
+  "error_count": 16,
   "errors": [
     {
-      "instance_id": "case_001-E01",
-      "mutation_id": "D05_UNSPECIFIED_ENRICHMENT_STAGE",
-      "error_type_id": "D05",
+      "error_type_id": "T01",
+      "source_type": 2,
+      "difficulty": "high",
+      "evidence_quote": "Журнал документа",
+      "title": "Одновременно нарушены таблица и служебный раздел",
+      "problem": "У таблицы структуры удалена обязательная колонка, а история изменений переименована."
+    },
+    {
+      "error_type_id": "D04",
+      "source_type": 1,
+      "difficulty": "high",
+      "evidence_quote": "Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.",
+      "title": "Не согласованы фильтры расчета и выгрузки",
+      "problem": "Для онлайн-расчета и повторной выгрузки заявлены разные наборы фильтров, но ни один набор не перечислен."
+    },
+    {
+      "error_type_id": "D02",
       "source_type": 1,
       "difficulty": "low",
-      "evidence_quote": "Описание этого этапа будет согласовано после начала разработки.",
-      "evidence_relation": "at",
-      "title": "Этап не заполнен и не отмечен как неприменимый",
-      "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо».",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Описать обогащение либо явно указать, что оно не применяется.",
-      "affected_sections": [
-        "Шаг 2. Обогащение данных"
-      ],
-      "injected_change": "Раздел обогащения оставлен без алгоритма и без явного «не применимо»."
+      "evidence_quote": "Data Catalog: ссылка отсутствует",
+      "title": "Нет прямой ссылки на Data Catalog",
+      "problem": "У одного источника удалена прямая ссылка на карточку каталога."
     },
     {
-      "instance_id": "case_001-E02",
-      "mutation_id": "D01_SIMPLE_SERIALIZATION",
-      "error_type_id": "D01",
-      "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "JSON; схема и версия не указаны",
-      "evidence_relation": "at",
-      "title": "Неполная спецификация сериализации",
-      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
-    },
-    {
-      "instance_id": "case_001-E03",
-      "mutation_id": "D06_MISSING_KAFKA_CLUSTER",
-      "error_type_id": "D06",
+      "error_type_id": "D07",
       "source_type": 1,
       "difficulty": "low",
-      "evidence_quote": "Kafka; кластер не указан",
-      "evidence_relation": "at",
-      "title": "Не указан Kafka-кластер",
-      "problem": "Для одного Kafka-источника удалено имя кластера.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Указать точное имя Kafka-кластера.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного Kafka-источника удалено имя кластера."
+      "evidence_quote": "HDFS; путь не указан",
+      "title": "Не указан полный путь файлового приемника",
+      "problem": "Для одного HDFS-приемника удален полный путь хранения."
     },
     {
-      "instance_id": "case_001-E04",
-      "mutation_id": "D08_UNIDENTIFIED_REFERENCE",
-      "error_type_id": "D08",
-      "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "Ссылка на справочник отсутствует",
-      "evidence_relation": "at",
-      "title": "Не идентифицирован справочник",
-      "problem": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точное имя, ссылку, назначение и версию справочника.",
-      "affected_sections": [
-        "Источники обогащения данных"
-      ],
-      "injected_change": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей."
-    },
-    {
-      "instance_id": "case_001-E05",
-      "mutation_id": "D03_MISSING_NULLABILITY",
       "error_type_id": "D03",
       "source_type": 1,
-      "difficulty": "low",
-      "evidence_quote": "| cell_id | string | Идентификатор LTE-сектора | cell-state | cell_id | string | Часть бизнес-ключа; непустая строка длиной 1–64 |",
-      "evidence_relation": "at",
-      "title": "Не указана обязательность поля",
-      "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать обязательность поля и согласовать ее с алгоритмом.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Для одного целевого поля удален признак NOT NULL/NULLABLE."
+      "difficulty": "high",
+      "evidence_quote": "Идентификатор площадки; обязательность поля `site_id` не определена",
+      "title": "Контракт NULL нарушен системно",
+      "problem": "Обязательность не задана для трех последовательных полей, поэтому поведение отсутствующих значений нельзя проверить."
     },
     {
-      "instance_id": "case_001-E06",
-      "mutation_id": "U05_AMBIGUOUS_MAPPING",
-      "error_type_id": "U05",
+      "error_type_id": "D08",
+      "source_type": 1,
+      "difficulty": "high",
+      "evidence_quote": "Используется актуальная версия с необходимыми полями",
+      "title": "Справочник нельзя однозначно выбрать",
+      "problem": "В карточке обогащения одновременно потеряны идентификатор справочника, ссылка и версия используемого среза."
+    },
+    {
+      "error_type_id": "U08",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "При нескольких совпадениях со справочником в результат передаются все найденные варианты.",
+      "title": "Не определена кардинальность обогащения",
+      "problem": "При нескольких совпадениях сохраняются все строки, что может размножить результат."
+    },
+    {
+      "error_type_id": "U17",
       "source_type": 3,
       "difficulty": "medium",
-      "evidence_quote": "Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.",
-      "evidence_relation": "at",
-      "title": "Неоднозначен маппинг поля",
-      "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точный источник и атрибут каждого целевого поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Разрешено брать значение из любого одноименного атрибута без приоритета."
+      "evidence_quote": "Первая строка считается штатным результатом и должна приниматься без преобразований.",
+      "title": "Пример нарушает контракт поля",
+      "problem": "В пример записано значение за пределами описанного домена, поэтому пример не может быть получен заявленным алгоритмом."
     },
     {
-      "instance_id": "case_001-E07",
-      "mutation_id": "U07_OPEN_TIME_BOUNDARY",
+      "error_type_id": "U02",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Подтвержденная запись — запись, для которой получено не менее двух событий из источника.",
+      "title": "Термин «подтвержденный» определен противоречиво",
+      "problem": "Один термин в разных частях документа означает прохождение проверки и наличие двух событий, что меняет состав результата."
+    },
+    {
+      "error_type_id": "U16",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Автоматический replay гарантирован для любых периодов за последние 90 суток.",
+      "title": "Горизонт replay превышает retention",
+      "problem": "Документ обещает автоматический пересчет периода, для которого исходные данные уже гарантированно удалены."
+    },
+    {
       "error_type_id": "U07",
       "source_type": 3,
       "difficulty": "medium",
       "evidence_quote": "Дополнительно учитываются события только за последние 7 дней.",
-      "evidence_relation": "at",
       "title": "Не определены границы периода",
-      "problem": "Относительный период не задает опорное время и включение граничных значений.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать опорное время и точный полуинтервал отбора.",
-      "affected_sections": [
-        "Шаг 1. Фильтрация данных"
-      ],
-      "injected_change": "Относительный период не задает опорное время и включение граничных значений."
+      "problem": "Относительный период не задает опорное время и включение граничных значений."
     },
     {
-      "instance_id": "case_001-E08",
-      "mutation_id": "U18_VAGUE_ACCEPTANCE",
-      "error_type_id": "U18",
-      "source_type": 3,
-      "difficulty": "low",
-      "evidence_quote": "Дополнительная метрика: качество результата должно быть высоким.",
-      "evidence_relation": "at",
-      "title": "Непроверяемый критерий качества",
-      "problem": "Добавлена метрика без формулы, порога и периода измерения.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Задать формулу, измеримый порог, период и источник проверки.",
-      "affected_sections": [
-        "Продуктовые метрики"
-      ],
-      "injected_change": "Добавлена метрика без формулы, порога и периода измерения."
-    },
-    {
-      "instance_id": "case_001-E09",
-      "mutation_id": "U17_DDL_TYPE_CONFLICT",
-      "error_type_id": "U17",
-      "source_type": 3,
-      "difficulty": "low",
-      "evidence_quote": "cell_id                    BIGINT          NOT NULL,",
-      "evidence_relation": "at",
-      "title": "Тип поля расходится с DDL",
-      "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Согласовать тип поля во всех частях документа.",
-      "affected_sections": [
-        "Структура данных",
-        "DDL"
-      ],
-      "injected_change": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры."
-    },
-    {
-      "instance_id": "case_001-E10",
-      "mutation_id": "U15_UNVERSIONED_SCHEMA_CHANGE",
-      "error_type_id": "U15",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.",
-      "evidence_relation": "at",
-      "title": "Допущено несовместимое изменение схемы",
-      "problem": "Тип поля разрешено менять без новой версии контракта.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить правила версионирования, совместимости и миграции потребителей.",
-      "affected_sections": [
-        "FAQ"
-      ],
-      "injected_change": "Тип поля разрешено менять без новой версии контракта."
-    },
-    {
-      "instance_id": "case_001-E11",
-      "mutation_id": "U12_UNSPECIFIED_UNITS",
       "error_type_id": "U12",
       "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.",
-      "evidence_relation": "at",
-      "title": "Не определены единицы числовых полей",
-      "problem": "Единицы значимых показателей переданы на усмотрение потребителя.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Зафиксировать единицу измерения и преобразование для каждого числового поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Единицы значимых показателей переданы на усмотрение потребителя."
-    },
-    {
-      "instance_id": "case_001-E12",
-      "mutation_id": "U09_NONDETERMINISTIC_LAST",
-      "error_type_id": "U09",
-      "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Если несколько последних записей имеют одинаковое время, сохраняется любая из них.",
-      "evidence_relation": "at",
-      "title": "Недетерминирован выбор последней записи",
-      "problem": "При одинаковом времени выбор оставлен произвольным.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Задать дополнительный уникальный tie-break и полный порядок сортировки.",
-      "affected_sections": [
-        "Шаг 3"
-      ],
-      "injected_change": "При одинаковом времени выбор оставлен произвольным."
+      "evidence_quote": "При NULL status записывается значение UNKNOWN.",
+      "title": "Default не входит в допустимый домен",
+      "problem": "Для отсутствующего значения задан специальный код, который одновременно запрещен перечислением допустимых значений."
     },
     {
-      "instance_id": "case_001-E13",
-      "mutation_id": "U03_CONFLICTING_SOURCES",
       "error_type_id": "U03",
       "source_type": 3,
       "difficulty": "high",
       "evidence_quote": "При расхождении значений между источниками допускается использовать значение любого из них.",
-      "evidence_relation": "at",
       "title": "Не задан источник истины",
-      "problem": "При конфликте источников разрешен произвольный выбор.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Назначить авторитетный источник и детерминированное правило разрешения конфликтов.",
-      "affected_sections": [
-        "Системы-источники"
-      ],
-      "injected_change": "При конфликте источников разрешен произвольный выбор."
+      "problem": "При конфликте источников разрешен произвольный выбор."
     },
     {
-      "instance_id": "case_001-E14",
-      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
-      "error_type_id": "U16",
-      "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
-      "evidence_relation": "at",
-      "title": "Задано нереализуемое требование задержки",
-      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
-      "affected_sections": [
-        "Нефункциональные требования"
-      ],
-      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
-    },
-    {
-      "instance_id": "case_001-E15",
-      "mutation_id": "U01_SCOPE_OUTPUT_GAP",
-      "error_type_id": "U01",
+      "error_type_id": "U09",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Результат также должен обеспечивать прогноз значений на следующие 30 дней.",
-      "evidence_relation": "at",
-      "title": "Заявленный результат не обеспечен контрактом",
-      "problem": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить, входит ли прогноз в скоуп, и описать его выход и расчет либо исключить обещание.",
-      "affected_sections": [
-        "Решаемая проблема"
-      ],
-      "injected_change": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме."
+      "evidence_quote": "Затем для каждого ключа выбирается запись с максимальной revision.",
+      "title": "DISTINCT уничтожает порядок ревизий",
+      "problem": "До выбора последней ревизии удаляются различающиеся версии, после чего победителя предлагается выбирать по уже потерянному полю."
     },
     {
-      "instance_id": "case_001-E16",
-      "mutation_id": "T01_RENAME_SOURCES",
-      "error_type_id": "T01",
-      "source_type": 2,
-      "difficulty": "low",
-      "evidence_quote": "Входные сущности проекта",
-      "evidence_relation": "at",
-      "title": "Нарушен обязательный шаблон",
-      "problem": "Обязательный раздел источников переименован.",
-      "roles": [
-        "Data Analyst",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Вернуть точное название «Источники данных».",
-      "affected_sections": [
-        "Нарушен обязательный шаблон"
-      ],
-      "injected_change": "Обязательный раздел источников переименован."
+      "error_type_id": "U15",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.",
+      "title": "Допущено несовместимое изменение схемы",
+      "problem": "Тип поля разрешено менять без новой версии контракта."
+    },
+    {
+      "error_type_id": "U10",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.",
+      "title": "Конфликтуют правила для нулевого значения",
+      "problem": "Для одного состояния одновременно заданы два разных результата."
     }
   ]
 }

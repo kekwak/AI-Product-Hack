@@ -1,24 +1,6 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_009",
-  "document_file": "corrupted/case_009.md",
-  "clean_document_id": "clean_02",
-  "clean_document_file": "clean/clean_02.md",
-  "generator_seed": 2026090309,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "352920bcce50c7e426dbdc7fc5fbe1c3d597b6219a0c6fa559f5af438de0271b",
-  "clean_document_sha256": "352920bcce50c7e426dbdc7fc5fbe1c3d597b6219a0c6fa559f5af438de0271b",
-  "expected_error_count": 0,
-  "counts_by_source_type": {
-    "1": 0,
-    "2": 0,
-    "3": 0
-  },
-  "counts_by_difficulty": {
-    "low": 0,
-    "medium": 0,
-    "high": 0
-  },
-  "counts_by_error_type": {},
+  "source_clean_document": "clean_02.md",
+  "error_count": 0,
   "errors": []
 }

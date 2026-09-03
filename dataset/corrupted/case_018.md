@@ -6,7 +6,7 @@
 | **Продуктовые метрики** | 1) Почасовые p95 и max утилизации доступны к 20-й минуте следующего часа. 2) Доля строк без пробела измерений (`has_sample_gap=false`) — не менее 98% в сутки. 3) Для планирования доступны 400 дней истории. |
 | **Заказчики** | Дирекция транспортной сети; команда Capacity Planning. |
 | **Нефункциональные требования** | Вход — до 20 млн измерений за 5 минут, пик 90 000 событий/с. Event time — UTC; watermark — 15 минут. Kafka retention — 96 часов, HDFS retention — 400 дней. Допустимое время пересчета суток — 2 часа. Публикация партиции атомарна; повтор не должен создавать дубли. |
-| **Системы-источники** | `IPMPLS_TELEMETRY_COLLECTOR` — унифицированные SNMP/gNMI-счетчики интерфейсов маршрутизаторов. При расхождении значений между источниками допускается использовать значение любого из них. |
+| **Системы-источники** | `IPMPLS_TELEMETRY_COLLECTOR` — унифицированные SNMP/gNMI-счетчики интерфейсов маршрутизаторов. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
 | **Data Catalog** | [Карточка NET_TRANSPORT_LINK_HOUR](https://datacatalog.mts.ru/data-products/net-transport-link-hour) |
 | **Исходники проекта** | [GitLab: transport-link-hour](https://gitlab.mts.ru/bigdata/transport/transport-link-hour) |
 | **Команда** | Роман Зайцев — аналитик; Алина Тихонова — разработчик; Денис Крылов — QA. |
@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Накопительные счетчики интерфейса, topic `net.transport.interface-counter.v2`; Kafka key — `device_id\|interface_name` | Kafka, кластер `kafka-transport-prod-01` | Data Catalog: ссылка отсутствует | Apache Avro 1.11, subject `net.transport.interface-counter-value`, schema ID `6304`, версия `5`; Confluent wire format, reader exact schema v5; `rx_octets` и `tx_octets` — unsigned 64-bit в Avro `bytes` с logical type `uint64` |
+| Накопительные счетчики интерфейса, topic `net.transport.interface-counter.v2`; Kafka key — `device_id\|interface_name` | Kafka; конкретный кластер не зафиксирован | [Data Catalog: net.transport.interface-counter.v2](https://datacatalog.mts.ru/topics/net-transport-interface-counter-v2) | Apache Avro 1.11, subject `net.transport.interface-counter-value`, schema ID `6304`, версия `5`; Confluent wire format, reader exact schema v5; `rx_octets` и `tx_octets` — unsigned 64-bit в Avro `bytes` с logical type `uint64` |
 
 ### Источники обогащения данных
 
@@ -25,6 +25,8 @@
 | `DICT_TRANSPORT_LINK_SCD2` | [Data Catalog: DICT_TRANSPORT_LINK_SCD2](https://datacatalog.mts.ru/tables/ref-dict-transport-link-scd2) | Ключ `(device_id, interface_name)` и полуинтервал `[valid_from_utc, valid_to_utc)`. Возвращает `link_id`, `region_code`, `capacity_mbps`, `endpoint_role`, `is_active`. `capacity_mbps > 0`; версии не пересекаются и начинают действие только на границе часа UTC. Snapshot фиксируется для batch. Другие справочники не используются. |
 
 ### Приемники данных
+
+Одна строка приемника является суточным агрегатом объекта.
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -42,7 +44,7 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 
 ### Алгоритм обработки потока
 
-Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+Каждое прошедшее фильтр событие записывается отдельной строкой без агрегации.
 
 `observed_at_utc` — event time в epoch milliseconds UTC. Исходные `rx_octets` и `tx_octets` — накопительные unsigned 64-bit счетчики по интерфейсу. Гранулярность результата — `(link_id, hour_start_utc)`, час является полуинтервалом `[hour_start_utc, hour_start_utc + 1 hour)`.
 
@@ -64,6 +66,8 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 
 #### Шаг 3. Расчет дельт и агрегация
 
+При NULL status записывается значение UNKNOWN.
+
 1. Валидные дедуплицированные source-точки сортируются по `(device_id, interface_name, observed_at_utc, event_id)`. Для текущей точки с `is_active=true` и `endpoint_role='PRIMARY'` берется непосредственно предыдущая source-точка того же интерфейса, включая точку из предыдущего часа. Предыдущая точка нужна только как значение счетчика и не обязана иметь роль PRIMARY; это исключает искусственный разрыв при смене роли на границе часа.
 2. Интервал допустим, если `240 <= interval_sec <= 420`. Иначе дельта не строится и увеличивается `invalid_intervals_total{reason='INTERVAL_GAP'}`.
 3. Для каждого счетчика: если `current >= previous`, `delta=current-previous`. Если `current < previous`, `previous > 18446702073709551615` и `current < 42000000000000`, фиксируется одно переполнение и `delta=(18446744073709551616-previous)+current`. Порог 42 000 000 000 000 байт равен максимуму за 420 секунд при физическом пределе 800 Гбит/с. Любое другое уменьшение — сброс устройства; интервал исключается с `COUNTER_RESET`. Несколько переполнений за 420 секунд физически невозможны.
@@ -79,6 +83,8 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 - Полный путь: `/data/prod/transport/link_hour/event_date_utc=YYYY-MM-DD/event_hour_utc=HH/`.
 
 ### Структура данных
+
+Допустимые значения status: ACTIVE и INACTIVE.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |

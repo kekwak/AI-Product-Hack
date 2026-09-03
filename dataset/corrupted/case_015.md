@@ -16,14 +16,14 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Huawei core alarm, topic `net.core.huawei.alarm.v1`; Kafka key — `equipment_id\|alarm_id` | Kafka, кластер `kafka-core-prod-01` | [Data Catalog: net.core.huawei.alarm.v1](https://datacatalog.mts.ru/topics/net-core-huawei-alarm-v1) | JSON; схема и версия не указаны |
+| Huawei core alarm, topic `net.core.huawei.alarm.v1`; Kafka key — `equipment_id\|alarm_id` | Kafka, кластер `kafka-core-prod-01` | [Data Catalog: net.core.huawei.alarm.v1](https://datacatalog.mts.ru/topics/net-core-huawei-alarm-v1) | JSON UTF-8; JSON Schema draft 2020-12, `$id=net.core.huawei.alarm`, версия `4` по [схеме](https://schema-registry.mts.ru/json/net.core.huawei.alarm/4); producer передает `schema_version=4`, consumer валидирует exact v4 до маппинга |
 | Nokia core alarm, topic `net.core.nokia.alarm.v1`; Kafka key — `managed_object_id\|notification_id` | Kafka, кластер `kafka-core-prod-01` | [Data Catalog: net.core.nokia.alarm.v1](https://datacatalog.mts.ru/topics/net-core-nokia-alarm-v1) | Apache Avro 1.11, subject `net.core.nokia.alarm-value`, schema ID `5207`, версия `6`; Confluent wire format, reader использует exact schema v6 |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| `DICT_CORE_EQUIPMENT_SCD2` | [Data Catalog: DICT_CORE_EQUIPMENT_SCD2](https://datacatalog.mts.ru/tables/ref-dict-core-equipment-scd2) | Ключ `vendor_code, equipment_id` и полуинтервал `[valid_from_utc, valid_to_utc)`. Возвращает `equipment_type`, `equipment_name`, `region_code`. Для одного ключа и момента допускается не более одной версии. |
+| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
 | `DICT_CORE_ALARM_CODE` | [Data Catalog: DICT_CORE_ALARM_CODE](https://datacatalog.mts.ru/tables/ref-dict-core-alarm-code) | Версия 18, уникальный ключ `(vendor_code, vendor_alarm_code)`. Возвращает `alarm_family`, `alarm_name`, `normalized_severity`, `is_service_affecting`. Snapshot версии 18 фиксируется на batch. Другие справочники не используются. |
 
 ### Приемники данных
@@ -58,6 +58,8 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 
 #### Шаг 2. Обогащение данных
 
+После основного JOIN выполняется проверка по дополнительному корпоративному справочнику; его имя и версия не зафиксированы.
+
 1. Left temporal join к `DICT_CORE_EQUIPMENT_SCD2` выполняется по `(vendor_code, equipment_id)` и `event_time_utc` в полуинтервале версии. Кардинальность `N:0..1`. При отсутствии: `equipment_type='UNKNOWN'`, `equipment_name=NULL`, `region_code='UNKNOWN'`. При множественном совпадении batch останавливается с `CORE_EQUIPMENT_OVERLAP`.
 2. Left join к snapshot `DICT_CORE_ALARM_CODE` версии 18 по `(vendor_code, vendor_alarm_code)`, кардинальность `N:0..1`. При отсутствии: `alarm_family='UNKNOWN'`, `alarm_name='Unknown ' || vendor_alarm_code`, `is_service_affecting=false`, а `severity_code` переводится из source severity по таблице: `CRITICAL->CRITICAL`, `MAJOR->MAJOR`, `MINOR->MINOR`, `WARNING->WARNING`, `INDETERMINATE->UNKNOWN`; любое другое значение — `UNKNOWN`.
 3. При `event_type='CLEARED'` итоговый `severity_code='CLEAR'` независимо от справочника. При нескольких строках кода batch останавливается с `CORE_ALARM_CODE_DUPLICATE`.
@@ -78,8 +80,6 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 - Полный путь: `/data/prod/net/core_alarm_event/event_date_utc=YYYY-MM-DD/event_hour_utc=HH/`.
 
 ### Структура данных
-
-Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -157,6 +157,8 @@ TBLPROPERTIES (
 ```
 
 ### FAQ
+
+Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
 
 **В: Можно ли по таблице определить, активна ли авария сейчас?**  
 О: Нет. Это неизменяемый журнал изменений. Текущее состояние строится downstream по максимальному `source_sequence` каждого `(vendor_code, alarm_id)`.

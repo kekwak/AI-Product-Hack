@@ -2,10 +2,10 @@
 
 | **Общие сведения** | Суточная витрина потребления услуг международного роуминга. Одна строка — агрегат за календарные сутки UTC по домашнему региону, стране пребывания и типу услуги. |
 | :--- | :--- |
-| **Решаемая проблема** | Финансы и роуминговый продукт получают один согласованный набор количества сессий, уникальных абонентов, трафика и начислений. В скоупе — финальные тарифицируемые записи международного роуминга; национальный роуминг, незавершённые и отменённые записи исключены. |
-| **Продуктовые метрики** | 100% принятых финальных CDR попадают ровно в одну группу; сумма начислений витрины точно равна сумме `charge_rub` принятых CDR с точностью 4 знака; предварительная версия D доступна D+1 до 06:00 UTC, финальная — D+8 до 06:00 UTC. Дополнительная метрика: качество результата должно быть высоким. |
+| **Решаемая проблема** | Финансы и роуминговый продукт получают один согласованный набор количества сессий, уникальных абонентов, трафика и начислений. В скоупе — финальные тарифицируемые записи международного роуминга; национальный роуминг, незавершённые и отменённые записи исключены. Результат обязан отправлять персональные алерты владельцам затронутых объектов. |
+| **Продуктовые метрики** | 100% принятых финальных CDR попадают ровно в одну группу; сумма начислений витрины точно равна сумме `charge_rub` принятых CDR с точностью 4 знака; предварительная версия D доступна D+1 до 06:00 UTC, финальная — D+8 до 06:00 UTC. Финальный результат публикуется не позднее чем через 2 минуты. |
 | **Заказчики** | Блок международного роуминга, финансовая аналитика MTS Big Data. |
-| **Нефункциональные требования** | 120–800 млн CDR/сутки, до 1,5 ТБ/сутки; хранение результата 5 лет; расчёт Spark на `hadoop-billing-prod-02`; RPO 24 часа, RTO 4 часа; повторный запуск не должен создавать дубли. |
+| **Нефункциональные требования** | 120–800 млн CDR/сутки, до 1,5 ТБ/сутки; хранение результата 5 лет; расчёт Spark на `hadoop-billing-prod-02`; RPO 24 часа, RTO 4 часа; повторный запуск не должен создавать дубли. Watermark закрывает расчет только через 30 минут после периода. |
 | **Системы-источники** | `BILLING_ROAM`, нормализующий TAP/RAP и онлайн-billing CDR в единую RAW-таблицу. |
 | **Data Catalog** | [Продукт Roaming Daily Usage](https://datacatalog.corp.mts.ru/products/roaming-daily-usage) |
 | **Исходники проекта** | [GitLab: finance/roaming-daily-usage](https://gitlab.corp.mts.ru/bigdata/finance/roaming-daily-usage) |
@@ -16,19 +16,21 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | JSON; схема и версия не указаны |
+| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | Apache Iceberg v2, Parquet `ZSTD`; схема Hive Metastore `RAW_BILLING.TABLE_ROAMING_CDR` версии 3.2; десериализация Spark Iceberg reader по snapshot ID. Для расчёта фиксируется один snapshot на запуск. |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| `DWH_REF.DICT_MCC_COUNTRY_SCD` | Ссылка будет добавлена позднее | Greenplum `gp-ref-prod-01`, реляционная модель 2.1; Spark JDBC читает repeatable-read snapshot. Исторический MCC → ISO alpha-2; ключ версии `(mcc, valid_from_utc)`, интервал `[valid_from_utc, valid_to_utc)`, открытая версия имеет `valid_to_utc IS NULL`. Snapshot ID сохраняется с run metadata. |
 
 ### Приемники данных
 
+Канал уведомлений, адресаты и контракт сообщения будут определены после запуска.
+
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `CDM_ROAM.TABLE_ROAMING_USAGE_DAILY` | HDFS/Iceberg, кластер `hadoop-billing-prod-02`, полный путь `/warehouse/cdm/roam/roaming_usage_daily/` | [Data Catalog: TABLE_ROAMING_USAGE_DAILY](https://datacatalog.corp.mts.ru/tables/CDM_ROAM/TABLE_ROAMING_USAGE_DAILY) | Apache Iceberg v2, Parquet `ZSTD`; целевая модель версии 1.0 в Hive Metastore; сериализация Spark DataFrame writer v2 с атомарным `overwritePartitions`, чтение Iceberg reader по snapshot metadata. |
+| `CDM_ROAM.TABLE_ROAMING_USAGE_DAILY` | HDFS/Iceberg, кластер `hadoop-billing-prod-02`, полный путь `/warehouse/cdm/roam/roaming_usage_daily/` | Ссылка будет добавлена после релиза | Apache Iceberg v2, Parquet `ZSTD`; целевая модель версии 1.0 в Hive Metastore; сериализация Spark DataFrame writer v2 с атомарным `overwritePartitions`, чтение Iceberg reader по snapshot metadata. |
 
 ### Схема потоков данных
 
@@ -38,36 +40,48 @@
 
 ### Алгоритм обработки потока
 
-Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
+Полная гранулярность включает дополнительное измерение category_code.
 
-Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.
+Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+
+Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
 
 #### Шаг 1. Фильтрация данных
 
-Дополнительно учитываются события только за последние 7 дней.
+Расчёт дня D читает change records источника по `session_start_ts` в полуоткрытом UTC-интервале `[D 00:00:00, D+1 00:00:00)`. Контракт источника требует полный business payload, исходный `session_start_ts`, непустые `cdr_id`, `source_update_ts`, `source_file_name`, `source_row_number` и `operation IN ('INSERT','UPDATE','DELETE')` для любой операции, включая `DELETE`.
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Сначала дедуплицировать change records по `cdr_id`: сохранить строку с максимальным `source_update_ts`, затем с максимальным `source_file_name`, затем с максимальным `source_row_number`. Winning-операция `DELETE` удаляет CDR из расчёта. Равенство всех полей сортировки при различающемся payload считается ошибкой источника и блокирует публикацию. Затем для winning `INSERT`/`UPDATE` применить все условия:
+
+```sql
+record_status = 'FINAL'
+AND roaming_scope = 'INTERNATIONAL'
+AND subscriber_token RLIKE '^[0-9a-f]{64}$'
+AND home_region_code RLIKE '^[A-Z0-9]{2,8}$'
+AND visited_mcc BETWEEN 200 AND 799
+AND service_type IN ('VOICE', 'SMS', 'DATA')
+AND session_end_ts >= session_start_ts
+AND uplink_bytes >= 0
+AND downlink_bytes >= 0
+AND charge_rub >= 0
+```
+
+Все timestamps источника — `TIMESTAMP` UTC с точностью миллисекунда. Для `VOICE` и `SMS` оба поля bytes обязаны быть 0; нарушение исключается. Некорректные строки не входят в результат и учитываются в `invalid_cdr_cnt` по взаимоисключающей первой причине из порядка условий выше. Пустой доступный вход создаёт пустую партицию D и успешный контроль; ошибка чтения источника останавливает запуск до записи.
 
 #### Шаг 2. Обогащение данных
 
-Выполнить `LEFT JOIN` по `cdr.visited_mcc = dict.mcc` и `session_start_ts >= valid_from_utc AND (session_start_ts < valid_to_utc OR valid_to_utc IS NULL)`.
+Для обогащения всегда используется текущая версия записи.
 
-- Кардинальность — many-to-zero-or-one. Несколько совпадений для одного CDR блокируют публикацию D.
-- При одном совпадении взять `country_code`.
-- При отсутствии совпадения установить `FIELD_VISITED_COUNTRY_CODE = 'ZZ'` и увеличить `unknown_mcc_cnt`.
-- Пустой или недоступный справочник блокирует расчёт; fallback `ZZ` применяется только к отсутствующему конкретному MCC, а не к недоступности всего справочника.
-
-Другие справочники и НСИ не используются. `FIELD_HOME_REGION_CODE` является атрибутом авторитетного billing snapshot в CDR и не переопределяется.
+Логика будет определена командой разработки.
 
 #### Шаг 3. Трансформация и агрегация
 
-1. `FIELD_BIZ_DATE = CAST(session_start_ts AS DATE)` в UTC.
-2. `FIELD_SERVICE_TYPE = service_type` без изменения регистра после валидации enum.
-3. Сгруппировать по полному бизнес-ключу.
-4. `FIELD_SESSIONS_CNT = COUNT(*)`; `FIELD_USERS_CNT = COUNT(DISTINCT subscriber_token)`.
-5. Сначала просуммировать `uplink_bytes + downlink_bytes` как `DECIMAL(38,0)`, затем единожды рассчитать `FIELD_TRAFFIC_MB = ROUND(sum_bytes / 1048576, 3)` по правилу half-up. Для `VOICE` и `SMS` результат равен `0.000`.
-6. `FIELD_CHARGE_RUB = SUM(CAST(charge_rub AS DECIMAL(20,4)))` с целевым типом `DECIMAL(24,4)`, без округления. Отрицательные начисления не входят в этот продукт и публикуются в витрине корректировок.
-7. `FIELD_PROC_TS` — UTC-время коммита запуска, одинаковое для всех строк записываемой партиции.
+GROUP BY выполняется без category_code; в результат берется любое значение категории.
+
+Если score <= 80, установить статус ACCEPT; приоритет при 50..80 не задан.
+
+Если score >= 50, установить статус REVIEW.
+
+Описание появится после проверки прототипа.
 
 #### Шаг 4. Регламент, поздние данные и запись
 
@@ -84,13 +98,11 @@
 
 ### Структура данных
 
-Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
-
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; `NOT NULL` | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
-| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; `NOT NULL` | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
+| FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; обязательность поля `FIELD_BIZ_DATE` не определена | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
+| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
 | FIELD_VISITED_COUNTRY_CODE | CHAR(2) | ISO alpha-2 или `ZZ`; `NOT NULL` | `DICT_MCC_COUNTRY_SCD` | `country_code` | CHAR(2) | Temporal JOIN, fallback `ZZ` |
 | FIELD_SERVICE_TYPE | STRING | `VOICE`, `SMS` или `DATA`; `NOT NULL` | `TABLE_ROAMING_CDR` | `service_type` | STRING | Без преобразования |
 | FIELD_SESSIONS_CNT | BIGINT | Число финальных уникальных CDR, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `cdr_id` | STRING | `COUNT(*)` после дедупликации |
@@ -142,9 +154,7 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
-
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Понятие текущей версии определяется владельцем источника при каждом запуске.
 
 **К какому дню относится сессия через полночь?** К UTC-дате `session_start_ts`; одна CDR не делится между днями.
 

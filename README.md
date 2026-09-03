@@ -9,7 +9,6 @@
 .
 ├── src/
 │   ├── generate_dataset.py
-│   ├── validate_dataset.py
 │   ├── evaluate_predictions.py
 │   └── paths.py
 ├── dataset/
@@ -18,6 +17,8 @@
 │   ├── error_catalog.json
 │   └── manifest.json
 ├── tests/
+│   ├── test_dataset.py
+│   └── test_judge.py
 ├── examples/predictions/
 ├── docs/
 └── case/                 # исходные материалы кейсодателя

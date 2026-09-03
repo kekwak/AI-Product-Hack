@@ -21,13 +21,13 @@ CLI `evaluate-predictions` сопоставляет предсказания м�
 
 ## Правило матчинга
 
-Код применяет жесткие ограничения:
+Код до вызова LLM применяет жесткие ограничения:
 
 - `error_type_id` должен совпасть;
 - `evidence_quote` предсказания должна встречаться в документе ровно один раз;
 - matching строго one-to-one: одно предсказание не закрывает несколько ошибок, дубликаты становятся `FP`.
 
-После этого LLM-судья определяет, совпадают ли место, корневая причина и смысл `title/problem`. Частичного балла нет. Итоговые счетчики вычисляет код, а не модель.
+В LLM передаются только оставшиеся кандидаты одинакового типа. Судья сопоставляет место и корневую причину по `title`, `problem`, цитате и небольшому контексту. Он возвращает только пары индексов; `TP/FP/FN` считает код.
 
 ## Запуск
 
@@ -54,7 +54,7 @@ uv run evaluate-predictions \
 
 Для калибровки удобно начать с `--case case_001` или `--limit 3`. Ответы судьи кэшируются рядом с отчетом; `--no-cache` принудительно вызывает модель заново.
 
-Модель должна поддерживать structured outputs. Скрипт использует OpenRouter Chat Completions, строгую JSON Schema и `provider.require_parameters=true`. См. [OpenRouter Quickstart](https://openrouter.ai/docs/quickstart) и [Structured Outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
+Модель должна поддерживать structured outputs. Скрипт использует [`ChatOpenRouter`](https://docs.langchain.com/oss/python/integrations/chat/openrouter) из `langchain-openrouter`, Pydantic-схему и `provider.require_parameters=true`.
 
 Во внешний API отправляются четыре поля находки и небольшой контекст вокруг цитаты, а не полный документ. Для чувствительных ТЗ нужна разрешенная корпоративная конфигурация OpenRouter либо замена клиента на локальный совместимый endpoint.
 
@@ -66,7 +66,7 @@ uv run evaluate-predictions \
 - exact accuracy по документам;
 - метрики по каждому `error_type_id`;
 - число API-вызовов, токены и стоимость, возвращенную OpenRouter;
-- для каждого кейса: подтвержденные пары с объяснением судьи, все `FP`, все `FN` и технический audit вызова OpenRouter.
+- для каждого кейса: подтвержденные пары, все `FP`, все `FN` и технический audit вызова OpenRouter.
 
 ## Локальные тесты
 

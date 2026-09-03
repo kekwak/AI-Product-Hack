@@ -2,21 +2,21 @@
 
 | **Общие сведения** | Часовая витрина открытых аварий базовых станций. Одна строка содержит число уникальных аварий и затронутых сот сектора сети за один час UTC в разрезе региона, площадки, вендора, серьёзности и кода аварии. |
 | :--- | :--- |
-| **Решаемая проблема** | Единый проверяемый источник для оперативного мониторинга массовых аварий RAN и расчёта нагрузки региональных дежурных смен. В расчёт входят только события открытия аварии штатных площадок мобильной сети; тестовые и отменённые события не входят. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |
-| **Продуктовые метрики** | Доля валидных событий, доступных в витрине не позднее 10 минут после конца часа, не менее 99,5%; расхождение `FIELD_ALARMS_CNT` с принятыми уникальными событиями источника — 0; доля событий без найденной площадки — не более 0,1%. Метрики считаются за календарные сутки UTC. Дополнительная метрика: качество результата должно быть высоким. |
+| **Решаемая проблема** | Единый проверяемый источник для оперативного мониторинга массовых аварий RAN и расчёта нагрузки региональных дежурных смен. В расчёт входят только события открытия аварии штатных площадок мобильной сети; тестовые и отменённые события не входят. Пользователь должен видеть полную историю каждого изменения результата. |
+| **Продуктовые метрики** | Доля валидных событий, доступных в витрине не позднее 10 минут после конца часа, не менее 99,5%; расхождение `FIELD_ALARMS_CNT` с принятыми уникальными событиями источника — 0; доля событий без найденной площадки — не более 0,1%. Метрики считаются за календарные сутки UTC. |
 | **Заказчики** | Центр управления сетью MTS Big Data, дирекция эксплуатации RAN. |
 | **Нефункциональные требования** | До 18 млн входных событий в сутки и 35 тыс. событий/с; расчёт по event time; первичная публикация часа — H+10 минут, финализация — H+2 часа 10 минут; Kafka retention источника — 35 дней, хранение витрины — 400 дней; доступность — 99,9% в месяц; часовая партиция должна допускать безопасный повторный расчёт. |
-| **Системы-источники** | Платформа `RAN_FAULT_HUB`, публикующая унифицированные события открытия и закрытия аварий 2G/3G/4G/5G. |
+| **Системы-источники** | Платформа `RAN_FAULT_HUB`, публикующая унифицированные события открытия и закрытия аварий 2G/3G/4G/5G. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
 | **Data Catalog** | [Карточка продукта RAN Alarm Hourly](https://datacatalog.corp.mts.ru/products/net-ran-alarm-hourly) |
 | **Исходники проекта** | [GitLab: net/ran-alarm-hourly](https://gitlab.corp.mts.ru/bigdata/net/ran-alarm-hourly) |
 | **Команда** | Анна Лебедева — аналитик; Сергей Котов — разработчик; Мария Волкова — QA; Илья Орлов — Product Owner. |
 | **JIRA** | [NETDATA-6412 — Часовая витрина аварий RAN](https://jira.corp.mts.ru/browse/NETDATA-6412) |
 
-### Источники данных
+### Входной контур
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_RAN_ALARM_V2`, полные имена топика одинаковы во всех регионах; регион содержится в payload | Kafka, кластер `kafka-net-prod-01` | Data Catalog: ссылка отсутствует | Apache Avro; схема `com.mts.net.ran.AlarmEvent`, Schema Registry subject `TOPIC_RAN_ALARM_V2-value`, версия 7, backward-compatible; Confluent wire format с magic byte и schema ID, десериализация по schema ID из `schema-registry-net-prod-01`. Ключ — UTF-8 string `alarm_id`. |
+| `TOPIC_RAN_ALARM_V2`, полные имена топика одинаковы во всех регионах; регион содержится в payload | Kafka; конкретный кластер не зафиксирован | [Data Catalog: TOPIC_RAN_ALARM_V2](https://datacatalog.corp.mts.ru/kafka/kafka-net-prod-01/TOPIC_RAN_ALARM_V2) | Apache Avro; схема `com.mts.net.ran.AlarmEvent`, Schema Registry subject `TOPIC_RAN_ALARM_V2-value`, версия 7, backward-compatible; Confluent wire format с magic byte и schema ID, десериализация по schema ID из `schema-registry-net-prod-01`. Ключ — UTF-8 string `alarm_id`. |
 
 ### Источники обогащения данных
 
@@ -24,13 +24,17 @@
 | :--- | :--- | :--- |
 | `DWH_REF.DICT_RAN_SITE_SCD`, версия данных на момент `event_ts` | [Data Catalog: DICT_RAN_SITE_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_RAN_SITE_SCD) | Greenplum `gp-ref-prod-01`, реляционная модель 4.0; чтение Spark JDBC в repeatable-read snapshot, типы декодируются PostgreSQL driver 42.7. SCD2-ключ `(site_id, valid_from_utc)`; интервалы `[valid_from_utc, valid_to_utc)`, `valid_to_utc IS NULL` означает бесконечность. Содержит `region_code`, `vendor_name`, `is_test_site`. |
 
-### Приемники данных
+### Выходной контур
+
+В приемнике сохраняется только последняя опубликованная версия без журнала изменений.
+
+Одна строка приемника является суточным агрегатом объекта.
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `CDM_NET.TABLE_RAN_ALARM_HOURLY` | HDFS; путь не указан | [Data Catalog: TABLE_RAN_ALARM_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_NET/TABLE_RAN_ALARM_HOURLY) | Apache Iceberg v2, файлы Parquet с `SNAPPY`; схема `CDM_NET.TABLE_RAN_ALARM_HOURLY` версии 1.0 из Hive Metastore `hms-net-prod-01`; запись Spark DataFrame writer v2 с `overwritePartitions`, чтение Iceberg reader по snapshot metadata. |
+| `CDM_NET.TABLE_RAN_ALARM_HOURLY` | HDFS, кластер `hadoop-net-prod-01`, полный путь `/warehouse/cdm/net/ran_alarm_hourly/` | [Data Catalog: TABLE_RAN_ALARM_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_NET/TABLE_RAN_ALARM_HOURLY) | Apache Iceberg v2, файлы Parquet с `SNAPPY`; схема `CDM_NET.TABLE_RAN_ALARM_HOURLY` версии 1.0 из Hive Metastore `hms-net-prod-01`; запись Spark DataFrame writer v2 с `overwritePartitions`, чтение Iceberg reader по snapshot metadata. |
 
-### Общая архитектура
+### Схема потоков данных
 
 `RAN_FAULT_HUB` → Kafka `kafka-net-prod-01.TOPIC_RAN_ALARM_V2` → Flink job `ran-alarm-normalizer` → дедупликация и SCD2-обогащение → Spark job `ran-alarm-hourly` → Iceberg `CDM_NET.TABLE_RAN_ALARM_HOURLY` в `/warehouse/cdm/net/ran_alarm_hourly/`.
 
@@ -38,9 +42,17 @@
 
 ### Алгоритм обработки потока
 
+Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+
+Каждое прошедшее фильтр событие записывается отдельной строкой без агрегации.
+
 Расчёт использует `event_ts` как время события и `ingest_ts` только для дедупликации и контроля задержки. Все timestamps источника имеют формат epoch milliseconds UTC. Интервал часа полуоткрытый: `[H, H + 1 hour)`.
 
 #### Шаг 1. Фильтрация данных
+
+Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.
+
+Онлайн применяет стандартные фильтры качества, перечень которых хранится в коде.
 
 1. Десериализовать сообщение по schema ID. Сообщение с неизвестной или несовместимой схемой не попадает в витрину; job увеличивает метрику `schema_reject_cnt` и сохраняет Kafka partition и offset в техническом журнале без payload. Null-value Kafka tombstone запрещён append-only контрактом источника и обрабатывается так же, как schema reject.
 2. Среди успешно декодированных записей с непустым `alarm_id` сначала дедуплицировать по `alarm_id`: сохранить запись с максимальным `ingest_ts`; при равенстве — с максимальной парой `(kafka_partition, kafka_offset)`. Исправленная версия источника замещает старую до бизнес-фильтра, поэтому невалидная новая версия не оставляет в результате устаревшую валидную запись.
@@ -55,8 +67,6 @@
 4. После JOIN исключить строки с `is_test_site = true`. Версия справочника выбирается строго на `event_ts`, поэтому последующее изменение атрибутов площадки не меняет историю без явного backfill.
 
 #### Шаг 3. Трансформация и агрегация
-
-Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
 
 1. Получить `FIELD_BIZ_DATE = CAST(event_ts AT TIME ZONE 'UTC' AS DATE)` и `FIELD_HOUR_UTC = EXTRACT(HOUR FROM event_ts AT TIME ZONE 'UTC')` со значениями 0–23.
 2. Сгруппировать по полному бизнес-ключу результата.

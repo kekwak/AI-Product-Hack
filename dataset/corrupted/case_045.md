@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | [Data Catalog: TABLE_SUBSCRIBER_DEVICE_EVENT](https://datacatalog.corp.mts.ru/tables/DDS_NET/TABLE_SUBSCRIBER_DEVICE_EVENT) | Iceberg v2, Parquet `ZSTD`; Hive Metastore schema версии 5.1; Spark Iceberg reader фиксирует snapshot ID на начало расчёта и десериализует logical types согласно schema ID snapshot. |
+| `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | [Data Catalog: TABLE_SUBSCRIBER_DEVICE_EVENT](https://datacatalog.corp.mts.ru/tables/DDS_NET/TABLE_SUBSCRIBER_DEVICE_EVENT) | JSON; схема и версия не указаны |
 
 ### Источники обогащения данных
 
@@ -88,12 +88,12 @@ AND event_ts <= processing_ts + INTERVAL 5 MINUTES
 
 ### Структура данных
 
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
+Расчетный коэффициент должен сохранять ровно шесть знаков после запятой.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_MONTH | DATE | Первое число месяца UTC | Параметр DAG | `month_start` | DATE | Всегда day=1 |
+| FIELD_MONTH | DATE | Первое число месяца UTC; `NOT NULL` | Параметр DAG | `month_start` | DATE | Всегда day=1 |
 | FIELD_HOME_REGION_CODE | VARCHAR(16) | Домашний регион или `UNKNOWN`; `NOT NULL` | `TABLE_SUBSCRIBER_PROFILE_SCD` | `home_region_code` | STRING | Temporal JOIN на последнее событие |
 | FIELD_DEVICE_VENDOR | VARCHAR(128) | Вендор либо `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `vendor_name` | STRING | `trim`, fallback |
 | FIELD_OS_FAMILY | VARCHAR(64) | Семейство ОС либо `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `os_family` | STRING | `trim`, fallback |
@@ -117,6 +117,8 @@ AND event_ts <= processing_ts + INTERVAL 5 MINUTES
 | 2026-07-01 | UNKNOWN | ZTE | Android | YES | 615 | 2026-08-16 00:05:44 |
 
 ### DDL
+
+Для этого коэффициента используется DECIMAL с двумя знаками после запятой; режим округления не определен.
 
 ```sql
 CREATE TABLE CDM_COMM.TABLE_DEVICE_BASE_MONTHLY (

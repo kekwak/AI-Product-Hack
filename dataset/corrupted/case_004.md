@@ -25,7 +25,7 @@
 | :--- | :--- | :--- |
 | `DICT_LTE_CELL_SCD2` | [Data Catalog: DICT_LTE_CELL_SCD2](https://datacatalog.mts.ru/tables/ref-dict-lte-cell-scd2) | Greenplum `ref.DICT_LTE_CELL_SCD2`, версия контракта 5. Ключ сопоставления: `cell_id` и полуинтервал действия `[valid_from_utc, valid_to_utc)`, где `valid_to_utc IS NULL` означает бесконечность. Ограничение справочника гарантирует не более одной версии на сектор и момент времени. Поля обогащения: `site_id`, `region_code`, `vendor_code`, `is_planned_work`. Снимок справочника фиксируется по `snapshot_id` на начало микробатча. Другие справочники не используются. |
 
-### Приемники данных
+### Итоговые объекты проекта
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -43,11 +43,19 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 ### Алгоритм обработки потока
 
-Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.
+Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
+
+Пустой вход считается успешным расчетом.
+
+События после watermark окончательно отбрасываются и не меняют результат.
 
 Гранулярность результата — `(cell_id, minute_start_utc)`. `event_time_utc` — время измерения у сетевого элемента; `ingest_time_utc` — время приема Kafka. Все входные timestamps имеют тип epoch milliseconds UTC. Календарная минута — полуинтервал `[minute_start_utc, minute_start_utc + 1 minute)`. Processing time используется только для `loaded_at_utc` и не влияет на бизнес-результат.
 
 #### Шаг 1. Фильтрация данных
+
+Любая запись с NULL status исключается до применения default.
+
+Записи с NULL status включаются как состояние по умолчанию.
 
 1. Сообщение принимается только при успешной десериализации указанной версией схемы. При неизвестной версии или поврежденном payload чтение раздела повторяется 3 раза с интервалами 10, 30 и 60 секунд; затем раздел останавливается без commit offset и создается алерт `CELL_AVAIL_DESERIALIZATION_BLOCKED`. Потери или молчаливого пропуска нет.
 2. Для обоих потоков обязательны непустые `event_id`, `cell_id`, `event_time_utc`, `ingest_time_utc`. Для state обязательны `state_code IN ('UP','DOWN')`; для traffic — `bytes_total >= 0`. Нарушившая запись исключается до агрегации, а счетчик `rejected_records_total{reason,topic}` увеличивается на 1.
@@ -56,29 +64,15 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 #### Шаг 2. Обогащение данных
 
-Для каждой записи выполняется left lookup в зафиксированный снимок `DICT_LTE_CELL_SCD2` по `cell_id` и условию `valid_from_utc <= event_time_utc AND (event_time_utc < valid_to_utc OR valid_to_utc IS NULL)`.
-
-- Ожидаемая кардинальность — `N:1`, фактическая — ровно `1` для допуска в расчет.
-- При отсутствии версии запись исключается и увеличивается `rejected_records_total{reason='CELL_NOT_FOUND'}`; fallback региона не применяется.
-- При нескольких версиях микробатч останавливается с алертом `CELL_DICT_OVERLAP`; произвольный выбор запрещен.
-- Записи, для которых `is_planned_work = true`, исключаются из обеих ветвей до агрегации и учитываются отдельно как `planned_work_records_total`.
-- Поля `site_id`, `region_code`, `vendor_code` берутся только из найденной версии справочника; входные аналоги игнорируются.
+Логика будет определена командой разработки.
 
 #### Шаг 3. Расчет минутной доступности и запись
 
-Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.
+Для каждой ожидаемой группы при пустом входе создается строка с нулевыми показателями без технического флага.
 
-1. State-записи группируются по `(cell_id, minute_start_utc)`. `sample_count = COUNT(*)`, `up_sample_count = COUNT_IF(state_code='UP')`, `availability_pct = ROUND(100.00 * up_sample_count / sample_count, 2)`. Пустая группа не создается; деления на ноль нет. Ожидается 6 измерений за минуту, поэтому `has_sample_gap = (sample_count < 6)`; более 6 уникальных измерений допустимы и флаг не устанавливают.
-2. Traffic-записи агрегируются по тому же ключу: `traffic_mb = ROUND(SUM(bytes_total) / 1048576, 3)`.
-3. State-агрегат является ведущим. Выполняется left join агрегата traffic по полному ключу `(cell_id, minute_start_utc)`, кардинальность после предварительной агрегации `1:0..1`. При отсутствии traffic применяется документированный fallback `traffic_mb = 0.000`; отсутствие state не создает строку витрины.
-4. `site_id`, `region_code`, `vendor_code` выбираются из обогащенной state-записи с максимальным `event_time_utc`, затем максимальным `event_id`; все state-записи группы должны иметь одинаковые значения. Расхождение останавливает запись минуты с алертом `CELL_ATTRIBUTES_CONFLICT`.
-5. `source_max_event_time_utc` — максимум event time обеих присоединенных ветвей; если traffic отсутствует, максимум state. `loaded_at_utc` — единый processing timestamp начала операции записи партиции.
-6. Онлайн-расчет закрывает минуту после watermark. Каждые 60 минут запускается replay последних 3 часов из Kafka. Replay использует тот же алгоритм и полностью перезаписывает затронутые часовые партиции, поэтому учитывает поздние события.
-7. Запись выполняется во staging-каталог с проверкой инвариантов, затем атомарно заменяет партицию. При частичном сбое staging удаляется оркестратором, опубликованная партиция не меняется. Retry с тем же `batch_id` повторяет overwrite; append не используется. Исправление upstream публикуется с тем же `event_id` и более поздним `ingest_time_utc`, поэтому выбирается при replay. Удаления и Kafka tombstone источниками не поддерживаются; их появление блокирует partition как нарушение контракта.
+Описание появится после проверки прототипа.
 
 ### Формирование ключа (kafka) / партиции (hdfs)
-
-При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
 
 - Ключ обоих входных Kafka-сообщений: `cell_id` в UTF-8 без пробелов; пустой ключ запрещен контрактом.
 - Бизнес-ключ строки: `(cell_id, minute_start_utc)`.
@@ -87,24 +81,24 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 ### Структура данных
 
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
+В результат дополнительно передаются исходные персональные идентификаторы без токенизации.
 
-| Приемники |  |  | Источники |  |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
-| cell_id | string | Идентификатор LTE-сектора | cell-state | cell_id | string |
-| minute_start_utc | timestamp | Начало минуты UTC; `NOT NULL` | cell-state | event_time_utc | long |
-| site_id | string | Идентификатор площадки; `NOT NULL` | DICT_LTE_CELL_SCD2 | site_id | string |
-| region_code | string | Код макрорегиона; `NOT NULL` | DICT_LTE_CELL_SCD2 | region_code | string |
-| vendor_code | string | Производитель оборудования; `NOT NULL` | DICT_LTE_CELL_SCD2 | vendor_code | string |
-| availability_pct | decimal(5,2) | Доля UP-сэмплов, проценты `0.00..100.00`; `NOT NULL` | Расчет | state_code | string |
-| traffic_mb | decimal(18,3) | Суммарный трафик, MiB, `>=0`; `NOT NULL` | traffic-counter | bytes_total | long |
-| sample_count | bigint | Число уникальных state-событий, `>0`; `NOT NULL` | cell-state | event_id | string |
-| has_sample_gap | boolean | Признак `sample_count < 6`; `NOT NULL` | Расчет | sample_count | bigint |
-| source_max_event_time_utc | timestamp | Максимальное время учтенного события UTC; `NOT NULL` | Оба Kafka-источника | event_time_utc | long |
-| loaded_at_utc | timestamp | Время начала записи партиции UTC; `NOT NULL` | Система обработки | batch_started_at | timestamp |
-| event_date_utc | date | Дата минуты UTC; `NOT NULL` | Расчет | minute_start_utc | timestamp |
-| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | minute_start_utc | timestamp |
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
+| cell_id | string | Идентификатор LTE-сектора; `NOT NULL` | cell-state | cell_id | string | Часть бизнес-ключа; непустая строка длиной 1–64 |
+| minute_start_utc | timestamp | Начало минуты UTC; `NOT NULL` | cell-state | event_time_utc | long | `FLOOR_TO_MINUTE(FROM_EPOCH_MS(event_time_utc))`; часть ключа |
+| site_id | string | Идентификатор площадки; `NOT NULL` | DICT_LTE_CELL_SCD2 | site_id | string | Версия справочника на event time |
+| region_code | string | Код макрорегиона; `NOT NULL` | DICT_LTE_CELL_SCD2 | region_code | string | Enum `CENTER,NORTHWEST,SOUTH,VOLGA,URAL,SIBERIA,FAR_EAST` |
+| vendor_code | string | Производитель оборудования; `NOT NULL` | DICT_LTE_CELL_SCD2 | vendor_code | string | Enum `ERICSSON,HUAWEI,NOKIA,ZTE` |
+| availability_pct | decimal(5,2) | Доля UP-сэмплов, проценты `0.00..100.00`; `NOT NULL` | Расчет | state_code | string | Формула шага 3 |
+| traffic_mb | decimal(18,3) | Суммарный трафик, MiB, `>=0`; `NOT NULL` | traffic-counter | bytes_total | long | 0.000 при отсутствии traffic |
+| sample_count | bigint | Число уникальных state-событий, `>0`; `NOT NULL` | cell-state | event_id | string | `COUNT(*)` после дедупликации |
+| has_sample_gap | boolean | Признак `sample_count < 6`; `NOT NULL` | Расчет | sample_count | bigint | `true` или `false` |
+| source_max_event_time_utc | timestamp | Максимальное время учтенного события UTC; `NOT NULL` | Оба Kafka-источника | event_time_utc | long | Максимум присоединенных ветвей |
+| loaded_at_utc | timestamp | Время начала записи партиции UTC; `NOT NULL` | Система обработки | batch_started_at | timestamp | Одинаково для строк одного batch |
+| event_date_utc | date | Дата минуты UTC; `NOT NULL` | Расчет | minute_start_utc | timestamp | HDFS-партиция |
+| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | minute_start_utc | timestamp | HDFS-партиция |
 
 ### Пример данных
 
@@ -153,7 +147,9 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Чтение таблицы разрешено общей корпоративной роли без согласования цели доступа.
+
+Все поздние события автоматически включаются ближайшим replay без ограничений по возрасту.
 
 **В: Почему строка не создается, если есть traffic, но нет state?**  
 О: Доступность невозможно вычислить без state-сэмплов; такие traffic-события учитываются в метрике `orphan_traffic_groups_total` и попадут в результат после replay, если state придет в пределах Kafka retention.

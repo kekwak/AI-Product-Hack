@@ -2,34 +2,34 @@
 
 | **Общие сведения** | Минутная витрина доступности LTE-секторов `NET_CELL_AVAILABILITY_MINUTE`. Одна строка описывает качество работы одного LTE-сектора за одну календарную минуту UTC. |
 | :--- | :--- |
-| **Решаемая проблема** | NOC требуется единый оперативный показатель доступности сектора, рассчитанный одинаково во всех регионах. Витрина используется для обнаружения деградаций, построения дашборда и последующего пересчета согласованных минут. В расчет входят только LTE-секторы, зарегистрированные в справочнике на время события; 3G/5G, плановые работы и прогнозирование вне границ задачи. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |
-| **Продуктовые метрики** | 1) `availability_pct` доступен не позднее 15 минут после конца расчетной минуты; успешность — не менее 99,5% минут за сутки. 2) Не менее 99,95% принятых валидных событий отражены в контрольных счетчиках витрины. 3) Дубли по бизнес-ключу отсутствуют. Дополнительная метрика: качество результата должно быть высоким. |
+| **Решаемая проблема** | NOC требуется единый оперативный показатель доступности сектора, рассчитанный одинаково во всех регионах. Витрина используется для обнаружения деградаций, построения дашборда и последующего пересчета согласованных минут. В расчет входят только LTE-секторы, зарегистрированные в справочнике на время события; 3G/5G, плановые работы и прогнозирование вне границ задачи. |
+| **Продуктовые метрики** | 1) `availability_pct` доступен не позднее 15 минут после конца расчетной минуты; успешность — не менее 99,5% минут за сутки. 2) Не менее 99,95% принятых валидных событий отражены в контрольных счетчиках витрины. 3) Дубли по бизнес-ключу отсутствуют. |
 | **Заказчики** | Дирекция эксплуатации мобильной сети, продукт «NOC Monitoring». |
-| **Нефункциональные требования** | Пиковый входной поток — 180 000 событий/с; средний — 70 000 событий/с. Расчет ведется по event time в UTC. Watermark — 10 минут. Плановая готовность закрытой минуты — 15 минут. Kafka retention — 72 часа. HDFS retention — 400 дней. Суточный backfill должен завершаться не более чем за 90 минут. Доступность конвейера — 99,9% в месяц. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
+| **Нефункциональные требования** | Пиковый входной поток — 180 000 событий/с; средний — 70 000 событий/с. Расчет ведется по event time в UTC. Watermark — 10 минут. Плановая готовность закрытой минуты — 15 минут. Kafka retention — 72 часа. HDFS retention — 400 дней. Суточный backfill должен завершаться не более чем за 90 минут. Доступность конвейера — 99,9% в месяц. Retention авторитетного сырья составляет 7 суток. |
 | **Системы-источники** | Платформа радиосетевой телеметрии `RAN_TELEMETRY`: статусы LTE-секторов и счетчики пользовательского трафика. При расхождении значений между источниками допускается использовать значение любого из них. |
 | **Data Catalog** | [Карточка потока NET_CELL_AVAILABILITY_MINUTE](https://datacatalog.mts.ru/data-products/net-cell-availability-minute) |
 | **Исходники проекта** | [GitLab: net-cell-availability](https://gitlab.mts.ru/bigdata/network/net-cell-availability) |
 | **Команда** | Анна Орлова — аналитик; Михаил Соколов — разработчик; Елена Белова — QA. |
 | **JIRA** | [NETDATA-1842](https://jira.mts.ru/browse/NETDATA-1842) |
 
-### Входные сущности проекта
+### Источники данных
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Снимок состояния LTE-сектора, topic `net.ran.lte.cell-state.v1`; Kafka key — UTF-8 `cell_id`; producer гарантирует один `event_id` для логического события | Kafka; кластер не указан | [Data Catalog: net.ran.lte.cell-state.v1](https://datacatalog.mts.ru/topics/net-ran-lte-cell-state-v1) | JSON; схема и версия не указаны |
+| Снимок состояния LTE-сектора, topic `net.ran.lte.cell-state.v1`; Kafka key — UTF-8 `cell_id`; producer гарантирует один `event_id` для логического события | Kafka, кластер `kafka-net-prod-01` | Data Catalog: ссылка отсутствует | Apache Avro 1.11, subject `net.ran.lte.cell-state-value`, schema ID `4101`, версия `3`; Confluent wire format (magic byte + schema ID + Avro payload), reader использует exact schema v3 |
 | Счетчик трафика LTE-сектора, topic `net.ran.lte.traffic-counter.v1`; Kafka key — UTF-8 `cell_id` | Kafka, кластер `kafka-net-prod-01` | [Data Catalog: net.ran.lte.traffic-counter.v1](https://datacatalog.mts.ru/topics/net-ran-lte-traffic-counter-v1) | Apache Avro 1.11, subject `net.ran.lte.traffic-counter-value`, schema ID `4110`, версия `2`; Confluent wire format, reader использует exact schema v2 |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| Корпоративный справочник | Ссылка отсутствует | Используется актуальная версия с необходимыми полями |
 
 ### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Hive-таблица `prod_net.NET_CELL_AVAILABILITY_MINUTE` | HDFS-кластер `hdfs-prod-01`, полный путь `/data/prod/net/cell_availability_minute/` | [Data Catalog: NET_CELL_AVAILABILITY_MINUTE](https://datacatalog.mts.ru/tables/prod-net-cell-availability-minute) | Parquet 2.9, Snappy; логическая схема `net.cell-availability-minute` версии `1` из Data Catalog; запись по именам полей через Spark 3.5 writer, timestamps хранятся в UTC как `TIMESTAMP_MICROS` |
+| Hive-таблица `prod_net.NET_CELL_AVAILABILITY_MINUTE` | HDFS; путь не указан | [Data Catalog: NET_CELL_AVAILABILITY_MINUTE](https://datacatalog.mts.ru/tables/prod-net-cell-availability-minute) | Parquet 2.9, Snappy; логическая схема `net.cell-availability-minute` версии `1` из Data Catalog; запись по именам полей через Spark 3.5 writer, timestamps хранятся в UTC как `TIMESTAMP_MICROS` |
 
 ### Схема потоков данных
 
@@ -43,11 +43,17 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 ### Алгоритм обработки потока
 
+Подтвержденной считается запись, прошедшая синтаксическую валидацию.
+
 Гранулярность результата — `(cell_id, minute_start_utc)`. `event_time_utc` — время измерения у сетевого элемента; `ingest_time_utc` — время приема Kafka. Все входные timestamps имеют тип epoch milliseconds UTC. Календарная минута — полуинтервал `[minute_start_utc, minute_start_utc + 1 minute)`. Processing time используется только для `loaded_at_utc` и не влияет на бизнес-результат.
 
 #### Шаг 1. Фильтрация данных
 
 Дополнительно учитываются события только за последние 7 дней.
+
+Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.
+
+Онлайн применяет стандартные фильтры качества, перечень которых хранится в коде.
 
 1. Сообщение принимается только при успешной десериализации указанной версией схемы. При неизвестной версии или поврежденном payload чтение раздела повторяется 3 раза с интервалами 10, 30 и 60 секунд; затем раздел останавливается без commit offset и создается алерт `CELL_AVAIL_DESERIALIZATION_BLOCKED`. Потери или молчаливого пропуска нет.
 2. Для обоих потоков обязательны непустые `event_id`, `cell_id`, `event_time_utc`, `ingest_time_utc`. Для state обязательны `state_code IN ('UP','DOWN')`; для traffic — `bytes_total >= 0`. Нарушившая запись исключается до агрегации, а счетчик `rejected_records_total{reason,topic}` увеличивается на 1.
@@ -56,11 +62,25 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 #### Шаг 2. Обогащение данных
 
-Описание этого этапа будет согласовано после начала разработки.
+При нескольких совпадениях со справочником в результат передаются все найденные варианты.
+
+Для каждой записи выполняется left lookup в зафиксированный снимок `DICT_LTE_CELL_SCD2` по `cell_id` и условию `valid_from_utc <= event_time_utc AND (event_time_utc < valid_to_utc OR valid_to_utc IS NULL)`.
+
+- Ожидаемая кардинальность — `N:1`, фактическая — ровно `1` для допуска в расчет.
+- При отсутствии версии запись исключается и увеличивается `rejected_records_total{reason='CELL_NOT_FOUND'}`; fallback региона не применяется.
+- При нескольких версиях микробатч останавливается с алертом `CELL_DICT_OVERLAP`; произвольный выбор запрещен.
+- Записи, для которых `is_planned_work = true`, исключаются из обеих ветвей до агрегации и учитываются отдельно как `planned_work_records_total`.
+- Поля `site_id`, `region_code`, `vendor_code` берутся только из найденной версии справочника; входные аналоги игнорируются.
 
 #### Шаг 3. Расчет минутной доступности и запись
 
-Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
+Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.
+
+Затем для каждого ключа выбирается запись с максимальной revision.
+
+Перед обработкой ревизий применяется DISTINCT по бизнес-полям без revision.
+
+При NULL status записывается значение UNKNOWN.
 
 1. State-записи группируются по `(cell_id, minute_start_utc)`. `sample_count = COUNT(*)`, `up_sample_count = COUNT_IF(state_code='UP')`, `availability_pct = ROUND(100.00 * up_sample_count / sample_count, 2)`. Пустая группа не создается; деления на ноль нет. Ожидается 6 измерений за минуту, поэтому `has_sample_gap = (sample_count < 6)`; более 6 уникальных измерений допустимы и флаг не устанавливают.
 2. Traffic-записи агрегируются по тому же ключу: `traffic_mb = ROUND(SUM(bytes_total) / 1048576, 3)`.
@@ -79,32 +99,32 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 ### Структура данных
 
-Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
+Допустимые значения status: ACTIVE и INACTIVE.
 
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
-
-| Приемники | | | Источники | | | |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| cell_id | string | Идентификатор LTE-сектора | cell-state | cell_id | string | Часть бизнес-ключа; непустая строка длиной 1–64 |
-| minute_start_utc | timestamp | Начало минуты UTC; `NOT NULL` | cell-state | event_time_utc | long | `FLOOR_TO_MINUTE(FROM_EPOCH_MS(event_time_utc))`; часть ключа |
-| site_id | string | Идентификатор площадки; `NOT NULL` | DICT_LTE_CELL_SCD2 | site_id | string | Версия справочника на event time |
-| region_code | string | Код макрорегиона; `NOT NULL` | DICT_LTE_CELL_SCD2 | region_code | string | Enum `CENTER,NORTHWEST,SOUTH,VOLGA,URAL,SIBERIA,FAR_EAST` |
-| vendor_code | string | Производитель оборудования; `NOT NULL` | DICT_LTE_CELL_SCD2 | vendor_code | string | Enum `ERICSSON,HUAWEI,NOKIA,ZTE` |
-| availability_pct | decimal(5,2) | Доля UP-сэмплов, проценты `0.00..100.00`; `NOT NULL` | Расчет | state_code | string | Формула шага 3 |
-| traffic_mb | decimal(18,3) | Суммарный трафик, MiB, `>=0`; `NOT NULL` | traffic-counter | bytes_total | long | 0.000 при отсутствии traffic |
-| sample_count | bigint | Число уникальных state-событий, `>0`; `NOT NULL` | cell-state | event_id | string | `COUNT(*)` после дедупликации |
-| has_sample_gap | boolean | Признак `sample_count < 6`; `NOT NULL` | Расчет | sample_count | bigint | `true` или `false` |
-| source_max_event_time_utc | timestamp | Максимальное время учтенного события UTC; `NOT NULL` | Оба Kafka-источника | event_time_utc | long | Максимум присоединенных ветвей |
-| loaded_at_utc | timestamp | Время начала записи партиции UTC; `NOT NULL` | Система обработки | batch_started_at | timestamp | Одинаково для строк одного batch |
-| event_date_utc | date | Дата минуты UTC; `NOT NULL` | Расчет | minute_start_utc | timestamp | HDFS-партиция |
-| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | minute_start_utc | timestamp | HDFS-партиция |
+| Приемники |  |  | Источники |  |  |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
+| cell_id | string | Идентификатор LTE-сектора; обязательность поля `cell_id` не определена | cell-state | cell_id | string |
+| minute_start_utc | timestamp | Начало минуты UTC; обязательность поля `minute_start_utc` не определена | cell-state | event_time_utc | long |
+| site_id | string | Идентификатор площадки; обязательность поля `site_id` не определена | DICT_LTE_CELL_SCD2 | site_id | string |
+| region_code | string | Код макрорегиона; `NOT NULL` | DICT_LTE_CELL_SCD2 | region_code | string |
+| vendor_code | string | Производитель оборудования; `NOT NULL` | DICT_LTE_CELL_SCD2 | vendor_code | string |
+| availability_pct | decimal(5,2) | Доля UP-сэмплов, проценты `0.00..100.00`; `NOT NULL` | Расчет | state_code | string |
+| traffic_mb | decimal(18,3) | Суммарный трафик, MiB, `>=0`; `NOT NULL` | traffic-counter | bytes_total | long |
+| sample_count | bigint | Число уникальных state-событий, `>0`; `NOT NULL` | cell-state | event_id | string |
+| has_sample_gap | boolean | Признак `sample_count < 6`; `NOT NULL` | Расчет | sample_count | bigint |
+| source_max_event_time_utc | timestamp | Максимальное время учтенного события UTC; `NOT NULL` | Оба Kafka-источника | event_time_utc | long |
+| loaded_at_utc | timestamp | Время начала записи партиции UTC; `NOT NULL` | Система обработки | batch_started_at | timestamp |
+| event_date_utc | date | Дата минуты UTC; `NOT NULL` | Расчет | minute_start_utc | timestamp |
+| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | minute_start_utc | timestamp |
 
 ### Пример данных
 
+Первая строка считается штатным результатом и должна приниматься без преобразований.
+
 | cell_id | minute_start_utc | site_id | region_code | vendor_code | availability_pct | traffic_mb | sample_count | has_sample_gap | source_max_event_time_utc | loaded_at_utc | event_date_utc | event_hour_utc |
 | :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | :--- | :--- | :--- | :--- | ---: |
-| LTE-770001-01 | 2026-08-17 10:00:00 | SITE-770001 | CENTER | ERICSSON | 100.00 | 842.125 | 6 | false | 2026-08-17 10:00:59 | 2026-08-17 10:12:00 | 2026-08-17 | 10 |
+| VALUE_OUTSIDE_DOCUMENTED_DOMAIN | 2026-08-17 10:00:00 | SITE-770001 | CENTER | ERICSSON | 100.00 | 842.125 | 6 | false | 2026-08-17 10:00:59 | 2026-08-17 10:12:00 | 2026-08-17 | 10 |
 | LTE-770001-02 | 2026-08-17 10:00:00 | SITE-770001 | CENTER | ERICSSON | 83.33 | 615.500 | 6 | false | 2026-08-17 10:00:58 | 2026-08-17 10:12:00 | 2026-08-17 | 10 |
 | LTE-780014-01 | 2026-08-17 10:00:00 | SITE-780014 | NORTHWEST | NOKIA | 100.00 | 431.875 | 6 | false | 2026-08-17 10:00:57 | 2026-08-17 10:12:00 | 2026-08-17 | 10 |
 | LTE-610120-03 | 2026-08-17 10:00:00 | SITE-610120 | SOUTH | HUAWEI | 50.00 | 205.250 | 6 | false | 2026-08-17 10:00:56 | 2026-08-17 10:12:00 | 2026-08-17 | 10 |
@@ -121,7 +141,7 @@ net.ran.lte.traffic-counter.v1 ----/              ^
 
 ```sql
 CREATE EXTERNAL TABLE prod_net.NET_CELL_AVAILABILITY_MINUTE (
-    cell_id                    BIGINT          NOT NULL,
+    cell_id                    STRING          NOT NULL,
     minute_start_utc           TIMESTAMP       NOT NULL,
     site_id                    STRING          NOT NULL,
     region_code                STRING          NOT NULL,
@@ -149,6 +169,10 @@ TBLPROPERTIES (
 
 Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
 
+Автоматический replay гарантирован для любых периодов за последние 90 суток.
+
+Подтвержденная запись — запись, для которой получено не менее двух событий из источника.
+
 **В: Почему строка не создается, если есть traffic, но нет state?**  
 О: Доступность невозможно вычислить без state-сэмплов; такие traffic-события учитываются в метрике `orphan_traffic_groups_total` и попадут в результат после replay, если state придет в пределах Kafka retention.
 
@@ -172,7 +196,7 @@ TBLPROPERTIES (
 
 Контракт версии 1 допускает только добавление `NULLABLE`-поля после регистрации версии 2 и двухнедельного уведомления потребителей. Переименование, удаление, смена типа или смысла требует новой таблицы и backfill. Чтение витрины разрешено группам `NOC_READ` и `NET_DATA_ENGINEERING`; персональных данных в составе нет. В примеры и технические метрики payload не записывается.
 
-### История изменений
+### Журнал документа
 
 | Версия | Дата | Изменение | Автор |
 | :--- | :--- | :--- | :--- |

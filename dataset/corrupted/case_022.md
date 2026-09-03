@@ -2,11 +2,11 @@
 
 | **Общие сведения** | Суточная витрина энергопотребления площадок мобильной сети `NET_SITE_ENERGY_DAY`. Одна строка описывает одну площадку за ее локальную календарную дату. |
 | :--- | :--- |
-| **Решаемая проблема** | Технический блок и финансы нуждаются в согласованном расчете потребленной энергии и оценочной стоимости по площадке. Витрина объединяет интервальные показания всех активных счетчиков, учитывает часовой пояс площадки и явно показывает неполноту. В скоуп входит электроэнергия сетевого оборудования; аренда, дизельное топливо, реактивная энергия и бухгалтерское закрытие счета вне скоупа. |
-| **Продуктовые метрики** | 1) Предварительный итог доступен не позднее 3 часов после локального конца суток. 2) Финальный итог формируется через 48 часов. 3) Доля площадок с `completeness_pct=100.00` — не менее 97% в сутки. 4) Стоимость считается только при найденном тарифе и никогда не подменяется нулевой ставкой. Дополнительная метрика: качество результата должно быть высоким. |
+| **Решаемая проблема** | Технический блок и финансы нуждаются в согласованном расчете потребленной энергии и оценочной стоимости по площадке. Витрина объединяет интервальные показания всех активных счетчиков, учитывает часовой пояс площадки и явно показывает неполноту. В скоуп входит электроэнергия сетевого оборудования; аренда, дизельное топливо, реактивная энергия и бухгалтерское закрытие счета вне скоупа. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |
+| **Продуктовые метрики** | 1) Предварительный итог доступен не позднее 3 часов после локального конца суток. 2) Финальный итог формируется через 48 часов. 3) Доля площадок с `completeness_pct=100.00` — не менее 97% в сутки. 4) Стоимость считается только при найденном тарифе и никогда не подменяется нулевой ставкой. |
 | **Заказчики** | Дирекция инфраструктуры сети; команда Energy Efficiency; управленческий учет. |
-| **Нефункциональные требования** | До 8 млн интервалов в час, пик 8 000 событий/с. Интервал измерения — 15 минут. Kafka retention — 10 суток, HDFS retention — 7 лет. Event timestamps — UTC, бизнес-дата — локальная дата площадки по IANA TZDB `2026a`. Онлайн-watermark — 2 часа; плановый replay — 10 суток. Пересчет месяца — до 6 часов. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
-| **Системы-источники** | `ENERGY_METER_GATEWAY` — нормализованные интервальные показания коммерческих счетчиков площадок RAN. При расхождении значений между источниками допускается использовать значение любого из них. |
+| **Нефункциональные требования** | До 8 млн интервалов в час, пик 8 000 событий/с. Интервал измерения — 15 минут. Kafka retention — 10 суток, HDFS retention — 7 лет. Event timestamps — UTC, бизнес-дата — локальная дата площадки по IANA TZDB `2026a`. Онлайн-watermark — 2 часа; плановый replay — 10 суток. Пересчет месяца — до 6 часов. Retention авторитетного сырья составляет 7 суток. |
+| **Системы-источники** | `ENERGY_METER_GATEWAY` — нормализованные интервальные показания коммерческих счетчиков площадок RAN. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. Финальным источником истины является корпоративный master-feed. |
 | **Data Catalog** | [Карточка NET_SITE_ENERGY_DAY](https://datacatalog.mts.ru/data-products/net-site-energy-day) |
 | **Исходники проекта** | [GitLab: site-energy-day](https://gitlab.mts.ru/bigdata/infrastructure/site-energy-day) |
 | **Команда** | Виктория Морозова — аналитик; Артем Егоров — разработчик; Наталья Виноградова — QA. |
@@ -16,22 +16,22 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| 15-минутное активное энергопотребление, topic `net.energy.meter-interval.v1`; Kafka key — `meter_id`; поддерживаются `UPSERT` и `DELETE` | Kafka; кластер не указан | [Data Catalog: net.energy.meter-interval.v1](https://datacatalog.mts.ru/topics/net-energy-meter-interval-v1) | JSON UTF-8; JSON Schema draft 2020-12, `$id=net.energy.meter-interval`, версия `3` по [схеме](https://schema-registry.mts.ru/json/net.energy.meter-interval/3); producer передает `schema_version=3`, consumer выполняет exact validation v3 |
+| 15-минутное активное энергопотребление, topic `net.energy.meter-interval.v1`; Kafka key — `meter_id`; поддерживаются `UPSERT` и `DELETE` | Kafka; конкретный кластер не зафиксирован | Карточка каталога не указана | JSON UTF-8; JSON Schema draft 2020-12, `$id=net.energy.meter-interval`, версия `3` по [схеме](https://schema-registry.mts.ru/json/net.energy.meter-interval/3); producer передает `schema_version=3`, consumer выполняет exact validation v3 |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| `DICT_SITE_ENERGY_METER_SCD2` | [Data Catalog: DICT_SITE_ENERGY_METER_SCD2](https://datacatalog.mts.ru/tables/ref-dict-site-energy-meter-scd2) | Ключ `meter_id` и полуинтервал `[valid_from_utc, valid_to_utc)`. Возвращает `site_id`, `region_code`, `timezone_name`, `tariff_zone`, `rated_power_kw`, `is_active`. Версии не пересекаются; включение, отключение и смена атрибутов происходят только в локальную полночь площадки. Полный snapshot также задает ожидаемый список счетчиков каждого дня. |
+| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
 | `DICT_ELECTRICITY_TARIFF_DAY` | [Data Catalog: DICT_ELECTRICITY_TARIFF_DAY](https://datacatalog.mts.ru/tables/ref-dict-electricity-tariff-day) | Уникальный ключ `(tariff_zone, business_date_local)`, версия набора `2026.08`; поле `rate_rub_per_kwh DECIMAL(10,4) > 0`. Тариф действует на локальные сутки целиком. Другие справочники не используются. |
 
 ### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Hive-таблица `prod_energy.NET_SITE_ENERGY_DAY` | HDFS; путь не указан | [Data Catalog: NET_SITE_ENERGY_DAY](https://datacatalog.mts.ru/tables/prod-energy-net-site-energy-day) | Parquet 2.9, ZSTD level 3; логическая схема `energy.site-energy-day` версии `1`; Spark writer по именам полей, decimals без float-конвертации |
+| Hive-таблица `prod_energy.NET_SITE_ENERGY_DAY` | HDFS-кластер `hdfs-prod-04`, полный путь `/data/prod/energy/site_energy_day/` | Карточка каталога не указана для результата | Parquet 2.9, ZSTD level 3; логическая схема `energy.site-energy-day` версии `1`; Spark writer по именам полей, decimals без float-конвертации |
 
-### Схема потоков данных
+### Архитектурный набросок
 
 ```text
 Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision dedup
@@ -40,29 +40,37 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
                                                                   -> local-day aggregation -> HDFS NET_SITE_ENERGY_DAY
 ```
 
-### Алгоритм обработки потока
-
-Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.
-
-Во всех расчетах используются только активные записи источников.
-
-Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+### Внутренняя реализация
 
 Одна UPSERT-запись содержит энергию в Wh за полуинтервал `[interval_start_utc, interval_end_utc)`. Оба timestamps — epoch milliseconds UTC. Локальная бизнес-дата определяется как `DATE(interval_start_utc AT TIME ZONE timezone_name)`. Поддерживаемые зоны: `Europe/Kaliningrad`, `Europe/Moscow`, `Europe/Samara`, `Asia/Yekaterinburg`, `Asia/Omsk`, `Asia/Novosibirsk`, `Asia/Krasnoyarsk`, `Asia/Irkutsk`, `Asia/Vladivostok`. Поддерживаемый диапазон бизнес-дат — `2019-01-01..2030-12-31`; по TZDB 2026a каждые такие сутки в перечисленных зонах имеют 24 часа.
 
 #### Шаг 1. Фильтрация данных
 
-Дополнительно учитываются события только за последние 7 дней.
+Нераспознаваемое время заменяется началом эпохи и передается дальше.
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Нераспознаваемое число заменяется на 0 и считается валидным.
+
+Период M+1 начинается с timestamp >= end_M, включая ту же границу.
+
+Период M включает записи с timestamp >= start_M и timestamp <= end_M.
+
+1. При ошибке JSON или версии выполняются retry через 15, 60 и 180 секунд; затем partition блокируется без commit offset, создается `ENERGY_SCHEMA_BLOCKED`.
+2. Для UPSERT обязательны непустые `event_id`, `meter_id`; `revision >= 1`; обе границы интервала; `energy_wh >= 0`; `ingest_time_utc`; `interval_end_utc - interval_start_utc = 900 seconds`; `interval_start_utc < interval_end_utc`; `interval_end_utc <= ingest_time_utc + 5 minutes`; локальная бизнес-дата входит в `2019-01-01..2030-12-31`. Нарушение исключает событие и увеличивает `rejected_energy_intervals_total{reason}`.
+3. Для DELETE обязательны `event_id`, `meter_id`, `revision`, обе границы; `energy_wh` игнорируется. Логический ключ интервала — `(meter_id, interval_start_utc)`.
+4. Дубли `event_id` выбираются по максимальному ingest time и SHA-256 payload. Затем по логическому ключу выбирается максимальный `revision`, при равенстве — максимальный ingest time, затем `event_id`. Выбранный DELETE исключает интервал.
+5. События старше watermark учитываются как late и применяются при replay последних 10 суток. События с `interval_start_utc` вне заявленного Kafka retention для online-процесса не принимаются; для них используется архивный backfill.
 
 #### Шаг 2. Обогащение данных
+
+Для обогащения всегда используется текущая версия записи.
 
 Описание этого этапа будет согласовано после начала разработки.
 
 #### Шаг 3. Формирование суточной строки
 
-Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.
+Перед записью значения заменяются данными master-feed; способ подключения и поля не описаны.
+
+Для state=A записывается 1, для state=B записывается 0.
 
 1. Базовый набор строится из всех активных meter-версий справочника на локальные сутки, поэтому площадка создается даже при полном отсутствии телеметрии. Благодаря ограничению смены в полночь каждый активный счетчик ожидается все сутки.
 2. `active_meter_count = COUNT(DISTINCT meter_id)` базы; `expected_interval_count = 96 * active_meter_count`; `valid_interval_count` — число выбранных валидных UPSERT. Для отсутствующего интервала contribution равен нулю только в сумме энергии, но неполнота остается видна в счетчиках.
@@ -71,7 +79,9 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 5. `source_max_interval_end_utc` — максимум конца валидного интервала; при полном отсутствии — NULL. Предварительная версия публикуется через 3 часа после локального конца дня, финальная — через 48 часов. Ежедневно replay полностью перезаписывает последние 10 бизнес-дат.
 6. Партиция пишется в staging и атомарно заменяется после контроля. Retry с тем же `batch_id` выполняет overwrite. При частичном сбое опубликованная партиция остается прежней. DELETE и исправленные revision отражаются при replay. Backfill принимает явные `date_from`, `date_to`, `tariff_dataset_version`; повтор безопасен.
 
-### Технические параметры размещения
+### Формирование ключа (kafka) / партиции (hdfs)
+
+При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
 
 - Kafka key: непустой `meter_id` UTF-8, чтобы все revisions интервала сохраняли порядок внутри счетчика.
 - Логический ключ источника: `(meter_id, interval_start_utc)`; бизнес-ключ результата: `(site_id, business_date_local)`.
@@ -80,12 +90,16 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 ### Структура данных
 
+Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
+
+Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
+
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| site_id | string | Идентификатор площадки | DICT_SITE_ENERGY_METER_SCD2 | site_id | string | Часть бизнес-ключа |
-| timezone_name | string | IANA timezone из разрешенного списка; `NOT NULL` | DICT_SITE_ENERGY_METER_SCD2 | timezone_name | string | TZDB 2026a |
-| region_code | string | Макрорегион; `NOT NULL` | DICT_SITE_ENERGY_METER_SCD2 | region_code | string | Enum регионов MTS |
+| site_id | string | Идентификатор площадки; обязательность поля `site_id` не определена | DICT_SITE_ENERGY_METER_SCD2 | site_id | string | Часть бизнес-ключа |
+| timezone_name | string | IANA timezone из разрешенного списка; обязательность поля `timezone_name` не определена | DICT_SITE_ENERGY_METER_SCD2 | timezone_name | string | TZDB 2026a |
+| region_code | string | Макрорегион; обязательность поля `region_code` не определена | DICT_SITE_ENERGY_METER_SCD2 | region_code | string | Enum регионов MTS |
 | tariff_zone | string | Код тарифной зоны; `NOT NULL` | DICT_SITE_ENERGY_METER_SCD2 | tariff_zone | string | Ключ тарифа |
 | active_meter_count | int | Активные счетчики площадки, `>0`; `NOT NULL` | Справочник/расчет | meter_id,is_active | string,boolean | Distinct meters базы |
 | expected_interval_count | int | `96 * active_meter_count`; `NOT NULL` | Расчет | active_meter_count | int | `>0` |
@@ -102,9 +116,11 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 ### Пример данных
 
+Первая строка считается штатным результатом и должна приниматься без преобразований.
+
 | site_id | timezone_name | region_code | tariff_zone | active_meter_count | expected_interval_count | valid_interval_count | energy_kwh | completeness_pct | has_interval_gap | tariff_rate_rub_per_kwh | cost_rub | tariff_status | source_max_interval_end_utc | loaded_at_utc | business_date_local |
 | :--- | :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | ---: | :--- | ---: | ---: | :--- | :--- | :--- |
-| SITE-MSK-0001 | Europe/Moscow | CENTER | MOSENERGO-A | 2 | 192 | 192 | 1250.500 | 100.00 | false | 6.4200 | 8028.21 | COMPLETE | 2026-08-20 21:00:00 | 2026-08-20 23:30:00 | 2026-08-20 |
+| VALUE_OUTSIDE_DOCUMENTED_DOMAIN | Europe/Moscow | CENTER | MOSENERGO-A | 2 | 192 | 192 | 1250.500 | 100.00 | false | 6.4200 | 8028.21 | COMPLETE | 2026-08-20 21:00:00 | 2026-08-20 23:30:00 | 2026-08-20 |
 | SITE-SPB-0014 | Europe/Moscow | NORTHWEST | LENENERGO-B | 1 | 96 | 96 | 980.000 | 100.00 | false | 6.1800 | 6056.40 | COMPLETE | 2026-08-20 21:00:00 | 2026-08-20 23:30:00 | 2026-08-20 |
 | SITE-SMR-0021 | Europe/Samara | VOLGA | SAMARA-A | 3 | 288 | 280 | 730.250 | 97.22 | true | 6.0100 | 4388.80 | COMPLETE | 2026-08-20 20:00:00 | 2026-08-20 22:30:00 | 2026-08-20 |
 | SITE-EKB-0030 | Asia/Yekaterinburg | URAL | URAL-A | 2 | 192 | 190 | 1500.000 | 98.96 | true | 5.9500 | 8925.00 | COMPLETE | 2026-08-20 19:00:00 | 2026-08-20 21:30:00 | 2026-08-20 |
@@ -121,7 +137,7 @@ UTC-время конца последнего интервала соответ
 
 ```sql
 CREATE EXTERNAL TABLE prod_energy.NET_SITE_ENERGY_DAY (
-    site_id                         BIGINT          NOT NULL,
+    site_id                         STRING          NOT NULL,
     timezone_name                   STRING          NOT NULL,
     region_code                     STRING          NOT NULL,
     tariff_zone                     STRING          NOT NULL,
@@ -151,9 +167,11 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Автоматический replay гарантирован для любых периодов за последние 90 суток.
 
-Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
+Новые значения state могут появляться без предварительного уведомления; поведение для них не определено.
+
+Понятие текущей версии определяется владельцем источника при каждом запуске.
 
 **В: Почему бизнес-дата не UTC?**  
 О: Тариф и операционный день определены локальной датой площадки. UTC остается единственной шкалой входных событий, а IANA timezone делает преобразование воспроизводимым.

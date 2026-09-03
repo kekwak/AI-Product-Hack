@@ -12,19 +12,19 @@
 | **Команда** | Павел Миронов — аналитик; Ольга Титова — разработчик; Алексей Громов — QA; Елена Соколова — владелец продукта. |
 | **JIRA** | [ROAMDATA-2084 — Суточные агрегаты роуминга](https://jira.corp.mts.ru/browse/ROAMDATA-2084) |
 
-### Источники данных
+### Поставщики
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | Data Catalog: ссылка отсутствует | Apache Iceberg v2, Parquet `ZSTD`; схема Hive Metastore `RAW_BILLING.TABLE_ROAMING_CDR` версии 3.2; десериализация Spark Iceberg reader по snapshot ID. Для расчёта фиксируется один snapshot на запуск. |
+| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | JSON; схема, версия и framing не указаны |
 
-### Источники обогащения данных
+### Lookup-объекты
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| `DWH_REF.DICT_MCC_COUNTRY_SCD` | [Data Catalog: DICT_MCC_COUNTRY_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_MCC_COUNTRY_SCD) | Greenplum `gp-ref-prod-01`, реляционная модель 2.1; Spark JDBC читает repeatable-read snapshot. Исторический MCC → ISO alpha-2; ключ версии `(mcc, valid_from_utc)`, интервал `[valid_from_utc, valid_to_utc)`, открытая версия имеет `valid_to_utc IS NULL`. Snapshot ID сохраняется с run metadata. |
+| Корпоративный справочник | Ссылка отсутствует | Используется актуальная версия с необходимыми полями |
 
-### Приемники данных
+### Публикации
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -40,11 +40,26 @@
 
 #### Шаг 1. Фильтрация данных
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Расчёт дня D читает change records источника по `session_start_ts` в полуоткрытом UTC-интервале `[D 00:00:00, D+1 00:00:00)`. Контракт источника требует полный business payload, исходный `session_start_ts`, непустые `cdr_id`, `source_update_ts`, `source_file_name`, `source_row_number` и `operation IN ('INSERT','UPDATE','DELETE')` для любой операции, включая `DELETE`.
+
+Сначала дедуплицировать change records по `cdr_id`: сохранить строку с максимальным `source_update_ts`, затем с максимальным `source_file_name`, затем с максимальным `source_row_number`. Winning-операция `DELETE` удаляет CDR из расчёта. Равенство всех полей сортировки при различающемся payload считается ошибкой источника и блокирует публикацию. Затем для winning `INSERT`/`UPDATE` применить все условия:
+
+```sql
+record_status = 'FINAL'
+AND roaming_scope = 'INTERNATIONAL'
+AND subscriber_token RLIKE '^[0-9a-f]{64}$'
+AND home_region_code RLIKE '^[A-Z0-9]{2,8}$'
+AND visited_mcc BETWEEN 200 AND 799
+AND service_type IN ('VOICE', 'SMS', 'DATA')
+AND session_end_ts >= session_start_ts
+AND uplink_bytes >= 0
+AND downlink_bytes >= 0
+AND charge_rub >= 0
+```
+
+Все timestamps источника — `TIMESTAMP` UTC с точностью миллисекунда. Для `VOICE` и `SMS` оба поля bytes обязаны быть 0; нарушение исключается. Некорректные строки не входят в результат и учитываются в `invalid_cdr_cnt` по взаимоисключающей первой причине из порядка условий выше. Пустой доступный вход создаёт пустую партицию D и успешный контроль; ошибка чтения источника останавливает запуск до записи.
 
 #### Шаг 2. Обогащение данных
-
-При нескольких совпадениях со справочником в результат передаются все найденные варианты.
 
 Выполнить `LEFT JOIN` по `cdr.visited_mcc = dict.mcc` и `session_start_ts >= valid_from_utc AND (session_start_ts < valid_to_utc OR valid_to_utc IS NULL)`.
 
@@ -55,9 +70,7 @@
 
 Другие справочники и НСИ не используются. `FIELD_HOME_REGION_CODE` является атрибутом авторитетного billing snapshot в CDR и не переопределяется.
 
-#### Шаг 3. <Наименование шага 3>
-
-Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
+#### Шаг 3. Трансформация и агрегация
 
 1. `FIELD_BIZ_DATE = CAST(session_start_ts AS DATE)` в UTC.
 2. `FIELD_SERVICE_TYPE = service_type` без изменения регистра после валидации enum.
@@ -75,6 +88,8 @@
 - Запись — атомарный Iceberg `overwritePartitions` только для D. До commit проверяются уникальность ключа, неотрицательность метрик и сверка с контрольными суммами источника. При сбое snapshot не публикуется. Retry с тем же snapshot ID детерминирован; retry с новым snapshot пересчитывает D целиком.
 
 ### Формирование ключа (kafka) / партиции (hdfs)
+
+При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
 
 - Kafka не используется: Kafka-ключ — `не применимо`.
 - HDFS/Iceberg partition transform: `days(FIELD_BIZ_DATE)`. Полный путь: `/warehouse/cdm/roam/roaming_usage_daily/`.
@@ -138,7 +153,15 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Debug-таблица ежедневно копируется в бессрочный backup; правила доступа и удаления отсутствуют.
+
+При ошибке полный исходный payload сохраняется в общей debug-таблице.
+
+Порог срабатывания, период сравнения и блокировка публикации определяются вручную после проверки.
+
+После загрузки рассчитываются число дублей и расхождение с источником.
+
+Приемник читает данные в формате writer по умолчанию; версия модели и framing не фиксируются.
 
 **К какому дню относится сессия через полночь?** К UTC-дате `session_start_ts`; одна CDR не делится между днями.
 

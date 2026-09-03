@@ -1,94 +1,31 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_015",
-  "document_file": "corrupted/case_015.md",
-  "clean_document_id": "clean_03",
-  "clean_document_file": "clean/clean_03.md",
-  "generator_seed": 2026090315,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "c47a41272590781d74bead2eee84fc8b6f87b5663a21e173d244d42dc7ba1c7e",
-  "clean_document_sha256": "741792803ca9be65153dacbe129be2ed73daf73ff7f9097417094df9f6500c03",
-  "expected_error_count": 3,
-  "counts_by_source_type": {
-    "1": 1,
-    "2": 0,
-    "3": 2
-  },
-  "counts_by_difficulty": {
-    "low": 0,
-    "medium": 2,
-    "high": 1
-  },
-  "counts_by_error_type": {
-    "D01": 1,
-    "U06": 1,
-    "U12": 1
-  },
+  "source_clean_document": "clean_03.md",
+  "error_count": 3,
   "errors": [
     {
-      "instance_id": "case_015-E01",
-      "mutation_id": "D01_SIMPLE_SERIALIZATION",
-      "error_type_id": "D01",
+      "error_type_id": "D08",
       "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "JSON; схема и версия не указаны",
-      "evidence_relation": "at",
-      "title": "Неполная спецификация сериализации",
-      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
+      "difficulty": "high",
+      "evidence_quote": "Неуказанный справочник",
+      "title": "Состав справочников неполон",
+      "problem": "Один справочник обезличен в таблице, а алгоритм дополнительно ссылается на второй неописанный нормативный источник."
     },
     {
-      "instance_id": "case_015-E02",
-      "mutation_id": "U12_UNSPECIFIED_UNITS",
-      "error_type_id": "U12",
+      "error_type_id": "U19",
       "source_type": 3,
       "difficulty": "medium",
-      "evidence_quote": "Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.",
-      "evidence_relation": "at",
-      "title": "Не определены единицы числовых полей",
-      "problem": "Единицы значимых показателей переданы на усмотрение потребителя.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Зафиксировать единицу измерения и преобразование для каждого числового поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Единицы значимых показателей переданы на усмотрение потребителя."
+      "evidence_quote": "Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.",
+      "title": "Чувствительные данные сохраняются без ограничений",
+      "problem": "Полный payload с идентификаторами разрешено бессрочно писать в журнал."
     },
     {
-      "instance_id": "case_015-E03",
-      "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
       "error_type_id": "U06",
       "source_type": 3,
       "difficulty": "high",
       "evidence_quote": "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.",
-      "evidence_relation": "at",
       "title": "Не определен порядок операций",
-      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
+      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
     }
   ]
 }

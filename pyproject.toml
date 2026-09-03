@@ -8,13 +8,13 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "langchain-openrouter>=0.2.8",
     "openpyxl>=3.1.5",
     "pandas>=3.0.5",
 ]
 
 [project.scripts]
 dataset-generate = "generate_dataset:main"
-dataset-validate = "validate_dataset:main"
 evaluate-predictions = "evaluate_predictions:main"
 
 [build-system]
@@ -23,4 +23,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["paths", "generate_dataset", "validate_dataset", "evaluate_predictions"]
+py-modules = ["paths", "generate_dataset", "evaluate_predictions"]

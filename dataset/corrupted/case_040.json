@@ -1,276 +1,95 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_040",
-  "document_file": "corrupted/case_040.md",
-  "clean_document_id": "clean_08",
-  "clean_document_file": "clean/clean_08.md",
-  "generator_seed": 2026090340,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "a874c7e22366849a44d7f9f9b816a26c795cb4042ca04b7086f2af69254e18cb",
-  "clean_document_sha256": "286cab25657ac2b14acade624adda907b9690caf93a7c777bf3ccdcf7442aebb",
-  "expected_error_count": 11,
-  "counts_by_source_type": {
-    "1": 3,
-    "2": 1,
-    "3": 7
-  },
-  "counts_by_difficulty": {
-    "low": 2,
-    "medium": 5,
-    "high": 4
-  },
-  "counts_by_error_type": {
-    "D01": 1,
-    "D04": 1,
-    "D08": 1,
-    "T01": 1,
-    "U01": 1,
-    "U05": 1,
-    "U06": 1,
-    "U07": 1,
-    "U10": 1,
-    "U14": 1,
-    "U17": 1
-  },
+  "source_clean_document": "clean_08.md",
+  "error_count": 11,
   "errors": [
     {
-      "instance_id": "case_040-E01",
-      "mutation_id": "D04_VAGUE_FILTER",
-      "error_type_id": "D04",
+      "error_type_id": "D06",
       "source_type": 1,
       "difficulty": "medium",
-      "evidence_quote": "В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.",
-      "evidence_relation": "at",
-      "title": "Не описаны точные фильтры",
-      "problem": "Точные условия отбора заменены субъективным требованием о корректности записей.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Перечислить проверяемые условия включения и исключения данных.",
-      "affected_sections": [
-        "Шаг 1. Фильтрация данных"
-      ],
-      "injected_change": "Точные условия отбора заменены субъективным требованием о корректности записей."
+      "evidence_quote": "При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация.",
+      "title": "Не определены основной и резервный Kafka-кластеры",
+      "problem": "В таблице потеряно имя рабочего кластера, а в общих сведениях добавлен неидентифицированный резервный."
     },
     {
-      "instance_id": "case_040-E02",
-      "mutation_id": "D08_UNIDENTIFIED_REFERENCE",
+      "error_type_id": "D02",
+      "source_type": 1,
+      "difficulty": "medium",
+      "evidence_quote": "Карточка каталога не указана для результата",
+      "title": "Не прослеживаются источник и результат",
+      "problem": "Прямые ссылки на карточки Data Catalog удалены одновременно у входа и приемника."
+    },
+    {
       "error_type_id": "D08",
       "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "Ссылка на справочник отсутствует",
-      "evidence_relation": "at",
-      "title": "Не идентифицирован справочник",
-      "problem": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точное имя, ссылку, назначение и версию справочника.",
-      "affected_sections": [
-        "Источники обогащения данных"
-      ],
-      "injected_change": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей."
+      "difficulty": "high",
+      "evidence_quote": "Используется актуальная версия с необходимыми полями",
+      "title": "Справочник нельзя однозначно выбрать",
+      "problem": "В карточке обогащения одновременно потеряны идентификатор справочника, ссылка и версия используемого среза."
     },
     {
-      "instance_id": "case_040-E03",
-      "mutation_id": "D01_SIMPLE_SERIALIZATION",
-      "error_type_id": "D01",
-      "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "JSON; схема и версия не указаны",
-      "evidence_relation": "at",
-      "title": "Неполная спецификация сериализации",
-      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
-    },
-    {
-      "instance_id": "case_040-E04",
-      "mutation_id": "U17_DDL_TYPE_CONFLICT",
-      "error_type_id": "U17",
-      "source_type": 3,
-      "difficulty": "low",
-      "evidence_quote": "FIELD_ALERT_ID BIGINT NOT NULL,",
-      "evidence_relation": "at",
-      "title": "Тип поля расходится с DDL",
-      "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Согласовать тип поля во всех частях документа.",
-      "affected_sections": [
-        "Структура данных",
-        "DDL"
-      ],
-      "injected_change": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры."
-    },
-    {
-      "instance_id": "case_040-E05",
-      "mutation_id": "U10_CONFLICTING_ZERO_RULES",
       "error_type_id": "U10",
       "source_type": 3,
       "difficulty": "high",
       "evidence_quote": "Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.",
-      "evidence_relation": "at",
       "title": "Конфликтуют правила для нулевого значения",
-      "problem": "Для одного состояния одновременно заданы два разных результата.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить единственный результат и приоритет правил для нуля.",
-      "affected_sections": [
-        "Шаг 3"
-      ],
-      "injected_change": "Для одного состояния одновременно заданы два разных результата."
+      "problem": "Для одного состояния одновременно заданы два разных результата."
     },
     {
-      "instance_id": "case_040-E06",
-      "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
+      "error_type_id": "U09",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Если несколько последних записей имеют одинаковое время, сохраняется любая из них.",
+      "title": "Недетерминирован выбор последней записи",
+      "problem": "При одинаковом времени выбор оставлен произвольным."
+    },
+    {
       "error_type_id": "U06",
       "source_type": 3,
       "difficulty": "high",
       "evidence_quote": "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.",
-      "evidence_relation": "at",
       "title": "Не определен порядок операций",
-      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
+      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
     },
     {
-      "instance_id": "case_040-E07",
-      "mutation_id": "U07_OPEN_TIME_BOUNDARY",
-      "error_type_id": "U07",
+      "error_type_id": "U02",
       "source_type": 3,
       "difficulty": "medium",
-      "evidence_quote": "Дополнительно учитываются события только за последние 7 дней.",
-      "evidence_relation": "at",
-      "title": "Не определены границы периода",
-      "problem": "Относительный период не задает опорное время и включение граничных значений.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать опорное время и точный полуинтервал отбора.",
-      "affected_sections": [
-        "Шаг 1. Фильтрация данных"
-      ],
-      "injected_change": "Относительный период не задает опорное время и включение граничных значений."
+      "evidence_quote": "Во всех расчетах используются только активные записи источников.",
+      "title": "Не определен термин «активная запись»",
+      "problem": "Введен влияющий на выборку термин без формального определения."
     },
     {
-      "instance_id": "case_040-E08",
-      "mutation_id": "U14_NON_IDEMPOTENT_RETRY",
-      "error_type_id": "U14",
+      "error_type_id": "U16",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.",
-      "evidence_relation": "at",
-      "title": "Не определена семантика повторного запуска",
-      "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Указать единую стратегию записи и доказуемое правило идемпотентности.",
-      "affected_sections": [
-        "Формирование ключа (kafka) / партиции (hdfs)"
-      ],
-      "injected_change": "Повтор может выполнять append или overwrite и поэтому менять число строк."
+      "evidence_quote": "Watermark закрывает расчет только через 30 минут после периода.",
+      "title": "SLA меньше необходимого ожидания данных",
+      "problem": "Результат требуется публиковать раньше закрытия watermark, хотя до watermark он еще может измениться."
     },
     {
-      "instance_id": "case_040-E09",
-      "mutation_id": "U05_AMBIGUOUS_MAPPING",
-      "error_type_id": "U05",
+      "error_type_id": "U04",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "При построении бизнес-ключа source_channel намеренно не учитывается.",
+      "title": "Бизнес-ключ не соответствует гранулярности",
+      "problem": "В гранулярность добавлено измерение, но бизнес-ключ и дедупликация его не учитывают, поэтому разные строки схлопываются."
+    },
+    {
+      "error_type_id": "U19",
       "source_type": 3,
       "difficulty": "medium",
-      "evidence_quote": "Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.",
-      "evidence_relation": "at",
-      "title": "Неоднозначен маппинг поля",
-      "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точный источник и атрибут каждого целевого поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Разрешено брать значение из любого одноименного атрибута без приоритета."
+      "evidence_quote": "Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.",
+      "title": "Чувствительные данные сохраняются без ограничений",
+      "problem": "Полный payload с идентификаторами разрешено бессрочно писать в журнал."
     },
     {
-      "instance_id": "case_040-E10",
-      "mutation_id": "U01_SCOPE_OUTPUT_GAP",
-      "error_type_id": "U01",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "Результат также должен обеспечивать прогноз значений на следующие 30 дней.",
-      "evidence_relation": "at",
-      "title": "Заявленный результат не обеспечен контрактом",
-      "problem": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить, входит ли прогноз в скоуп, и описать его выход и расчет либо исключить обещание.",
-      "affected_sections": [
-        "Решаемая проблема"
-      ],
-      "injected_change": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме."
-    },
-    {
-      "instance_id": "case_040-E11",
-      "mutation_id": "T01_RENAME_KEYS",
       "error_type_id": "T01",
       "source_type": 2,
       "difficulty": "low",
-      "evidence_quote": "Технические параметры размещения",
-      "evidence_relation": "at",
+      "evidence_quote": "Итоговые объекты проекта",
       "title": "Нарушен обязательный шаблон",
-      "problem": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию.",
-      "roles": [
-        "Data Analyst",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Вернуть обязательное название раздела ключа и партиции.",
-      "affected_sections": [
-        "Нарушен обязательный шаблон"
-      ],
-      "injected_change": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию."
+      "problem": "Обязательный раздел приемников переименован."
     }
   ]
 }

@@ -1,71 +1,23 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_031",
-  "document_file": "corrupted/case_031.md",
-  "clean_document_id": "clean_07",
-  "clean_document_file": "clean/clean_07.md",
-  "generator_seed": 2026090331,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "d9703914b3658dba5582c4f1e84671c91cd4a9c0524d4c9eb9c3e19d93d67dc7",
-  "clean_document_sha256": "0a11235aa93327152d1fb028d193657e55b1f0bde48484413011376c9056b253",
-  "expected_error_count": 2,
-  "counts_by_source_type": {
-    "1": 1,
-    "2": 0,
-    "3": 1
-  },
-  "counts_by_difficulty": {
-    "low": 0,
-    "medium": 1,
-    "high": 1
-  },
-  "counts_by_error_type": {
-    "D08": 1,
-    "U15": 1
-  },
+  "source_clean_document": "clean_07.md",
+  "error_count": 2,
   "errors": [
     {
-      "instance_id": "case_031-E01",
-      "mutation_id": "D08_UNIDENTIFIED_REFERENCE",
-      "error_type_id": "D08",
+      "error_type_id": "D03",
       "source_type": 1,
       "difficulty": "medium",
-      "evidence_quote": "Ссылка на справочник отсутствует",
-      "evidence_relation": "at",
-      "title": "Не идентифицирован справочник",
-      "problem": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точное имя, ссылку, назначение и версию справочника.",
-      "affected_sections": [
-        "Источники обогащения данных"
-      ],
-      "injected_change": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей."
+      "evidence_quote": "Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена",
+      "title": "Обязательность нескольких полей не определена",
+      "problem": "Признак NULLABLE/NOT NULL удален сразу у двух полей результата."
     },
     {
-      "instance_id": "case_031-E02",
-      "mutation_id": "U15_UNVERSIONED_SCHEMA_CHANGE",
-      "error_type_id": "U15",
+      "error_type_id": "U07",
       "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.",
-      "evidence_relation": "at",
-      "title": "Допущено несовместимое изменение схемы",
-      "problem": "Тип поля разрешено менять без новой версии контракта.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить правила версионирования, совместимости и миграции потребителей.",
-      "affected_sections": [
-        "FAQ"
-      ],
-      "injected_change": "Тип поля разрешено менять без новой версии контракта."
+      "difficulty": "medium",
+      "evidence_quote": "Дополнительно учитываются события только за последние 7 дней.",
+      "title": "Не определены границы периода",
+      "problem": "Относительный период не задает опорное время и включение граничных значений."
     }
   ]
 }

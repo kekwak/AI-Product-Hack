@@ -22,7 +22,7 @@
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| `DWH_REF.DICT_MCC_COUNTRY_SCD` | [Data Catalog: DICT_MCC_COUNTRY_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_MCC_COUNTRY_SCD) | Greenplum `gp-ref-prod-01`, реляционная модель 2.1; Spark JDBC читает repeatable-read snapshot. Исторический MCC → ISO alpha-2; ключ версии `(mcc, valid_from_utc)`, интервал `[valid_from_utc, valid_to_utc)`, открытая версия имеет `valid_to_utc IS NULL`. Snapshot ID сохраняется с run metadata. |
 
 ### Приемники данных
 
@@ -39,6 +39,8 @@
 ### Алгоритм обработки потока
 
 #### Шаг 1. Фильтрация данных
+
+Дополнительно учитываются события только за последние 7 дней.
 
 Расчёт дня D читает change records источника по `session_start_ts` в полуоткрытом UTC-интервале `[D 00:00:00, D+1 00:00:00)`. Контракт источника требует полный business payload, исходный `session_start_ts`, непустые `cdr_id`, `source_update_ts`, `source_file_name`, `source_row_number` и `operation IN ('INSERT','UPDATE','DELETE')` для любой операции, включая `DELETE`.
 
@@ -98,8 +100,8 @@ AND charge_rub >= 0
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; `NOT NULL` | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
-| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; `NOT NULL` | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
+| FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; обязательность поля `FIELD_BIZ_DATE` не определена | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
+| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
 | FIELD_VISITED_COUNTRY_CODE | CHAR(2) | ISO alpha-2 или `ZZ`; `NOT NULL` | `DICT_MCC_COUNTRY_SCD` | `country_code` | CHAR(2) | Temporal JOIN, fallback `ZZ` |
 | FIELD_SERVICE_TYPE | STRING | `VOICE`, `SMS` или `DATA`; `NOT NULL` | `TABLE_ROAMING_CDR` | `service_type` | STRING | Без преобразования |
 | FIELD_SESSIONS_CNT | BIGINT | Число финальных уникальных CDR, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `cdr_id` | STRING | `COUNT(*)` после дедупликации |
@@ -150,8 +152,6 @@ TBLPROPERTIES (
 Проверки перед commit: ключ уникален; `FIELD_USERS_CNT <= FIELD_SESSIONS_CNT`; все счётчики положительны; денежные и трафиковые поля неотрицательны; для `VOICE`/`SMS` трафик равен нулю; сумма сессий совпадает с числом принятых CDR, а сумма charge — с контрольной суммой источника точно до четырёх знаков.
 
 ### FAQ
-
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
 
 **К какому дню относится сессия через полночь?** К UTC-дате `session_start_ts`; одна CDR не делится между днями.
 

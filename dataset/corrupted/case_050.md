@@ -2,11 +2,11 @@
 
 | **Общие сведения** | Почасовая витрина финальных исходов SMS. Одна строка описывает сообщения, получившие финальный статус в одном UTC-часе, для региона маршрута, направления и канала трафика. |
 | :--- | :--- |
-| **Решаемая проблема** | NOC и продукт Messaging должны одинаково считать доставку SMS и быстро находить деградации маршрутов. Включаются финальные статусы `DELIVERED`, `FAILED`, `EXPIRED`; промежуточные статусы, содержимое SMS и тестовый трафик исключаются. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |
-| **Продуктовые метрики** | Полнота принятых финальных сообщений — 100%; час опубликован не позднее H+31 минуты; уникальность `message_id` до агрегации — 100%; `FIELD_DELIVERY_RATE_PCT` воспроизводится из счётчиков без расхождения. Дополнительная метрика: качество результата должно быть высоким. |
+| **Решаемая проблема** | NOC и продукт Messaging должны одинаково считать доставку SMS и быстро находить деградации маршрутов. Включаются финальные статусы `DELIVERED`, `FAILED`, `EXPIRED`; промежуточные статусы, содержимое SMS и тестовый трафик исключаются. |
+| **Продуктовые метрики** | Полнота принятых финальных сообщений — 100%; час опубликован не позднее H+31 минуты; уникальность `message_id` до агрегации — 100%; `FIELD_DELIVERY_RATE_PCT` воспроизводится из счётчиков без расхождения. |
 | **Заказчики** | Центр управления Messaging, команда качества цифровых коммуникаций. |
 | **Нефункциональные требования** | До 300 млн сообщений/сутки, пик 25 тыс./с; event-time обработка UTC; первичный SLA H+5 минут, финальный H+31 минута; хранение результата 2 года; безопасный replay Kafka за 14 дней; RTO 60 минут. |
-| **Системы-источники** | `SMS_STATUS_HUB` — шлюз унифицированных финальных статусов SMSC. |
+| **Системы-источники** | `SMS_STATUS_HUB` — шлюз унифицированных финальных статусов SMSC. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
 | **Data Catalog** | [Продукт SMS Delivery Hourly](https://datacatalog.corp.mts.ru/products/sms-delivery-hourly) |
 | **Исходники проекта** | [GitLab: messaging/sms-delivery-hourly](https://gitlab.corp.mts.ru/bigdata/messaging/sms-delivery-hourly) |
 | **Команда** | Кирилл Зайцев — аналитик; Лилия Фролова — разработчик; Артём Денисов — QA; Оксана Чернова — Product Owner. |
@@ -16,13 +16,13 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_SMS_FINAL_STATUS_V2` | Kafka; кластер не указан | Data Catalog: ссылка отсутствует | JSON Schema draft 2020-12; schema `mts.messaging.sms-final-status`, версия 2.3, Schema Registry subject `TOPIC_SMS_FINAL_STATUS_V2-value`, compatibility `BACKWARD`; Confluent JSON Schema framing с schema ID, UTF-8, десериализация registry-aware Flink format. Kafka key — UTF-8 `message_id`. Payload содержит `operation=UPSERT\|DELETE` и монотонный `status_revision`; DELETE сохраняет исходный `final_status_ts`. Неизвестные свойства разрешены и игнорируются, обязательные поля задаёт schema. |
+| `TOPIC_SMS_FINAL_STATUS_V2` | Kafka; конкретный кластер не зафиксирован | [Data Catalog: TOPIC_SMS_FINAL_STATUS_V2](https://datacatalog.corp.mts.ru/kafka/kafka-messaging-prod-02/TOPIC_SMS_FINAL_STATUS_V2) | JSON Schema draft 2020-12; schema `mts.messaging.sms-final-status`, версия 2.3, Schema Registry subject `TOPIC_SMS_FINAL_STATUS_V2-value`, compatibility `BACKWARD`; Confluent JSON Schema framing с schema ID, UTF-8, десериализация registry-aware Flink format. Kafka key — UTF-8 `message_id`. Payload содержит `operation=UPSERT\|DELETE` и монотонный `status_revision`; DELETE сохраняет исходный `final_status_ts`. Неизвестные свойства разрешены и игнорируются, обязательные поля задаёт schema. |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| `DWH_REF.DICT_SMS_ROUTE_SCD` | [Data Catalog: DICT_SMS_ROUTE_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_SMS_ROUTE_SCD) | PostgreSQL `ref-messaging-prod-01`, модель 2.0; Flink JDBC temporal lookup, версия snapshot закреплена checkpoint. Поля `route_id`, `region_code`, `traffic_channel`; SCD2-интервал UTC `[valid_from_ts, valid_to_ts)`, enum channel: `P2P`, `A2P`, `SERVICE`. |
+| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
 
 ### Приемники данных
 
@@ -38,7 +38,17 @@
 
 ### Алгоритм обработки потока
 
+Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
+
 #### Шаг 1. Фильтрация данных
+
+Некорректную запись разрешается либо исключить, либо сохранить без изменений.
+
+Дополнительно учитываются события только за последние 7 дней.
+
+Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.
+
+Онлайн применяет стандартные фильтры качества, перечень которых хранится в коде.
 
 Event time — `final_status_ts`, epoch milliseconds UTC. Сначала принять декодированные change records с `operation IN ('UPSERT','DELETE')`, непустыми `message_id`, `final_status_ts`, `status_revision >= 1` и Kafka key, равным payload `message_id`. Дедуплицировать по `message_id`: выбрать максимальный `status_revision`, затем максимальные `(kafka_partition, kafka_offset)`. Winning `DELETE` удаляет сообщение из агрегата исходного часа. Одинаковый revision и порядок при различном payload блокируют commit checkpoint.
 
@@ -62,9 +72,17 @@ NULL не проходит соответствующее условие. Оши
 
 При нескольких совпадениях со справочником в результат передаются все найденные варианты.
 
-Описание этого этапа будет согласовано после начала разработки.
+После основного JOIN выполняется проверка по дополнительному корпоративному справочнику; его имя и версия не зафиксированы.
+
+Temporal `LEFT JOIN` по `event.route_id = ref.route_id` и `final_status_ts` в `[valid_from_ts, valid_to_ts)`. Ожидаемая кардинальность many-to-zero-or-one. При нескольких совпадениях checkpoint не коммитится и поднимается ошибка справочника.
+
+При отсутствии маршрута установить `FIELD_REGION_CODE='UNKNOWN'` и `FIELD_TRAFFIC_CHANNEL='UNKNOWN'`, сохранить сообщение и увеличить `route_not_found_cnt`. Если строка справочника найдена, но `region_code` пуст или `traffic_channel` не входит в enum, это дефект справочника: публикация останавливается. Другие справочники и НСИ не используются.
 
 #### Шаг 3. Агрегация и расчёт показателей
+
+После расчета агрегатов дубли удаляются по идентификатору исходного события.
+
+Сначала все входные строки агрегируются без дедупликации.
 
 Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
 
@@ -128,7 +146,7 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 ```sql
 CREATE TABLE IF NOT EXISTS CDM_MSG.TABLE_SMS_DELIVERY_HOURLY (
-    FIELD_BIZ_DATE STRING NOT NULL,
+    FIELD_BIZ_DATE DATE NOT NULL,
     FIELD_HOUR_UTC TINYINT NOT NULL,
     FIELD_REGION_CODE STRING NOT NULL,
     FIELD_DIRECTION STRING NOT NULL,
@@ -154,8 +172,6 @@ TBLPROPERTIES (
 Приёмка до commit: уникальность бизнес-ключа, отсутствие NULL, допустимые enum/час, неотрицательные компоненты, положительный total, точное равенство суммы исходов total и повторный расчёт rate по формуле. Контрольная сумма принятых уникальных `message_id` равна сумме `FIELD_MESSAGES_CNT`.
 
 ### FAQ
-
-Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
 
 **Почему час определяется по финальному статусу, а не отправке?** Продукт мониторит работу контура завершения доставки. Аналитика по часу отправки находится в отдельной витрине и не смешивается с этим SLA.
 

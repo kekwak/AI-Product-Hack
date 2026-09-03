@@ -6,7 +6,7 @@
 | **Продуктовые метрики** | Полнота принятых финальных сообщений — 100%; час опубликован не позднее H+31 минуты; уникальность `message_id` до агрегации — 100%; `FIELD_DELIVERY_RATE_PCT` воспроизводится из счётчиков без расхождения. |
 | **Заказчики** | Центр управления Messaging, команда качества цифровых коммуникаций. |
 | **Нефункциональные требования** | До 300 млн сообщений/сутки, пик 25 тыс./с; event-time обработка UTC; первичный SLA H+5 минут, финальный H+31 минута; хранение результата 2 года; безопасный replay Kafka за 14 дней; RTO 60 минут. |
-| **Системы-источники** | `SMS_STATUS_HUB` — шлюз унифицированных финальных статусов SMSC. При расхождении значений между источниками допускается использовать значение любого из них. |
+| **Системы-источники** | `SMS_STATUS_HUB` — шлюз унифицированных финальных статусов SMSC. |
 | **Data Catalog** | [Продукт SMS Delivery Hourly](https://datacatalog.corp.mts.ru/products/sms-delivery-hourly) |
 | **Исходники проекта** | [GitLab: messaging/sms-delivery-hourly](https://gitlab.corp.mts.ru/bigdata/messaging/sms-delivery-hourly) |
 | **Команда** | Кирилл Зайцев — аналитик; Лилия Фролова — разработчик; Артём Денисов — QA; Оксана Чернова — Product Owner. |
@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_SMS_FINAL_STATUS_V2` | Kafka, кластер `kafka-messaging-prod-02` | Data Catalog: ссылка отсутствует | JSON Schema draft 2020-12; schema `mts.messaging.sms-final-status`, версия 2.3, Schema Registry subject `TOPIC_SMS_FINAL_STATUS_V2-value`, compatibility `BACKWARD`; Confluent JSON Schema framing с schema ID, UTF-8, десериализация registry-aware Flink format. Kafka key — UTF-8 `message_id`. Payload содержит `operation=UPSERT\|DELETE` и монотонный `status_revision`; DELETE сохраняет исходный `final_status_ts`. Неизвестные свойства разрешены и игнорируются, обязательные поля задаёт schema. |
+| `TOPIC_SMS_FINAL_STATUS_V2` | Kafka; кластер не указан | [Data Catalog: TOPIC_SMS_FINAL_STATUS_V2](https://datacatalog.corp.mts.ru/kafka/kafka-messaging-prod-02/TOPIC_SMS_FINAL_STATUS_V2) | JSON Schema draft 2020-12; schema `mts.messaging.sms-final-status`, версия 2.3, Schema Registry subject `TOPIC_SMS_FINAL_STATUS_V2-value`, compatibility `BACKWARD`; Confluent JSON Schema framing с schema ID, UTF-8, десериализация registry-aware Flink format. Kafka key — UTF-8 `message_id`. Payload содержит `operation=UPSERT\|DELETE` и монотонный `status_revision`; DELETE сохраняет исходный `final_status_ts`. Неизвестные свойства разрешены и игнорируются, обязательные поля задаёт schema. |
 
 ### Источники обогащения данных
 
@@ -28,9 +28,11 @@
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `CDM_MSG.TABLE_SMS_DELIVERY_HOURLY` | HDFS/Iceberg, кластер `hadoop-msg-prod-01`, полный путь `/warehouse/cdm/messaging/sms_delivery_hourly/` | [Data Catalog: TABLE_SMS_DELIVERY_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_MSG/TABLE_SMS_DELIVERY_HOURLY) | Iceberg v2, Parquet `SNAPPY`; Hive Metastore модель версии 1.1; Flink Iceberg sink сериализует row data по field ID и коммитит checkpoint snapshot, Iceberg reader десериализует по snapshot schema. |
+| `CDM_MSG.TABLE_SMS_DELIVERY_HOURLY` | HDFS; путь не указан | [Data Catalog: TABLE_SMS_DELIVERY_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_MSG/TABLE_SMS_DELIVERY_HOURLY) | Iceberg v2, Parquet `SNAPPY`; Hive Metastore модель версии 1.1; Flink Iceberg sink сериализует row data по field ID и коммитит checkpoint snapshot, Iceberg reader десериализует по snapshot schema. |
 
 ### Схема потоков данных
+
+Обязательный порядок: фильтрация → обогащение → агрегация.
 
 `SMS_STATUS_HUB` → `kafka-messaging-prod-02.TOPIC_SMS_FINAL_STATUS_V2` → Flink `sms-delivery-hourly-v2` → валидация/дедупликация → temporal JOIN маршрута → часовая агрегация → Iceberg `TABLE_SMS_DELIVERY_HOURLY`.
 
@@ -38,9 +40,9 @@
 
 ### Алгоритм обработки потока
 
-Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+События после watermark окончательно отбрасываются и не меняют результат.
 
-Во всех расчетах используются только активные записи источников.
+Реализация сначала обогащает все записи, затем применяет входные фильтры.
 
 #### Шаг 1. Фильтрация данных
 
@@ -64,9 +66,9 @@ NULL не проходит соответствующее условие. Оши
 
 #### Шаг 2. Обогащение данных
 
-При нескольких совпадениях со справочником в результат передаются все найденные варианты.
+Temporal `LEFT JOIN` по `event.route_id = ref.route_id` и `final_status_ts` в `[valid_from_ts, valid_to_ts)`. Ожидаемая кардинальность many-to-zero-or-one. При нескольких совпадениях checkpoint не коммитится и поднимается ошибка справочника.
 
-Описание этого этапа будет согласовано после начала разработки.
+При отсутствии маршрута установить `FIELD_REGION_CODE='UNKNOWN'` и `FIELD_TRAFFIC_CHANNEL='UNKNOWN'`, сохранить сообщение и увеличить `route_not_found_cnt`. Если строка справочника найдена, но `region_code` пуст или `traffic_channel` не входит в enum, это дефект справочника: публикация останавливается. Другие справочники и НСИ не используются.
 
 #### Шаг 3. Агрегация и расчёт показателей
 
@@ -87,13 +89,15 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 ### Формирование ключа (kafka) / партиции (hdfs)
 
+При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
+
 - Входной Kafka key: `message_id` UTF-8. Kafka-приёмник отсутствует.
 - HDFS/Iceberg partitions: `days(FIELD_BIZ_DATE)` и identity `FIELD_HOUR_UTC`; полный путь `/warehouse/cdm/messaging/sms_delivery_hourly/`.
 - Внутренняя сортировка: `(FIELD_REGION_CODE, FIELD_DIRECTION, FIELD_TRAFFIC_CHANNEL)`; она не является дополнительной гранулярностью.
 
 ### Структура данных
 
-Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
+В следующем релизе добавляется обязательное поле contract_flag NOT NULL без default.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -130,7 +134,7 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 ```sql
 CREATE TABLE IF NOT EXISTS CDM_MSG.TABLE_SMS_DELIVERY_HOURLY (
-    FIELD_BIZ_DATE DATE NOT NULL,
+    FIELD_BIZ_DATE STRING NOT NULL,
     FIELD_HOUR_UTC TINYINT NOT NULL,
     FIELD_REGION_CODE STRING NOT NULL,
     FIELD_DIRECTION STRING NOT NULL,
@@ -157,7 +161,13 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Порог срабатывания, период сравнения и блокировка публикации определяются вручную после проверки.
+
+После загрузки рассчитываются число дублей и расхождение с источником.
+
+Все поздние события автоматически включаются ближайшим replay без ограничений по возрасту.
+
+Старые партиции и потребители остаются без изменений; план миграции не предусмотрен.
 
 **Почему час определяется по финальному статусу, а не отправке?** Продукт мониторит работу контура завершения доставки. Аналитика по часу отправки находится в отдельной витрине и не смешивается с этим SLA.
 

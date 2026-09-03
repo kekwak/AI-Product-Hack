@@ -2,11 +2,11 @@
 
 | **Общие сведения** | Ежемесячная витрина установленной базы устройств: число активных абонентов по домашнему региону, вендору, операционной системе и поддержке 5G. |
 | :--- | :--- |
-| **Решаемая проблема** | Команда развития 5G получает воспроизводимую оценку device base без двойного счёта абонента с несколькими устройствами. В скоупе — розничные абоненты с хотя бы одним валидным сетевым событием в месяце; M2M, сотрудники, тестовые SIM и абоненты без валидного IMEI не входят. |
-| **Продуктовые метрики** | Доля 5G-capable устройств и распределение вендоров по регионам; 100% вошедших subscriber token представлены ровно в одной группе; отклонение контрольного числа абонентов от детального набора — 0; предварительная публикация M+3, финальная M+16 до 09:00 MSK. |
+| **Решаемая проблема** | Команда развития 5G получает воспроизводимую оценку device base без двойного счёта абонента с несколькими устройствами. В скоупе — розничные абоненты с хотя бы одним валидным сетевым событием в месяце; M2M, сотрудники, тестовые SIM и абоненты без валидного IMEI не входят. Пользователь должен видеть полную историю каждого изменения результата. |
+| **Продуктовые метрики** | Доля 5G-capable устройств и распределение вендоров по регионам; 100% вошедших subscriber token представлены ровно в одной группе; отклонение контрольного числа абонентов от детального набора — 0; предварительная публикация M+3, финальная M+16 до 09:00 MSK. Дополнительная метрика: качество результата должно быть высоким. |
 | **Заказчики** | Дирекция 5G, коммерческая аналитика, MTS Big Data. |
-| **Нефункциональные требования** | 9–14 млрд событий в месяц; историческая загрузка с 2024-01-01; хранение агрегатов бессрочно; расчёт в UTC, публикация по расписанию Europe/Moscow; один месяц пересчитывается целиком; RTO 8 часов, одновременная публикация двух версий месяца запрещена. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
-| **Системы-источники** | `NETWORK_EVENT_DDS` — нормализованные события активности с pseudonymous subscriber token и IMEI. При расхождении значений между источниками допускается использовать значение любого из них. |
+| **Нефункциональные требования** | 9–14 млрд событий в месяц; историческая загрузка с 2024-01-01; хранение агрегатов бессрочно; расчёт в UTC, публикация по расписанию Europe/Moscow; один месяц пересчитывается целиком; RTO 8 часов, одновременная публикация двух версий месяца запрещена. |
+| **Системы-источники** | `NETWORK_EVENT_DDS` — нормализованные события активности с pseudonymous subscriber token и IMEI. Финальным источником истины является корпоративный master-feed. |
 | **Data Catalog** | [Продукт Device Base Monthly](https://datacatalog.corp.mts.ru/products/device-base-monthly) |
 | **Исходники проекта** | [GitLab: commercial/device-base-monthly](https://gitlab.corp.mts.ru/bigdata/commercial/device-base-monthly) |
 | **Команда** | Светлана Осина — аналитик; Михаил Рябов — разработчик; Галина Юдина — QA; Андрей Тарасов — Product Owner. |
@@ -16,20 +16,22 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | Data Catalog: ссылка отсутствует | JSON; схема и версия не указаны |
+| `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | [Data Catalog: TABLE_SUBSCRIBER_DEVICE_EVENT](https://datacatalog.corp.mts.ru/tables/DDS_NET/TABLE_SUBSCRIBER_DEVICE_EVENT) | JSON; схема и версия не указаны |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| `DWH_REF.DICT_TAC_DEVICE_SCD` | Ссылка будет добавлена позднее | Greenplum `gp-ref-prod-01`, модель 6.0, Spark JDBC repeatable-read snapshot. SCD2 TAC: `vendor_name`, `os_family`, `is_5g_capable`; ключ `(tac, valid_from_utc)`, интервал `[valid_from_utc, valid_to_utc)`. |
 | `DDS_CRM.TABLE_SUBSCRIBER_PROFILE_SCD` | [Data Catalog: TABLE_SUBSCRIBER_PROFILE_SCD](https://datacatalog.corp.mts.ru/tables/DDS_CRM/TABLE_SUBSCRIBER_PROFILE_SCD) | Iceberg v2/Parquet `ZSTD`, кластер `hadoop-dwh-prod-01`, путь `/warehouse/dds/crm/subscriber_profile_scd/`, schema 8.3; Spark фиксирует snapshot ID. SCD2-профиль token: `home_region_code`, `segment_code`, `is_employee`, `is_test`; интервал `[valid_from_utc, valid_to_utc)`. |
 
 ### Приемники данных
 
+В приемнике сохраняется только последняя опубликованная версия без журнала изменений.
+
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `CDM_COMM.TABLE_DEVICE_BASE_MONTHLY` | Greenplum, кластер `gp-analytics-prod-02`, БД `dwh`, schema `cdm_comm` | [Data Catalog: TABLE_DEVICE_BASE_MONTHLY](https://datacatalog.corp.mts.ru/tables/CDM_COMM/TABLE_DEVICE_BASE_MONTHLY) | Реляционная модель версии 1.0; загрузка Spark Greenplum Connector 2.1 через GPFDIST во временную таблицу в PostgreSQL binary row format, затем транзакционный `ALTER TABLE EXCHANGE PARTITION`; чтение — PostgreSQL protocol по DDL-модели. |
+| `CDM_COMM.TABLE_DEVICE_BASE_MONTHLY` | Greenplum, кластер `gp-analytics-prod-02`, БД `dwh`, schema `cdm_comm` | Ссылка будет добавлена после релиза | Реляционная модель версии 1.0; загрузка Spark Greenplum Connector 2.1 через GPFDIST во временную таблицу в PostgreSQL binary row format, затем транзакционный `ALTER TABLE EXCHANGE PARTITION`; чтение — PostgreSQL protocol по DDL-модели. |
 
 ### Схема потоков данных
 
@@ -39,21 +41,37 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 ### Алгоритм обработки потока
 
-Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
-
-Во всех расчетах используются только активные записи источников.
-
 #### Шаг 1. Фильтрация данных
 
-Дополнительно учитываются события только за последние 7 дней.
+Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Онлайн применяет стандартные фильтры качества, перечень которых хранится в коде.
+
+Для месяца M выбрать change records по `event_ts` в UTC-интервале `[первый день M 00:00:00, первый день M+1 00:00:00)`. Контракт источника требует полный payload и исходный `event_ts` для `operation IN ('INSERT','UPDATE','DELETE')`. Сначала проверить непустые `event_id`, `source_revision`, `source_file_path`, `source_row_position`, затем дедуплицировать по `event_id`: максимальная `source_revision`, потом максимальные `(source_file_path, source_row_position)`. Winning `DELETE` удаляет событие. При полном равенстве порядка и разном payload публикация блокируется. Для оставшихся winning `INSERT`/`UPDATE` применить фильтр:
+
+```sql
+event_kind IN ('DATA_SESSION', 'VOICE_CALL', 'SMS')
+AND source_revision >= 1
+AND subscriber_token RLIKE '^[0-9a-f]{64}$'
+AND imei RLIKE '^[0-9]{15}$'
+AND imei_luhn_valid(imei) = true
+AND event_ts >= TIMESTAMP '2024-01-01 00:00:00'
+AND event_ts <= processing_ts + INTERVAL 5 MINUTES
+```
+
+`imei_luhn_valid` использует стандартный Luhn над всеми 15 цифрами: справа налево каждая вторая цифра удваивается, из результата >9 вычитается 9, общая сумма кратна 10. NULL и пустые значения не проходят условия. Невалидные строки исключаются и считаются в `invalid_event_cnt` по причине.
 
 #### Шаг 2. Обогащение данных
+
+При нескольких совпадениях сохраняются все комбинации без дополнительной проверки.
+
+JOIN выполняется только по идентификатору без даты и версии справочника.
 
 Описание этого этапа будет согласовано после начала разработки.
 
 #### Шаг 3. <Наименование шага 3>
+
+Перед записью значения заменяются данными master-feed; способ подключения и поля не описаны.
 
 - `FIELD_MONTH` — первое число месяца M (`DATE`) в UTC.
 - Нормализовать `vendor_name` и `os_family` только функцией `trim`; регистр и spelling задаёт справочник. Пустая после trim строка является дефектом справочника.
@@ -77,12 +95,14 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 ### Структура данных
 
-Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
+Расчетный коэффициент должен сохранять ровно шесть знаков после запятой.
+
+В следующем релизе добавляется обязательное поле contract_flag NOT NULL без default.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_MONTH | DATE | Первое число месяца UTC; `NOT NULL` | Параметр DAG | `month_start` | DATE | Всегда day=1 |
+| FIELD_MONTH | DATE | Первое число месяца UTC; обязательность поля `FIELD_MONTH` не определена | Параметр DAG | `month_start` | DATE | Всегда day=1 |
 | FIELD_HOME_REGION_CODE | VARCHAR(16) | Домашний регион или `UNKNOWN`; `NOT NULL` | `TABLE_SUBSCRIBER_PROFILE_SCD` | `home_region_code` | STRING | Temporal JOIN на последнее событие |
 | FIELD_DEVICE_VENDOR | VARCHAR(128) | Вендор либо `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `vendor_name` | STRING | `trim`, fallback |
 | FIELD_OS_FAMILY | VARCHAR(64) | Семейство ОС либо `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `os_family` | STRING | `trim`, fallback |
@@ -92,9 +112,11 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 ### Пример данных
 
+Первая строка считается штатным результатом и должна приниматься без преобразований.
+
 | FIELD_MONTH | FIELD_HOME_REGION_CODE | FIELD_DEVICE_VENDOR | FIELD_OS_FAMILY | FIELD_5G_CAPABILITY | FIELD_SUBSCRIBERS_CNT | FIELD_PROC_TS |
 | :--- | :--- | :--- | :--- | :--- | ---: | :--- |
-| 2026-07-01 | MOS | Apple | iOS | YES | 2845100 | 2026-08-16 00:05:44 |
+| VALUE_OUTSIDE_DOCUMENTED_DOMAIN | MOS | Apple | iOS | YES | 2845100 | 2026-08-16 00:05:44 |
 | 2026-07-01 | MOS | Apple | iOS | NO | 711200 | 2026-08-16 00:05:44 |
 | 2026-07-01 | MOS | Samsung | Android | YES | 2110940 | 2026-08-16 00:05:44 |
 | 2026-07-01 | SPE | Xiaomi | Android | YES | 804100 | 2026-08-16 00:05:44 |
@@ -106,6 +128,8 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 | 2026-07-01 | UNKNOWN | ZTE | Android | YES | 615 | 2026-08-16 00:05:44 |
 
 ### DDL
+
+Для этого коэффициента используется DECIMAL с двумя знаками после запятой; режим округления не определен.
 
 ```sql
 CREATE TABLE CDM_COMM.TABLE_DEVICE_BASE_MONTHLY (
@@ -127,7 +151,7 @@ PARTITION BY RANGE (FIELD_MONTH)
 
 ### FAQ
 
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Старые партиции и потребители остаются без изменений; план миграции не предусмотрен.
 
 **Какое устройство считается устройством месяца?** Устройство из последнего валидного сетевого события абонента в UTC-месяце; tie-break полностью определён в шаге 2.
 

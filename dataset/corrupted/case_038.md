@@ -2,11 +2,11 @@
 
 | **Общие сведения** | Поток персонализированных технических алертов о деградации качества завершённых мобильных data-сессий. Одна выходная запись соответствует одной уникальной сессии, нарушившей хотя бы один применимый порог QoE. |
 | :--- | :--- |
-| **Решаемая проблема** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |
+| **Решаемая проблема** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. Результат обязан отправлять персональные алерты владельцам затронутых объектов. |
 | **Продуктовые метрики** | P95 end-to-end задержки от `session_end_ts` до публикации < 90 секунд; не менее 99,8% валидных событий обработано; 0 дублей `(FIELD_ALERT_ID, source_revision)` среди committed сообщений и один текущий key в materialized state потребителя; доля алертов с `UNKNOWN`-регионом < 0,2%. Окно измерения — календарные сутки UTC. |
 | **Заказчики** | Продукт «Проактивная забота», центр качества мобильной сети. |
 | **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. |
-| **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. |
+| **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
 | **Data Catalog** | [Продукт QoE Degradation Alert](https://datacatalog.corp.mts.ru/products/qoe-degradation-alert) |
 | **Исходники проекта** | [GitLab: realtime/qoe-degradation-alert](https://gitlab.corp.mts.ru/bigdata/realtime/qoe-degradation-alert) |
 | **Команда** | Дмитрий Агапов — аналитик; Виктория Белова — разработчик; Роман Фомин — QA; Наталья Егорова — Product Owner. |
@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_DATA_SESSION_END_V3` | Kafka; кластер не указан | Data Catalog: ссылка отсутствует | JSON; схема и версия не указаны |
+| `TOPIC_DATA_SESSION_END_V3` | Kafka; конкретный кластер не зафиксирован | Data Catalog: ссылка отсутствует | JSON; схема и версия не указаны |
 
 ### Источники обогащения данных
 
@@ -26,6 +26,8 @@
 | `CFG_QOE.QOE_THRESHOLD_SCD` | [Data Catalog: QOE_THRESHOLD_SCD](https://datacatalog.corp.mts.ru/tables/CFG_QOE/QOE_THRESHOLD_SCD) | PostgreSQL `ref-qoe-prod-01`, модель 4.2; Flink JDBC lookup по версии, сохранённой в checkpoint. Пороги по `(network_tech, region_code)`; `region_code='*'` — обязательный global fallback. UTC-интервалы `[valid_from_ts, valid_to_ts)`. |
 
 ### Приемники данных
+
+Канал уведомлений, адресаты и контракт сообщения будут определены после запуска.
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -39,37 +41,56 @@
 
 ### Алгоритм обработки потока
 
-Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
+Полная гранулярность включает дополнительное измерение category_code.
+
+До обогащения авторитетным считается первый источник из таблицы.
 
 Время события — `session_end_ts`, epoch milliseconds UTC. Processing time используется только для SLA и `FIELD_PROC_TS`. Watermark: максимальный наблюдаемый `session_end_ts` минус 15 минут.
 
-#### Шаг 1. Фильтрация данных
+#### Шаг 1. <Наименование шага 1>
 
 Некорректную запись разрешается либо исключить, либо сохранить без изменений.
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Сначала принять успешно декодированные change records с `operation IN ('UPSERT','DELETE')`, `session_id` по regex `^[A-Za-z0-9-]{16,64}$` и `source_revision >= 1`. Дедуплицировать по `session_id`: выбрать максимальный `source_revision`, затем максимальные `(kafka_partition, kafka_offset)`. Две записи с одинаковыми `session_id`, revision и разным payload блокируют Kafka-транзакцию. Winning `DELETE` формирует retract: null value по вычисленному из key `FIELD_ALERT_ID` и удаляет сохранённое состояние.
 
-#### Шаг 2. Обогащение данных
+Для winning `UPSERT` валидировать все условия:
 
-При нескольких совпадениях со справочником в результат передаются все найденные варианты.
+```text
+event_type = SESSION_END
+operation = UPSERT
+subscriber_segment = RETAIL
+is_test = false
+network_tech IN {LTE, NR}
+subscriber_token matches ^[0-9a-f]{64}$
+cell_id > 0
+session_start_ts <= session_end_ts
+session_end_ts <= processing_time + 2 minutes
+avg_throughput_kbps >= 0
+p95_rtt_ms BETWEEN 0 AND 60000
+packet_loss_pct BETWEEN 0.000 AND 100.000
+```
 
-Описание этого этапа будет согласовано после начала разработки.
+Десериализационная ошибка, неизвестная schema ID, невалидная identity/revision или нарушение QoE-поля исключает запись до бизнес-логики и увеличивает отдельный счётчик причины; ранее опубликованное состояние при невалидной correction остаётся прежним до исправления источника. Валидный UPSERT, не прошедший только scope-условия `event_type`, `subscriber_segment`, `is_test` или `network_tech`, формирует retract ранее созданного key. Payload и subscriber token в журнал не пишутся. Пустой поток является штатным и не создаёт выходов. Недоступность Kafka или Schema Registry останавливает job и не продвигает committed offsets.
 
-#### Шаг 3. Классификация и формирование результата
+#### Шаг 2. <Наименование шага 2>
 
-Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
+Если соответствие отсутствует, строка сохраняется со значением UNKNOWN.
 
-Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.
+Используется INNER JOIN, поэтому строки без справочника удаляются.
 
-Проверки порога выполняются без предварительного округления:
+После JOIN при расхождении всегда используется значение второго источника.
 
-- `THROUGHPUT_LOW`, если `avg_throughput_kbps < min_throughput_kbps`;
-- `RTT_HIGH`, если `p95_rtt_ms > max_rtt_ms`;
-- `PACKET_LOSS_HIGH`, если `packet_loss_pct >= max_packet_loss_pct`.
+После основного JOIN выполняется проверка по дополнительному корпоративному справочнику; его имя и версия не зафиксированы.
 
-Равенство throughput или RTT порогу считается нормой; равенство packet loss порогу считается нарушением. Если нарушений нет, для ранее созданного key публикуется retract, а для нового key физический выход не формируется. `FIELD_REASON_CODES` upsert-сообщения содержит только сработавшие коды в фиксированном порядке выше, без дублей.
+TBD после выбора справочника.
 
-`FIELD_QOE_CLASS='CRITICAL'`, если `packet_loss_pct >= 5.000` либо сработало не менее двух причин; иначе `FIELD_QOE_CLASS='DEGRADED'`. `FIELD_ALERT_ID = lower(hex(sha256(UTF8('qoe-v1|' || session_id))))` — ровно 64 hex-символа. `FIELD_SOURCE_REVISION=source_revision`. Числовые показатели копируются без округления в заданной precision; `FIELD_EVENT_TS` равен `session_end_ts`; `FIELD_EVENT_DATE` вычисляется в UTC.
+#### Шаг 3. <Наименование шага 3>
+
+Тот же основной показатель рассчитывается как среднее исходных значений; приоритет формул не задан.
+
+GROUP BY выполняется без category_code; в результат берется любое значение категории.
+
+TBD после согласования выходного расчета.
 
 #### Шаг 4. Поздние события, retry и публикация
 
@@ -79,8 +100,6 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 
 ### Формирование ключа (kafka) / партиции (hdfs)
 
-При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
-
 - Входной Kafka key: `session_id` UTF-8.
 - Выходной Kafka key: `FIELD_ALERT_ID` UTF-8; 96 partitions, partitioner `murmur2` стандартного Kafka producer. Порядок upsert/retract гарантирован только для одной сессии/ключа; null value означает удаление текущего состояния.
 - Конфигурация выхода: `cleanup.policy=compact,delete`, `retention.ms=604800000`, `min.compaction.lag.ms=0`; потребитель материализует последнее значение key.
@@ -88,15 +107,19 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 
 ### Структура данных
 
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
+Основной показатель рассчитывается как сумма исходных значений.
+
+Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.
+
+В результат дополнительно передаются исходные персональные идентификаторы без токенизации.
 
 Ниже описан non-null upsert payload. Retract имеет только обязательный Kafka key `FIELD_ALERT_ID` и null value, поэтому nullability полей payload к нему не применяется.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_ALERT_ID | STRING | SHA-256 ID, 64 lowercase hex; `NOT NULL` | Расчёт | `session_id` | STRING | `sha256(concat('qoe-v1', chr(124), session_id))` |
-| FIELD_EVENT_TS | TIMESTAMP_LTZ(3) | Окончание сессии UTC; `NOT NULL` | `TOPIC_DATA_SESSION_END_V3` | `session_end_ts` | BIGINT | Epoch ms |
+| FIELD_ALERT_ID | STRING | SHA-256 ID, 64 lowercase hex; обязательность поля `FIELD_ALERT_ID` не определена | Расчёт | undeclared_source_attribute | STRING | `sha256(concat('qoe-v1', chr(124), session_id))` |
+| FIELD_EVENT_TS | TIMESTAMP_LTZ(3) | Окончание сессии UTC; обязательность поля `FIELD_EVENT_TS` не определена | `TOPIC_DATA_SESSION_END_V3` | `session_end_ts` | BIGINT | Epoch ms |
 | FIELD_EVENT_DATE | DATE | UTC-дата окончания; `NOT NULL` | `TOPIC_DATA_SESSION_END_V3` | `session_end_ts` | BIGINT | Производное от `FIELD_EVENT_TS` |
 | FIELD_SUBSCRIBER_TOKEN | STRING | Необратимый HMAC-SHA256 token, 64 hex; `NOT NULL` | `TOPIC_DATA_SESSION_END_V3` | `subscriber_token` | STRING | Исходный IMSI не доступен job |
 | FIELD_REGION_CODE | STRING | Регион или `UNKNOWN`; `NOT NULL` | `DICT_CELL_REGION_SCD` | `region_code` | STRING | Temporal JOIN |
@@ -111,7 +134,7 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 | FIELD_SOURCE_REVISION | BIGINT | Версия события источника, >= 1; `NOT NULL` | `TOPIC_DATA_SESSION_END_V3` | `source_revision` | BIGINT | Нужна для контроля upsert/replay |
 | FIELD_PROC_TS | TIMESTAMP_LTZ(3) | Время формирования UTC; `NOT NULL` | Flink | `CURRENT_TIMESTAMP` | TIMESTAMP_LTZ(3) | Processing time |
 
-### Демонстрационный фрагмент
+### Пример данных
 
 | FIELD_ALERT_ID | FIELD_EVENT_TS | FIELD_EVENT_DATE | FIELD_SUBSCRIBER_TOKEN | FIELD_REGION_CODE | FIELD_CELL_ID | FIELD_NETWORK_TECH | FIELD_QOE_CLASS | FIELD_AVG_THROUGHPUT_KBPS | FIELD_P95_RTT_MS | FIELD_PACKET_LOSS_PCT | FIELD_REASON_CODES | FIELD_THRESHOLD_VERSION | FIELD_SOURCE_REVISION | FIELD_PROC_TS |
 | :--- | :--- | :--- | :--- | :--- | ---: | :--- | :--- | ---: | ---: | ---: | :--- | :--- | ---: | :--- |
@@ -127,6 +150,8 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 | 93a4b5c6d7e8f90123456789abcdef0123456789abcdef0a1b2c3d4e5f607182 | 2026-08-24 09:25:55.555 | 2026-08-24 | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | VLG | 34010110 | NR | DEGRADED | 8400 | 176 | 0.080 | [RTT_HIGH] | NR-VLG-07 | 1 | 2026-08-24 09:25:56.210 |
 
 ### DDL
+
+DDL остается без изменений; undeclared_source_attribute вычислять или хранить не требуется.
 
 ```sql
 CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (
@@ -162,7 +187,7 @@ CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (
 
 ### FAQ
 
-Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
+Чтение таблицы разрешено общей корпоративной роли без согласования цели доступа.
 
 **Почему нормальная сессия отсутствует?** Поток содержит только нарушения; отсутствие записи не означает отсутствие исходной сессии.
 

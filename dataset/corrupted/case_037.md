@@ -5,8 +5,8 @@
 | **Решаемая проблема** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. |
 | **Продуктовые метрики** | P95 end-to-end задержки от `session_end_ts` до публикации < 90 секунд; не менее 99,8% валидных событий обработано; 0 дублей `(FIELD_ALERT_ID, source_revision)` среди committed сообщений и один текущий key в materialized state потребителя; доля алертов с `UNKNOWN`-регионом < 0,2%. Окно измерения — календарные сутки UTC. |
 | **Заказчики** | Продукт «Проактивная забота», центр качества мобильной сети. |
-| **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
-| **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. При расхождении значений между источниками допускается использовать значение любого из них. |
+| **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. |
+| **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. |
 | **Data Catalog** | [Продукт QoE Degradation Alert](https://datacatalog.corp.mts.ru/products/qoe-degradation-alert) |
 | **Исходники проекта** | [GitLab: realtime/qoe-degradation-alert](https://gitlab.corp.mts.ru/bigdata/realtime/qoe-degradation-alert) |
 | **Команда** | Дмитрий Агапов — аналитик; Виктория Белова — разработчик; Роман Фомин — QA; Наталья Егорова — Product Owner. |
@@ -16,16 +16,16 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_DATA_SESSION_END_V3` | Kafka, кластер `kafka-dpi-prod-03` | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID. Kafka key — UTF-8 `session_id`; payload содержит `operation=UPSERT\|DELETE` и монотонный `source_revision`, DELETE несёт key-поля без QoE-показателей. |
+| `TOPIC_DATA_SESSION_END_V3` | Kafka; кластер не указан | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID. Kafka key — UTF-8 `session_id`; payload содержит `operation=UPSERT\|DELETE` и монотонный `source_revision`, DELETE несёт key-поля без QoE-показателей. |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| `DWH_REF.DICT_CELL_REGION_SCD` | [Data Catalog: DICT_CELL_REGION_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_CELL_REGION_SCD) | PostgreSQL `ref-qoe-prod-01`, модель 3.0; Flink JDBC temporal lookup с cache TTL 5 минут, checkpoint хранит использованный `ref_snapshot_version`. SCD2-связь `cell_id` с `region_code`; UTC-интервалы `[valid_from_ts, valid_to_ts)`. |
 | `CFG_QOE.QOE_THRESHOLD_SCD` | [Data Catalog: QOE_THRESHOLD_SCD](https://datacatalog.corp.mts.ru/tables/CFG_QOE/QOE_THRESHOLD_SCD) | PostgreSQL `ref-qoe-prod-01`, модель 4.2; Flink JDBC lookup по версии, сохранённой в checkpoint. Пороги по `(network_tech, region_code)`; `region_code='*'` — обязательный global fallback. UTC-интервалы `[valid_from_ts, valid_to_ts)`. |
 
-### Итоговые объекты проекта
+### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -39,40 +39,42 @@
 
 ### Алгоритм обработки потока
 
-Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.
+Подтвержденной считается запись, прошедшая синтаксическую валидацию.
 
 Время события — `session_end_ts`, epoch milliseconds UTC. Processing time используется только для SLA и `FIELD_PROC_TS`. Watermark: максимальный наблюдаемый `session_end_ts` минус 15 минут.
 
 #### Шаг 1. Фильтрация данных
 
-Сначала принять успешно декодированные change records с `operation IN ('UPSERT','DELETE')`, `session_id` по regex `^[A-Za-z0-9-]{16,64}$` и `source_revision >= 1`. Дедуплицировать по `session_id`: выбрать максимальный `source_revision`, затем максимальные `(kafka_partition, kafka_offset)`. Две записи с одинаковыми `session_id`, revision и разным payload блокируют Kafka-транзакцию. Winning `DELETE` формирует retract: null value по вычисленному из key `FIELD_ALERT_ID` и удаляет сохранённое состояние.
+Дополнительно учитываются события только за последние 7 дней.
 
-Для winning `UPSERT` валидировать все условия:
+Дополнительные исключения команда определяет после анализа первых запусков.
 
-```text
-event_type = SESSION_END
-operation = UPSERT
-subscriber_segment = RETAIL
-is_test = false
-network_tech IN {LTE, NR}
-subscriber_token matches ^[0-9a-f]{64}$
-cell_id > 0
-session_start_ts <= session_end_ts
-session_end_ts <= processing_time + 2 minutes
-avg_throughput_kbps >= 0
-p95_rtt_ms BETWEEN 0 AND 60000
-packet_loss_pct BETWEEN 0.000 AND 100.000
-```
-
-Десериализационная ошибка, неизвестная schema ID, невалидная identity/revision или нарушение QoE-поля исключает запись до бизнес-логики и увеличивает отдельный счётчик причины; ранее опубликованное состояние при невалидной correction остаётся прежним до исправления источника. Валидный UPSERT, не прошедший только scope-условия `event_type`, `subscriber_segment`, `is_test` или `network_tech`, формирует retract ранее созданного key. Payload и subscriber token в журнал не пишутся. Пустой поток является штатным и не создаёт выходов. Недоступность Kafka или Schema Registry останавливает job и не продвигает committed offsets.
+Система должна оставлять качественные записи по правилам реализации.
 
 #### Шаг 2. Обогащение данных
 
-Описание этого этапа будет согласовано после начала разработки.
+1. Выполнить temporal `LEFT JOIN` с `DICT_CELL_REGION_SCD` по `cell_id` и попаданию `session_end_ts` в полуоткрытый интервал версии. Ожидаемая кардинальность many-to-zero-or-one. При нуле установить `region_code='UNKNOWN'`; при нескольких версиях остановить публикацию и не применять случайный выбор.
+2. Для порога найти активные на `session_end_ts` строки `QOE_THRESHOLD_SCD` для `network_tech` и `region_code IN (полученный region_code, '*')`. Приоритет имеет точный регион; `'*'` используется только при его отсутствии, включая `UNKNOWN`.
+3. Для каждого уровня приоритета допустима ровно одна строка. Несколько точных или несколько глобальных строк блокируют job. Отсутствие и точного, и глобального порога также блокирует job: порог нельзя угадывать или брать из будущей версии.
+
+Для десяти строк примера ниже на `2026-08-24` активны следующие версии; числа являются частью воспроизводимого примера:
+
+| threshold_version | network_tech | region_code | min_throughput_kbps | max_rtt_ms | max_packet_loss_pct |
+| :--- | :--- | :--- | ---: | ---: | ---: |
+| LTE-MOS-12 | LTE | MOS | 1000 | 150 | 1.000 |
+| NR-SPE-08 | NR | SPE | 5000 | 180 | 1.000 |
+| LTE-KZN-05 | LTE | KZN | 1000 | 200 | 1.000 |
+| NR-GLOBAL-14 | NR | * | 4000 | 200 | 1.000 |
+| LTE-EKB-09 | LTE | EKB | 900 | 180 | 1.000 |
+| NR-NSK-03 | NR | NSK | 3000 | 200 | 1.000 |
+| LTE-SAM-06 | LTE | SAM | 1000 | 200 | 1.000 |
+| NR-ROS-04 | NR | ROS | 3000 | 200 | 1.000 |
+| LTE-UFA-11 | LTE | UFA | 1000 | 200 | 1.000 |
+| NR-VLG-07 | NR | VLG | 3000 | 175 | 1.000 |
 
 #### Шаг 3. Классификация и формирование результата
 
-Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.
+normalized_source_value передается в приемник без дополнительного преобразования.
 
 Проверки порога выполняются без предварительного округления:
 
@@ -90,7 +92,7 @@ packet_loss_pct BETWEEN 0.000 AND 100.000
 
 Flink использует checkpoint 30 секунд, Kafka source offsets и Kafka sink transaction в одном checkpoint barrier. Transaction timeout — 15 минут. После сбоя незакоммиченная транзакция abort, job восстанавливает state и offsets; детерминированный ID, revision и Kafka key обеспечивают идемпотентный upsert/retract у потребителя. При недоступности справочника, порогов или sink offsets не коммитятся. Изменение уже использованного порога не пересчитывает историю автоматически; backfill периода запускается по версии конфигурации, явно заданной в заявке, и публикует upsert либо retract для каждого затронутого key.
 
-### Формирование ключа (kafka) / партиции (hdfs)
+### Размещение результата
 
 - Входной Kafka key: `session_id` UTF-8.
 - Выходной Kafka key: `FIELD_ALERT_ID` UTF-8; 96 partitions, partitioner `murmur2` стандартного Kafka producer. Порядок upsert/retract гарантирован только для одной сессии/ключа; null value означает удаление текущего состояния.
@@ -98,6 +100,8 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 - HDFS не используется: HDFS-партиция и путь — `не применимо`.
 
 ### Структура данных
+
+Для заполнения результата требуется промежуточное поле normalized_source_value.
 
 Ниже описан non-null upsert payload. Retract имеет только обязательный Kafka key `FIELD_ALERT_ID` и null value, поэтому nullability полей payload к нему не применяется.
 
@@ -171,6 +175,10 @@ CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (
 
 ### FAQ
 
+Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+
+Подтвержденная запись — запись, для которой получено не менее двух событий из источника.
+
 **Почему нормальная сессия отсутствует?** Поток содержит только нарушения; отсутствие записи не означает отсутствие исходной сессии.
 
 **Раскрывает ли token IMSI?** Нет. Источник формирует HMAC-SHA256 с ключом в HSM; job не имеет доступа к IMSI или секрету. Поле относится к данным ограниченного доступа, читать topic могут только service accounts `care-qoe-consumer` и `qoe-support-audit`, retention — 7 дней; token запрещено выводить в логи.
@@ -181,7 +189,7 @@ CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (
 
 **Как развивается схема?** Minor-версия допускает только новое optional protobuf-поле с безопасным default. Удаление, renumbering protobuf tag, изменение key, enum или семантики требует нового топика major-версии и периода двойной публикации.
 
-### История изменений
+### Журнал документа
 
 | Версия | Дата | Автор | Изменение |
 | :--- | :--- | :--- | :--- |

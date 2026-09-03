@@ -1,204 +1,71 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_004",
-  "document_file": "corrupted/case_004.md",
-  "clean_document_id": "clean_01",
-  "clean_document_file": "clean/clean_01.md",
-  "generator_seed": 2026090304,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "14c4c33235e43f34cef8e714ff2d38257f1b2601aa34c76f92942842e84f7351",
-  "clean_document_sha256": "c7b2f48bb780e73c26df4432aa513746392e736d364e6dbb84f1706814d3108d",
-  "expected_error_count": 8,
-  "counts_by_source_type": {
-    "1": 2,
-    "2": 1,
-    "3": 5
-  },
-  "counts_by_difficulty": {
-    "low": 1,
-    "medium": 3,
-    "high": 4
-  },
-  "counts_by_error_type": {
-    "D01": 1,
-    "D03": 1,
-    "T01": 1,
-    "U05": 1,
-    "U10": 1,
-    "U11": 1,
-    "U14": 1,
-    "U15": 1
-  },
+  "source_clean_document": "clean_01.md",
+  "error_count": 8,
   "errors": [
     {
-      "instance_id": "case_004-E01",
-      "mutation_id": "T01_DROP_STRUCTURE_COLUMN",
-      "error_type_id": "T01",
-      "source_type": 2,
-      "difficulty": "medium",
-      "evidence_quote": "| Приемники |  |  | Источники |  |  |",
-      "evidence_relation": "at",
-      "title": "Нарушена таблица обязательного шаблона",
-      "problem": "Из таблицы маппинга удалена обязательная колонка комментариев.",
-      "roles": [
-        "Data Analyst",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Восстановить семь колонок таблицы структуры данных.",
-      "affected_sections": [
-        "Нарушена таблица обязательного шаблона"
-      ],
-      "injected_change": "Из таблицы маппинга удалена обязательная колонка комментариев."
-    },
-    {
-      "instance_id": "case_004-E02",
-      "mutation_id": "D03_MISSING_NULLABILITY",
-      "error_type_id": "D03",
+      "error_type_id": "D05",
       "source_type": 1,
-      "difficulty": "low",
-      "evidence_quote": "| cell_id | string | Идентификатор LTE-сектора | cell-state | cell_id | string |",
-      "evidence_relation": "at",
-      "title": "Не указана обязательность поля",
-      "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать обязательность поля и согласовать ее с алгоритмом.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Для одного целевого поля удален признак NOT NULL/NULLABLE."
+      "difficulty": "high",
+      "evidence_quote": "Описание появится после проверки прототипа.",
+      "title": "Два этапа оставлены незаполненными",
+      "problem": "Обогащение и целевая трансформация обозначены как будущая работа без явного «не применимо»."
     },
     {
-      "instance_id": "case_004-E03",
-      "mutation_id": "D01_SIMPLE_SERIALIZATION",
       "error_type_id": "D01",
       "source_type": 1,
       "difficulty": "medium",
       "evidence_quote": "JSON; схема и версия не указаны",
-      "evidence_relation": "at",
       "title": "Неполная спецификация сериализации",
-      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
+      "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
     },
     {
-      "instance_id": "case_004-E04",
-      "mutation_id": "U10_CONFLICTING_ZERO_RULES",
-      "error_type_id": "U10",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "Нулевой показатель записывается как 0; одновременно нулевое значение считается неизвестным и записывается как NULL.",
-      "evidence_relation": "at",
-      "title": "Конфликтуют правила для нулевого значения",
-      "problem": "Для одного состояния одновременно заданы два разных результата.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить единственный результат и приоритет правил для нуля.",
-      "affected_sections": [
-        "Шаг 3"
-      ],
-      "injected_change": "Для одного состояния одновременно заданы два разных результата."
-    },
-    {
-      "instance_id": "case_004-E05",
-      "mutation_id": "U05_AMBIGUOUS_MAPPING",
-      "error_type_id": "U05",
-      "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.",
-      "evidence_relation": "at",
-      "title": "Неоднозначен маппинг поля",
-      "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точный источник и атрибут каждого целевого поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Разрешено брать значение из любого одноименного атрибута без приоритета."
-    },
-    {
-      "instance_id": "case_004-E06",
-      "mutation_id": "U14_NON_IDEMPOTENT_RETRY",
-      "error_type_id": "U14",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.",
-      "evidence_relation": "at",
-      "title": "Не определена семантика повторного запуска",
-      "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Указать единую стратегию записи и доказуемое правило идемпотентности.",
-      "affected_sections": [
-        "Формирование ключа (kafka) / партиции (hdfs)"
-      ],
-      "injected_change": "Повтор может выполнять append или overwrite и поэтому менять число строк."
-    },
-    {
-      "instance_id": "case_004-E07",
-      "mutation_id": "U15_UNVERSIONED_SCHEMA_CHANGE",
-      "error_type_id": "U15",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.",
-      "evidence_relation": "at",
-      "title": "Допущено несовместимое изменение схемы",
-      "problem": "Тип поля разрешено менять без новой версии контракта.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить правила версионирования, совместимости и миграции потребителей.",
-      "affected_sections": [
-        "FAQ"
-      ],
-      "injected_change": "Тип поля разрешено менять без новой версии контракта."
-    },
-    {
-      "instance_id": "case_004-E08",
-      "mutation_id": "U11_TIMEZONE_AMBIGUITY",
       "error_type_id": "U11",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.",
-      "evidence_relation": "at",
-      "title": "Не определен часовой пояс",
-      "problem": "Один timestamp разрешено интерпретировать в двух часовых поясах.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать timezone источника, результата и правила преобразования.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Один timestamp разрешено интерпретировать в двух часовых поясах."
+      "evidence_quote": "Все поздние события автоматически включаются ближайшим replay без ограничений по возрасту.",
+      "title": "Позднее событие обрабатывается двумя способами",
+      "problem": "Одно правило исключает событие после watermark навсегда, другое требует включить его автоматическим replay."
+    },
+    {
+      "error_type_id": "U13",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Для каждой ожидаемой группы при пустом входе создается строка с нулевыми показателями без технического флага.",
+      "title": "Пустой вход превращается в реальные нулевые данные",
+      "problem": "При отсутствии источника алгоритм публикует синтетические нулевые строки без признака неполноты, скрывая сбой поставки."
+    },
+    {
+      "error_type_id": "U04",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.",
+      "title": "Противоречиво определена гранулярность",
+      "problem": "Одна строка одновременно названа событием и агрегатом за период."
+    },
+    {
+      "error_type_id": "U19",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Чтение таблицы разрешено общей корпоративной роли без согласования цели доступа.",
+      "title": "Сырые идентификаторы публикуются без ограничений",
+      "problem": "Результат содержит прямые идентификаторы, доступ выдан всем сотрудникам, а назначение и маскирование не определены."
+    },
+    {
+      "error_type_id": "U07",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Любая запись с NULL status исключается до применения default.",
+      "title": "NULL одновременно включается и исключается",
+      "problem": "Два правила фильтрации по-разному обрабатывают одно и то же отсутствующее значение."
+    },
+    {
+      "error_type_id": "T01",
+      "source_type": 2,
+      "difficulty": "low",
+      "evidence_quote": "Итоговые объекты проекта",
+      "title": "Нарушен обязательный шаблон",
+      "problem": "Обязательный раздел приемников переименован."
     }
   ]
 }

@@ -5,16 +5,7 @@
     "source_type": 1,
     "difficulty": "medium",
     "title": "Неполная спецификация сериализации",
-    "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Уточнить схему, версию и механизм сериализации/десериализации.",
-    "affected_sections": [
-      "Источники данных"
-    ]
+    "problem": "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации."
   },
   {
     "mutation_id": "D02_MISSING_CATALOG_LINK",
@@ -22,17 +13,7 @@
     "source_type": 1,
     "difficulty": "low",
     "title": "Нет прямой ссылки на Data Catalog",
-    "problem": "У одного источника удалена прямая ссылка на карточку каталога.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Добавить точную ссылку на объект источника в Data Catalog.",
-    "affected_sections": [
-      "Источники данных"
-    ]
+    "problem": "У одного источника удалена прямая ссылка на карточку каталога."
   },
   {
     "mutation_id": "D03_MISSING_NULLABILITY",
@@ -40,16 +21,7 @@
     "source_type": 1,
     "difficulty": "low",
     "title": "Не указана обязательность поля",
-    "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Указать обязательность поля и согласовать ее с алгоритмом.",
-    "affected_sections": [
-      "Структура данных"
-    ]
+    "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE."
   },
   {
     "mutation_id": "D04_VAGUE_FILTER",
@@ -57,17 +29,7 @@
     "source_type": 1,
     "difficulty": "medium",
     "title": "Не описаны точные фильтры",
-    "problem": "Точные условия отбора заменены субъективным требованием о корректности записей.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Перечислить проверяемые условия включения и исключения данных.",
-    "affected_sections": [
-      "Шаг 1. Фильтрация данных"
-    ]
+    "problem": "Точные условия отбора заменены субъективным требованием о корректности записей."
   },
   {
     "mutation_id": "D05_UNSPECIFIED_ENRICHMENT_STAGE",
@@ -75,17 +37,7 @@
     "source_type": 1,
     "difficulty": "low",
     "title": "Этап не заполнен и не отмечен как неприменимый",
-    "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо».",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Описать обогащение либо явно указать, что оно не применяется.",
-    "affected_sections": [
-      "Шаг 2. Обогащение данных"
-    ]
+    "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо»."
   },
   {
     "mutation_id": "D06_MISSING_KAFKA_CLUSTER",
@@ -93,16 +45,7 @@
     "source_type": 1,
     "difficulty": "low",
     "title": "Не указан Kafka-кластер",
-    "problem": "Для одного Kafka-источника удалено имя кластера.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Указать точное имя Kafka-кластера.",
-    "affected_sections": [
-      "Источники данных"
-    ]
+    "problem": "Для одного Kafka-источника удалено имя кластера."
   },
   {
     "mutation_id": "D07_MISSING_HDFS_PATH",
@@ -110,16 +53,7 @@
     "source_type": 1,
     "difficulty": "low",
     "title": "Не указан полный путь файлового приемника",
-    "problem": "Для одного HDFS-приемника удален полный путь хранения.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Указать кластер, полный HDFS-путь и формат хранения.",
-    "affected_sections": [
-      "Приемники данных"
-    ]
+    "problem": "Для одного HDFS-приемника удален полный путь хранения."
   },
   {
     "mutation_id": "D08_UNIDENTIFIED_REFERENCE",
@@ -127,17 +61,135 @@
     "source_type": 1,
     "difficulty": "medium",
     "title": "Не идентифицирован справочник",
-    "problem": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Указать точное имя, ссылку, назначение и версию справочника.",
-    "affected_sections": [
-      "Источники обогащения данных"
-    ]
+    "problem": "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей."
+  },
+  {
+    "mutation_id": "D01_INPUT_OUTPUT_FORMAT_ONLY",
+    "error_type_id": "D01",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Сериализация не определена на обоих концах",
+    "problem": "У источника и приемника одновременно оставлен только формат без версии схемы и механизма чтения/записи."
+  },
+  {
+    "mutation_id": "D01_TWO_INPUTS_USE_LATEST",
+    "error_type_id": "D01",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Два потока читаются по плавающей схеме",
+    "problem": "Для двух входов зафиксирован формат, но reader использует неопределенную latest-версию вместо совместимого контракта."
+  },
+  {
+    "mutation_id": "D02_SOURCE_AND_SINK_LINKS",
+    "error_type_id": "D02",
+    "source_type": 1,
+    "difficulty": "medium",
+    "title": "Не прослеживаются источник и результат",
+    "problem": "Прямые ссылки на карточки Data Catalog удалены одновременно у входа и приемника."
+  },
+  {
+    "mutation_id": "D02_REFERENCE_AND_SINK_LINKS",
+    "error_type_id": "D02",
+    "source_type": 1,
+    "difficulty": "medium",
+    "title": "Нет ссылок на справочник и приемник",
+    "problem": "У справочника и результирующего объекта отсутствуют конкретные ссылки Data Catalog."
+  },
+  {
+    "mutation_id": "D03_TWO_FIELDS_WITHOUT_NULLABILITY",
+    "error_type_id": "D03",
+    "source_type": 1,
+    "difficulty": "medium",
+    "title": "Обязательность нескольких полей не определена",
+    "problem": "Признак NULLABLE/NOT NULL удален сразу у двух полей результата."
+  },
+  {
+    "mutation_id": "D03_THREE_FIELDS_WITHOUT_NULLABILITY",
+    "error_type_id": "D03",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Контракт NULL нарушен системно",
+    "problem": "Обязательность не задана для трех последовательных полей, поэтому поведение отсутствующих значений нельзя проверить."
+  },
+  {
+    "mutation_id": "D04_FILTERS_SPLIT_AND_VAGUE",
+    "error_type_id": "D04",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Фильтры оставлены на усмотрение реализации",
+    "problem": "Основной фильтр заменен субъективным правилом, а дополнительные исключения объявлены без условий."
+  },
+  {
+    "mutation_id": "D04_ONLINE_EXPORT_FILTER_GAP",
+    "error_type_id": "D04",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Не согласованы фильтры расчета и выгрузки",
+    "problem": "Для онлайн-расчета и повторной выгрузки заявлены разные наборы фильтров, но ни один набор не перечислен."
+  },
+  {
+    "mutation_id": "D05_TWO_UNDEFINED_STAGES",
+    "error_type_id": "D05",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Два этапа оставлены незаполненными",
+    "problem": "Обогащение и целевая трансформация обозначены как будущая работа без явного «не применимо»."
+  },
+  {
+    "mutation_id": "D05_ENRICHMENT_AND_TRANSFORMATION_TBD",
+    "error_type_id": "D05",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Обязательные этапы заменены TBD",
+    "problem": "Обогащение и целевая трансформация сохранены формально, но не описаны и не отмечены как неприменимые."
+  },
+  {
+    "mutation_id": "D06_TWO_KAFKA_CLUSTERS_MISSING",
+    "error_type_id": "D06",
+    "source_type": 1,
+    "difficulty": "medium",
+    "title": "Не идентифицированы два Kafka-подключения",
+    "problem": "Имена кластеров удалены сразу у двух Kafka-источников."
+  },
+  {
+    "mutation_id": "D06_PRIMARY_AND_BACKUP_UNKNOWN",
+    "error_type_id": "D06",
+    "source_type": 1,
+    "difficulty": "medium",
+    "title": "Не определены основной и резервный Kafka-кластеры",
+    "problem": "В таблице потеряно имя рабочего кластера, а в общих сведениях добавлен неидентифицированный резервный."
+  },
+  {
+    "mutation_id": "D07_PATH_AND_FORMAT_MISSING",
+    "error_type_id": "D07",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "У файлового приемника нет пути и формата",
+    "problem": "В одной строке приемника одновременно удалены полный путь и параметры формата хранения."
+  },
+  {
+    "mutation_id": "D07_BASE_AND_PARTITION_PATH_GAP",
+    "error_type_id": "D07",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Не определены базовый и партиционный пути",
+    "problem": "У приемника отсутствует базовый HDFS-путь, а раздел партиционирования содержит только шаблон без физического адреса."
+  },
+  {
+    "mutation_id": "D08_REFERENCE_SET_INCOMPLETE",
+    "error_type_id": "D08",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Состав справочников неполон",
+    "problem": "Один справочник обезличен в таблице, а алгоритм дополнительно ссылается на второй неописанный нормативный источник."
+  },
+  {
+    "mutation_id": "D08_REFERENCE_IDENTITY_AND_VERSION",
+    "error_type_id": "D08",
+    "source_type": 1,
+    "difficulty": "high",
+    "title": "Справочник нельзя однозначно выбрать",
+    "problem": "В карточке обогащения одновременно потеряны идентификатор справочника, ссылка и версия используемого среза."
   },
   {
     "mutation_id": "T01_RENAME_FAQ",
@@ -145,16 +197,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел FAQ переименован в несопоставимый заголовок.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Вернуть раздел с названием FAQ.",
-    "affected_sections": [
-      "Нарушен обязательный шаблон"
-    ]
+    "problem": "Обязательный раздел FAQ переименован в несопоставимый заголовок."
   },
   {
     "mutation_id": "T01_RENAME_SOURCES",
@@ -162,16 +205,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел источников переименован.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Вернуть точное название «Источники данных».",
-    "affected_sections": [
-      "Нарушен обязательный шаблон"
-    ]
+    "problem": "Обязательный раздел источников переименован."
   },
   {
     "mutation_id": "T01_RENAME_RECEIVERS",
@@ -179,16 +213,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел приемников переименован.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Вернуть точное название «Приемники данных».",
-    "affected_sections": [
-      "Нарушен обязательный шаблон"
-    ]
+    "problem": "Обязательный раздел приемников переименован."
   },
   {
     "mutation_id": "T01_RENAME_FLOW",
@@ -196,16 +221,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел схемы потока переименован.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Вернуть точное название «Схема потоков данных».",
-    "affected_sections": [
-      "Нарушен обязательный шаблон"
-    ]
+    "problem": "Обязательный раздел схемы потока переименован."
   },
   {
     "mutation_id": "T01_STEP3_PLACEHOLDER",
@@ -213,16 +229,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "В шаблоне остался плейсхолдер",
-    "problem": "Название третьего шага заменено незаполненной подсказкой шаблона.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Указать фактическое название третьего шага.",
-    "affected_sections": [
-      "В шаблоне остался плейсхолдер"
-    ]
+    "problem": "Название третьего шага заменено незаполненной подсказкой шаблона."
   },
   {
     "mutation_id": "T01_RENAME_KEYS",
@@ -230,16 +237,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "Нарушен обязательный шаблон",
-    "problem": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Вернуть обязательное название раздела ключа и партиции.",
-    "affected_sections": [
-      "Нарушен обязательный шаблон"
-    ]
+    "problem": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию."
   },
   {
     "mutation_id": "T01_RENAME_EXAMPLE",
@@ -247,16 +245,7 @@
     "source_type": 2,
     "difficulty": "low",
     "title": "Нарушен обязательный шаблон",
-    "problem": "Раздел примера данных переименован в несопоставимый заголовок.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Вернуть обязательное название «Пример данных».",
-    "affected_sections": [
-      "Нарушен обязательный шаблон"
-    ]
+    "problem": "Раздел примера данных переименован в несопоставимый заголовок."
   },
   {
     "mutation_id": "T01_DROP_STRUCTURE_COLUMN",
@@ -264,16 +253,71 @@
     "source_type": 2,
     "difficulty": "medium",
     "title": "Нарушена таблица обязательного шаблона",
-    "problem": "Из таблицы маппинга удалена обязательная колонка комментариев.",
-    "roles": [
-      "Data Analyst",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Восстановить семь колонок таблицы структуры данных.",
-    "affected_sections": [
-      "Нарушена таблица обязательного шаблона"
-    ]
+    "problem": "Из таблицы маппинга удалена обязательная колонка комментариев."
+  },
+  {
+    "mutation_id": "T01_RENAME_SOURCE_AND_RECEIVER",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Не распознаются входы и выходы",
+    "problem": "Одновременно переименованы два обязательных раздела шаблона: источники и приемники."
+  },
+  {
+    "mutation_id": "T01_RENAME_FLOW_AND_ALGORITHM",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Нарушена структура описания обработки",
+    "problem": "Схема потока и алгоритм обработки одновременно вынесены под нестандартные заголовки."
+  },
+  {
+    "mutation_id": "T01_RENAME_STRUCTURE_AND_EXAMPLE",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Не распознаются контракт и пример",
+    "problem": "Обязательные разделы структуры результата и примера данных получили несопоставимые названия."
+  },
+  {
+    "mutation_id": "T01_RENAME_DDL_AND_FAQ",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Потеряны два обязательных раздела",
+    "problem": "DDL и FAQ присутствуют по содержанию, но их обязательные заголовки заменены произвольными."
+  },
+  {
+    "mutation_id": "T01_ALL_STEPS_AS_PLACEHOLDERS",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "high",
+    "title": "Не заполнены названия этапов алгоритма",
+    "problem": "Все три обязательных шага сохранены как шаблонные плейсхолдеры вместо фактических названий."
+  },
+  {
+    "mutation_id": "T01_RENAME_KEYS_AND_HISTORY",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Нарушены технический и служебный разделы",
+    "problem": "Раздел ключей/партиций и история изменений переименованы так, что не сопоставляются с шаблоном."
+  },
+  {
+    "mutation_id": "T01_RENAME_THREE_DATA_SECTIONS",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "high",
+    "title": "Нарушен блок описания данных",
+    "problem": "Сразу три обязательных раздела источников, справочников и приемников заменены внутренними названиями."
+  },
+  {
+    "mutation_id": "T01_DROP_COLUMN_AND_RENAME_HISTORY",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "high",
+    "title": "Одновременно нарушены таблица и служебный раздел",
+    "problem": "У таблицы структуры удалена обязательная колонка, а история изменений переименована."
   },
   {
     "mutation_id": "U01_SCOPE_OUTPUT_GAP",
@@ -281,17 +325,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Заявленный результат не обеспечен контрактом",
-    "problem": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Уточнить, входит ли прогноз в скоуп, и описать его выход и расчет либо исключить обещание.",
-    "affected_sections": [
-      "Решаемая проблема"
-    ]
+    "problem": "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме."
   },
   {
     "mutation_id": "U02_UNDEFINED_ACTIVE",
@@ -299,17 +333,7 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Не определен термин «активная запись»",
-    "problem": "Введен влияющий на выборку термин без формального определения.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Определить проверяемые признаки активной записи.",
-    "affected_sections": [
-      "Алгоритм обработки потока"
-    ]
+    "problem": "Введен влияющий на выборку термин без формального определения."
   },
   {
     "mutation_id": "U03_CONFLICTING_SOURCES",
@@ -317,17 +341,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Не задан источник истины",
-    "problem": "При конфликте источников разрешен произвольный выбор.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Назначить авторитетный источник и детерминированное правило разрешения конфликтов.",
-    "affected_sections": [
-      "Системы-источники"
-    ]
+    "problem": "При конфликте источников разрешен произвольный выбор."
   },
   {
     "mutation_id": "U04_GRAIN_CONTRADICTION",
@@ -335,17 +349,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Противоречиво определена гранулярность",
-    "problem": "Одна строка одновременно названа событием и агрегатом за период.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Зафиксировать одну единицу строки и полный бизнес-ключ.",
-    "affected_sections": [
-      "Алгоритм обработки потока"
-    ]
+    "problem": "Одна строка одновременно названа событием и агрегатом за период."
   },
   {
     "mutation_id": "U05_AMBIGUOUS_MAPPING",
@@ -353,17 +357,7 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Неоднозначен маппинг поля",
-    "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Указать точный источник и атрибут каждого целевого поля.",
-    "affected_sections": [
-      "Структура данных"
-    ]
+    "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета."
   },
   {
     "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
@@ -371,17 +365,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Не определен порядок операций",
-    "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
-    "affected_sections": [
-      "Алгоритм обработки потока"
-    ]
+    "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
   },
   {
     "mutation_id": "U07_OPEN_TIME_BOUNDARY",
@@ -389,17 +373,7 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Не определены границы периода",
-    "problem": "Относительный период не задает опорное время и включение граничных значений.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Указать опорное время и точный полуинтервал отбора.",
-    "affected_sections": [
-      "Шаг 1. Фильтрация данных"
-    ]
+    "problem": "Относительный период не задает опорное время и включение граничных значений."
   },
   {
     "mutation_id": "U08_JOIN_CARDINALITY_GAP",
@@ -407,17 +381,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Не определена кардинальность обогащения",
-    "problem": "При нескольких совпадениях сохраняются все строки, что может размножить результат.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Указать полный ключ, ожидаемую кардинальность и правило для нуля и нескольких совпадений.",
-    "affected_sections": [
-      "Шаг 2. Обогащение данных"
-    ]
+    "problem": "При нескольких совпадениях сохраняются все строки, что может размножить результат."
   },
   {
     "mutation_id": "U09_NONDETERMINISTIC_LAST",
@@ -425,17 +389,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Недетерминирован выбор последней записи",
-    "problem": "При одинаковом времени выбор оставлен произвольным.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Задать дополнительный уникальный tie-break и полный порядок сортировки.",
-    "affected_sections": [
-      "Шаг 3"
-    ]
+    "problem": "При одинаковом времени выбор оставлен произвольным."
   },
   {
     "mutation_id": "U10_CONFLICTING_ZERO_RULES",
@@ -443,17 +397,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Конфликтуют правила для нулевого значения",
-    "problem": "Для одного состояния одновременно заданы два разных результата.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Определить единственный результат и приоритет правил для нуля.",
-    "affected_sections": [
-      "Шаг 3"
-    ]
+    "problem": "Для одного состояния одновременно заданы два разных результата."
   },
   {
     "mutation_id": "U11_TIMEZONE_AMBIGUITY",
@@ -461,16 +405,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Не определен часовой пояс",
-    "problem": "Один timestamp разрешено интерпретировать в двух часовых поясах.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Зафиксировать timezone источника, результата и правила преобразования.",
-    "affected_sections": [
-      "Алгоритм обработки потока"
-    ]
+    "problem": "Один timestamp разрешено интерпретировать в двух часовых поясах."
   },
   {
     "mutation_id": "U12_UNSPECIFIED_UNITS",
@@ -478,17 +413,7 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Не определены единицы числовых полей",
-    "problem": "Единицы значимых показателей переданы на усмотрение потребителя.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Зафиксировать единицу измерения и преобразование для каждого числового поля.",
-    "affected_sections": [
-      "Структура данных"
-    ]
+    "problem": "Единицы значимых показателей переданы на усмотрение потребителя."
   },
   {
     "mutation_id": "U13_ARBITRARY_BAD_DATA",
@@ -496,17 +421,7 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Не определена обработка невалидных данных",
-    "problem": "Одинаково невалидные записи могут быть сохранены или удалены.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Назначить однозначное действие для каждого класса невалидных данных.",
-    "affected_sections": [
-      "Шаг 1. Фильтрация данных"
-    ]
+    "problem": "Одинаково невалидные записи могут быть сохранены или удалены."
   },
   {
     "mutation_id": "U14_NON_IDEMPOTENT_RETRY",
@@ -514,16 +429,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Не определена семантика повторного запуска",
-    "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Указать единую стратегию записи и доказуемое правило идемпотентности.",
-    "affected_sections": [
-      "Формирование ключа (kafka) / партиции (hdfs)"
-    ]
+    "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк."
   },
   {
     "mutation_id": "U15_UNVERSIONED_SCHEMA_CHANGE",
@@ -531,16 +437,7 @@
     "source_type": 3,
     "difficulty": "high",
     "title": "Допущено несовместимое изменение схемы",
-    "problem": "Тип поля разрешено менять без новой версии контракта.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Определить правила версионирования, совместимости и миграции потребителей.",
-    "affected_sections": [
-      "FAQ"
-    ]
+    "problem": "Тип поля разрешено менять без новой версии контракта."
   },
   {
     "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
@@ -548,17 +445,7 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Задано нереализуемое требование задержки",
-    "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
-    "affected_sections": [
-      "Нефункциональные требования"
-    ]
+    "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
   },
   {
     "mutation_id": "U17_DDL_TYPE_CONFLICT",
@@ -566,17 +453,7 @@
     "source_type": 3,
     "difficulty": "low",
     "title": "Тип поля расходится с DDL",
-    "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Согласовать тип поля во всех частях документа.",
-    "affected_sections": [
-      "Структура данных",
-      "DDL"
-    ]
+    "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры."
   },
   {
     "mutation_id": "U18_VAGUE_ACCEPTANCE",
@@ -584,17 +461,7 @@
     "source_type": 3,
     "difficulty": "low",
     "title": "Непроверяемый критерий качества",
-    "problem": "Добавлена метрика без формулы, порога и периода измерения.",
-    "roles": [
-      "Data Analyst",
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P1",
-    "clarification_needed": "Задать формулу, измеримый порог, период и источник проверки.",
-    "affected_sections": [
-      "Продуктовые метрики"
-    ]
+    "problem": "Добавлена метрика без формулы, порога и периода измерения."
   },
   {
     "mutation_id": "U19_UNMASKED_SENSITIVE_LOG",
@@ -602,15 +469,310 @@
     "source_type": 3,
     "difficulty": "medium",
     "title": "Чувствительные данные сохраняются без ограничений",
-    "problem": "Полный payload с идентификаторами разрешено бессрочно писать в журнал.",
-    "roles": [
-      "Data Engineer",
-      "QA"
-    ],
-    "priority": "P0",
-    "clarification_needed": "Уточнить маскирование, состав логов, права доступа и срок хранения.",
-    "affected_sections": [
-      "FAQ"
-    ]
+    "problem": "Полный payload с идентификаторами разрешено бессрочно писать в журнал."
+  },
+  {
+    "mutation_id": "U01_ALERTS_WITHOUT_OUTPUT",
+    "error_type_id": "U01",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Обещаны алерты без выходного контракта",
+    "problem": "В цели появились персональные алерты, но ни приемник, ни схема доставки, ни поля уведомления не определены."
+  },
+  {
+    "mutation_id": "U01_HISTORY_OUTSIDE_RESULT",
+    "error_type_id": "U01",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Заявлена история, которой нет в результате",
+    "problem": "Документ обещает аудит всех прошлых состояний, хотя приемник хранит только актуальную версию и алгоритм истории не формирует."
+  },
+  {
+    "mutation_id": "U02_TWO_MEANINGS_OF_CONFIRMED",
+    "error_type_id": "U02",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Термин «подтвержденный» определен противоречиво",
+    "problem": "Один термин в разных частях документа означает прохождение проверки и наличие двух событий, что меняет состав результата."
+  },
+  {
+    "mutation_id": "U02_UNDEFINED_CURRENT_VERSION",
+    "error_type_id": "U02",
+    "source_type": 3,
+    "difficulty": "medium",
+    "title": "Не определена «текущая версия»",
+    "problem": "Выбор данных и повторный расчет зависят от текущей версии, но точка времени и правило ее определения отсутствуют."
+  },
+  {
+    "mutation_id": "U03_SOURCE_PRIORITY_CHANGES",
+    "error_type_id": "U03",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Приоритет источников меняется между этапами",
+    "problem": "До обогащения главным объявлен первый источник, после него — второй; правила разрешения расхождений нет."
+  },
+  {
+    "mutation_id": "U03_UNDECLARED_AUTHORITATIVE_FEED",
+    "error_type_id": "U03",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Алгоритм зависит от неописанного источника истины",
+    "problem": "Финальные значения должны сверяться с внешним master-feed, которого нет среди источников и контракт которого неизвестен."
+  },
+  {
+    "mutation_id": "U04_KEY_OMITS_DECLARED_DIMENSION",
+    "error_type_id": "U04",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Бизнес-ключ не соответствует гранулярности",
+    "problem": "В гранулярность добавлено измерение, но бизнес-ключ и дедупликация его не учитывают, поэтому разные строки схлопываются."
+  },
+  {
+    "mutation_id": "U04_TWO_GRAINS_FOR_RECEIVER",
+    "error_type_id": "U04",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Для одного приемника заданы две гранулярности",
+    "problem": "Алгоритм публикует строки по событиям, а описание приемника требует суточный агрегат без правила преобразования между уровнями."
+  },
+  {
+    "mutation_id": "U05_TWO_FORMULAS_FOR_TARGET",
+    "error_type_id": "U05",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Одно поле рассчитывается двумя способами",
+    "problem": "В маппинге и алгоритме заявлены несовместимые формулы одного выходного показателя без приоритета."
+  },
+  {
+    "mutation_id": "U05_HIDDEN_INTERMEDIATE_FIELD",
+    "error_type_id": "U05",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Маппинг зависит от необъявленного промежуточного поля",
+    "problem": "Расчет использует нормализованный атрибут, которого нет ни в источниках, ни среди шагов его получения."
+  },
+  {
+    "mutation_id": "U06_DEDUP_AFTER_AGGREGATION",
+    "error_type_id": "U06",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Дедупликация выполняется после агрегации",
+    "problem": "Дубли сначала попадают в сумму, а удаляются только из уже агрегированного результата, поэтому восстановить корректные показатели невозможно."
+  },
+  {
+    "mutation_id": "U06_TWO_OPERATION_ORDERS",
+    "error_type_id": "U06",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "В документе заданы два порядка обработки",
+    "problem": "Схема требует фильтрацию до JOIN, а текст алгоритма — JOIN до фильтрации; результаты могут различаться."
+  },
+  {
+    "mutation_id": "U07_OVERLAPPING_PERIODS",
+    "error_type_id": "U07",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Соседние периоды пересекаются",
+    "problem": "Конец одного расчетного периода и начало следующего включены одновременно, поэтому граничная запись считается дважды."
+  },
+  {
+    "mutation_id": "U07_NULL_FILTER_DISAGREEMENT",
+    "error_type_id": "U07",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "NULL одновременно включается и исключается",
+    "problem": "Два правила фильтрации по-разному обрабатывают одно и то же отсутствующее значение."
+  },
+  {
+    "mutation_id": "U08_PARTIAL_KEY_AND_FANOUT",
+    "error_type_id": "U08",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Неполный JOIN размножает строки",
+    "problem": "Из составного ключа исключена версия, а все найденные совпадения передаются дальше, создавая неконтролируемый fan-out."
+  },
+  {
+    "mutation_id": "U08_INNER_JOIN_WITH_FALLBACK",
+    "error_type_id": "U08",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Тип JOIN противоречит fallback",
+    "problem": "Алгоритм требует INNER JOIN, но следующая ветка описывает заполнение результата при отсутствии справочника — недостижимое состояние."
+  },
+  {
+    "mutation_id": "U09_DISTINCT_BEFORE_REVISION",
+    "error_type_id": "U09",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "DISTINCT уничтожает порядок ревизий",
+    "problem": "До выбора последней ревизии удаляются различающиеся версии, после чего победителя предлагается выбирать по уже потерянному полю."
+  },
+  {
+    "mutation_id": "U09_GROUPING_MISSES_DIMENSION",
+    "error_type_id": "U09",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "GROUP BY теряет часть ключа",
+    "problem": "Одна размерность объявлена частью гранулярности, но исключена из группировки и выбирается произвольно."
+  },
+  {
+    "mutation_id": "U10_OVERLAPPING_PRIORITY",
+    "error_type_id": "U10",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Пересекающиеся правила не имеют приоритета",
+    "problem": "Для одной записи могут одновременно сработать две ветки с разными результатами, а порядок применения не определен."
+  },
+  {
+    "mutation_id": "U10_MISSING_ELSE",
+    "error_type_id": "U10",
+    "source_type": 3,
+    "difficulty": "medium",
+    "title": "Не определена ветка по умолчанию",
+    "problem": "Правила покрывают только два известных состояния, но контракт разрешает другие значения и не задает результат для них."
+  },
+  {
+    "mutation_id": "U11_CURRENT_REFERENCE_FOR_BACKFILL",
+    "error_type_id": "U11",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Backfill использует неправильный исторический срез",
+    "problem": "Онлайн-расчет использует temporal-версию справочника, а пересчет прошлого — текущий snapshot, поэтому история меняется без входных событий."
+  },
+  {
+    "mutation_id": "U11_LATE_EVENT_TWO_POLICIES",
+    "error_type_id": "U11",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Позднее событие обрабатывается двумя способами",
+    "problem": "Одно правило исключает событие после watermark навсегда, другое требует включить его автоматическим replay."
+  },
+  {
+    "mutation_id": "U12_SCALE_AND_ROUNDING_CONFLICT",
+    "error_type_id": "U12",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Точность поля не поддерживает расчет",
+    "problem": "Формула требует сохранить шесть знаков, а целевой контракт ограничен двумя; правило округления или допустимая потеря точности не заданы."
+  },
+  {
+    "mutation_id": "U12_DEFAULT_OUTSIDE_ENUM",
+    "error_type_id": "U12",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Default не входит в допустимый домен",
+    "problem": "Для отсутствующего значения задан специальный код, который одновременно запрещен перечислением допустимых значений."
+  },
+  {
+    "mutation_id": "U13_BAD_DATA_BECOMES_VALID",
+    "error_type_id": "U13",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Ошибки маскируются валидным default",
+    "problem": "Испорченные числовые и временные значения заменяются нулями, неотличимыми от настоящих данных, и проходят дальнейший расчет."
+  },
+  {
+    "mutation_id": "U13_EMPTY_INPUT_PUBLISHES_ZERO",
+    "error_type_id": "U13",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Пустой вход превращается в реальные нулевые данные",
+    "problem": "При отсутствии источника алгоритм публикует синтетические нулевые строки без признака неполноты, скрывая сбой поставки."
+  },
+  {
+    "mutation_id": "U14_APPEND_RETRY_DUPLICATES",
+    "error_type_id": "U14",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Retry повторно добавляет опубликованные строки",
+    "problem": "Первый запуск пишет append, а повтор не проверяет идентификатор загрузки и снова добавляет тот же набор."
+  },
+  {
+    "mutation_id": "U14_DELETE_AND_CORRECTION_IGNORED",
+    "error_type_id": "U14",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Повторная обработка не применяет исправления",
+    "problem": "Replay добавляет новые ревизии, но не удаляет старые строки и игнорирует tombstone, поэтому состояние зависит от истории запусков."
+  },
+  {
+    "mutation_id": "U15_REQUIRED_FIELD_WITHOUT_MIGRATION",
+    "error_type_id": "U15",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Добавлено обязательное поле без миграции",
+    "problem": "Новая версия требует NOT NULL-поле, но не задает default, backfill истории и порядок обновления потребителей."
+  },
+  {
+    "mutation_id": "U15_RENAME_CHANGES_MEANING",
+    "error_type_id": "U15",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Поле переименовывается вместе со смыслом без версии",
+    "problem": "Существующее поле получает новое имя и другую семантику в той же версии схемы, а старые данные не преобразуются."
+  },
+  {
+    "mutation_id": "U16_WATERMARK_EXCEEDS_SLA",
+    "error_type_id": "U16",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "SLA меньше необходимого ожидания данных",
+    "problem": "Результат требуется публиковать раньше закрытия watermark, хотя до watermark он еще может измениться."
+  },
+  {
+    "mutation_id": "U16_REPLAY_LONGER_THAN_RETENTION",
+    "error_type_id": "U16",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Горизонт replay превышает retention",
+    "problem": "Документ обещает автоматический пересчет периода, для которого исходные данные уже гарантированно удалены."
+  },
+  {
+    "mutation_id": "U17_EXAMPLE_OUTSIDE_CONTRACT",
+    "error_type_id": "U17",
+    "source_type": 3,
+    "difficulty": "medium",
+    "title": "Пример нарушает контракт поля",
+    "problem": "В пример записано значение за пределами описанного домена, поэтому пример не может быть получен заявленным алгоритмом."
+  },
+  {
+    "mutation_id": "U17_SOURCE_FIELD_NOT_DECLARED",
+    "error_type_id": "U17",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Маппинг ссылается на отсутствующее поле",
+    "problem": "В таблице структуры указан новый source field, которого нет в описании источников и алгоритме, тогда как DDL сохраняет прежний контракт."
+  },
+  {
+    "mutation_id": "U18_NO_PASS_FAIL_THRESHOLDS",
+    "error_type_id": "U18",
+    "source_type": 3,
+    "difficulty": "medium",
+    "title": "Приемка зависит от субъективной оценки",
+    "problem": "Два ключевых свойства результата объявлены обязательными, но для них нет формулы, порога, периода и источника проверки."
+  },
+  {
+    "mutation_id": "U18_CONTROLS_WITHOUT_EXPECTED_VALUES",
+    "error_type_id": "U18",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Контрольные показатели нельзя интерпретировать",
+    "problem": "Предлагается считать расхождения и дубли, но не заданы допустимые значения и действие при нарушении."
+  },
+  {
+    "mutation_id": "U19_PUBLIC_RAW_IDENTIFIERS",
+    "error_type_id": "U19",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Сырые идентификаторы публикуются без ограничений",
+    "problem": "Результат содержит прямые идентификаторы, доступ выдан всем сотрудникам, а назначение и маскирование не определены."
+  },
+  {
+    "mutation_id": "U19_SENSITIVE_DEBUG_AND_BACKUP",
+    "error_type_id": "U19",
+    "source_type": 3,
+    "difficulty": "high",
+    "title": "Чувствительные данные бесконтрольно копируются",
+    "problem": "Полный payload пишется в debug-таблицу и резервную копию без владельца, ACL, маскирования и согласованного удаления."
   }
 ]

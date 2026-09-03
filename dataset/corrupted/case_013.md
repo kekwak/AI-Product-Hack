@@ -3,10 +3,10 @@
 | **Общие сведения** | Нормализованный поток аварий пакетного ядра `NET_CORE_ALARM_EVENT`. Одна строка — одна выбранная версия события изменения конкретной аварии оборудования. |
 | :--- | :--- |
 | **Решаемая проблема** | EMS разных вендоров публикуют несовместимые коды, уровни критичности и идентификаторы. Витрина дает NOC единый журнал событий `RAISED`, `UPDATED`, `CLEARED` для корреляции аварий. Она не хранит текущее состояние аварии и не выполняет корреляцию в инциденты; эти функции принадлежат downstream-продуктам. |
-| **Продуктовые метрики** | 1) 99,9% валидных событий опубликованы в течение 5 минут от `ingest_time_utc`. 2) 100% строк имеют нормализованный severity и явный статус справочного маппинга. 3) Дубли бизнес-ключа отсутствуют. Дополнительная метрика: качество результата должно быть высоким. |
+| **Продуктовые метрики** | 1) 99,9% валидных событий опубликованы в течение 5 минут от `ingest_time_utc`. 2) 100% строк имеют нормализованный severity и явный статус справочного маппинга. 3) Дубли бизнес-ключа отсутствуют. |
 | **Заказчики** | NOC пакетного ядра, платформа Event Correlation. |
-| **Нефункциональные требования** | Средний поток — 500 событий/с, пик — 10 000 событий/с. Event time — UTC; watermark — 30 минут. Kafka retention — 14 суток, HDFS retention — 5 лет. Обработка сохраняет входной порядок только в рамках Kafka key, но результат детерминирован и при ином порядке доставки. RPO — 0 подтвержденных Kafka offsets, RTO — 30 минут. |
-| **Системы-источники** | Huawei U2020 Adapter и Nokia NetAct Adapter в составе `CORE_EMS_GATEWAY`. При расхождении значений между источниками допускается использовать значение любого из них. |
+| **Нефункциональные требования** | Средний поток — 500 событий/с, пик — 10 000 событий/с. Event time — UTC; watermark — 30 минут. Kafka retention — 14 суток, HDFS retention — 5 лет. Обработка сохраняет входной порядок только в рамках Kafka key, но результат детерминирован и при ином порядке доставки. RPO — 0 подтвержденных Kafka offsets, RTO — 30 минут. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
+| **Системы-источники** | Huawei U2020 Adapter и Nokia NetAct Adapter в составе `CORE_EMS_GATEWAY`. |
 | **Data Catalog** | [Карточка NET_CORE_ALARM_EVENT](https://datacatalog.mts.ru/data-products/net-core-alarm-event) |
 | **Исходники проекта** | [GitLab: core-alarm-normalizer](https://gitlab.mts.ru/bigdata/network/core-alarm-normalizer) |
 | **Команда** | Кирилл Котов — аналитик; Мария Федорова — разработчик; Светлана Петрова — QA. |
@@ -16,21 +16,23 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Huawei core alarm, topic `net.core.huawei.alarm.v1`; Kafka key — `equipment_id\|alarm_id` | Kafka, кластер `kafka-core-prod-01` | [Data Catalog: net.core.huawei.alarm.v1](https://datacatalog.mts.ru/topics/net-core-huawei-alarm-v1) | JSON UTF-8; JSON Schema draft 2020-12, `$id=net.core.huawei.alarm`, версия `4` по [схеме](https://schema-registry.mts.ru/json/net.core.huawei.alarm/4); producer передает `schema_version=4`, consumer валидирует exact v4 до маппинга |
-| Nokia core alarm, topic `net.core.nokia.alarm.v1`; Kafka key — `managed_object_id\|notification_id` | Kafka, кластер `kafka-core-prod-01` | [Data Catalog: net.core.nokia.alarm.v1](https://datacatalog.mts.ru/topics/net-core-nokia-alarm-v1) | Apache Avro 1.11, subject `net.core.nokia.alarm-value`, schema ID `5207`, версия `6`; Confluent wire format, reader использует exact schema v6 |
+| Huawei core alarm, topic `net.core.huawei.alarm.v1`; Kafka key — `equipment_id\|alarm_id` | Kafka; кластер выбирается окружением | [Data Catalog: net.core.huawei.alarm.v1](https://datacatalog.mts.ru/topics/net-core-huawei-alarm-v1) | Avro; reader всегда использует latest-схему из registry |
+| Nokia core alarm, topic `net.core.nokia.alarm.v1`; Kafka key — `managed_object_id\|notification_id` | Kafka; кластер выбирается конфигурацией | [Data Catalog: net.core.nokia.alarm.v1](https://datacatalog.mts.ru/topics/net-core-nokia-alarm-v1) | Protobuf; версия сообщения выбирается автоматически |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| `DICT_CORE_EQUIPMENT_SCD2` | [Data Catalog: DICT_CORE_EQUIPMENT_SCD2](https://datacatalog.mts.ru/tables/ref-dict-core-equipment-scd2) | Ключ `vendor_code, equipment_id` и полуинтервал `[valid_from_utc, valid_to_utc)`. Возвращает `equipment_type`, `equipment_name`, `region_code`. Для одного ключа и момента допускается не более одной версии. |
 | `DICT_CORE_ALARM_CODE` | [Data Catalog: DICT_CORE_ALARM_CODE](https://datacatalog.mts.ru/tables/ref-dict-core-alarm-code) | Версия 18, уникальный ключ `(vendor_code, vendor_alarm_code)`. Возвращает `alarm_family`, `alarm_name`, `normalized_severity`, `is_service_affecting`. Snapshot версии 18 фиксируется на batch. Другие справочники не используются. |
 
 ### Приемники данных
 
+Одна строка приемника является суточным агрегатом объекта.
+
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Hive-таблица `prod_net.NET_CORE_ALARM_EVENT` | HDFS-кластер `hdfs-prod-01`, полный путь `/data/prod/net/core_alarm_event/` | [Data Catalog: NET_CORE_ALARM_EVENT](https://datacatalog.mts.ru/tables/prod-net-core-alarm-event) | Parquet 2.9, ZSTD level 3; логическая схема `net.core-alarm-event` версии `3`; Spark writer по именам полей, timestamp logical type `TIMESTAMP_MICROS` UTC |
+| Hive-таблица `prod_net.NET_CORE_ALARM_EVENT` | HDFS-кластер указан в runtime; полный путь отсутствует | [Data Catalog: NET_CORE_ALARM_EVENT](https://datacatalog.mts.ru/tables/prod-net-core-alarm-event) | Формат файла выбирается writer по умолчанию |
 
 ### Схема потоков данных
 
@@ -44,19 +46,30 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 
 ### Алгоритм обработки потока
 
-Временные метки могут интерпретироваться как UTC или московское время в зависимости от реализации.
+Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+
+Каждое прошедшее фильтр событие записывается отдельной строкой без агрегации.
 
 Гранулярность — `(vendor_code, alarm_id, source_sequence)`. Это событие изменения, а не текущее состояние. Huawei-поля нормализуются так: `notification_id -> alarm_id`, `notification_type -> event_type`, `occurred_at_ms -> event_time_utc`, `ne_id -> equipment_id`, `probable_cause -> vendor_alarm_code`, `sequence_no -> source_sequence`, `severity -> source_severity`. Nokia: `notification_id`, `change_type`, `event_time_ms`, `managed_object_id`, `alarm_code`, `sequence_number`, `perceived_severity -> source_severity`. `vendor_code` задается ветвью источника (`HUAWEI` или `NOKIA`), а не payload.
 
 #### Шаг 1. Фильтрация данных
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+1. Сообщение десериализуется только указанной схемой. После 3 неуспешных попыток через 10, 30 и 90 секунд consumer останавливает partition без commit и отправляет `CORE_ALARM_SCHEMA_BLOCKED`; поврежденное сообщение не пропускается.
+2. После канонического маппинга обязательны непустые `event_id`, `alarm_id`, `equipment_id`, `vendor_alarm_code`, `event_time_utc`, `ingest_time_utc`; `event_type IN ('RAISED','UPDATED','CLEARED')`; `source_sequence >= 1`; `event_time_utc <= ingest_time_utc + 5 minutes`. Нарушение исключает строку и увеличивает `rejected_alarm_events_total{reason,vendor}`.
+3. `event_time_utc` и `ingest_time_utc` поступают epoch milliseconds UTC. Значения до `2020-01-01T00:00:00Z` исключаются как невозможные для данного источника.
+4. Сначала одинаковые `event_id` дедуплицируются по максимальному `ingest_time_utc`, затем SHA-256 канонической записи. Далее по бизнес-ключу сохраняется запись с максимальным `ingest_time_utc`, при равенстве — максимальный `event_id`. Это обрабатывает повторную отправку revision с новым техническим event ID.
+5. Out-of-order события допустимы: `CLEARED` может быть обработан раньше `RAISED`, поскольку витрина не строит состояние. Позднее watermark событие учитывается счетчиком `late_alarm_events_total` и включается в hourly replay последних 14 суток.
 
 #### Шаг 2. Обогащение данных
 
-Описание этого этапа будет согласовано после начала разработки.
+Для обогащения всегда используется текущая версия записи.
 
-#### Шаг 3. <Наименование шага 3>
+1. Left temporal join к `DICT_CORE_EQUIPMENT_SCD2` выполняется по `(vendor_code, equipment_id)` и `event_time_utc` в полуинтервале версии. Кардинальность `N:0..1`. При отсутствии: `equipment_type='UNKNOWN'`, `equipment_name=NULL`, `region_code='UNKNOWN'`. При множественном совпадении batch останавливается с `CORE_EQUIPMENT_OVERLAP`.
+2. Left join к snapshot `DICT_CORE_ALARM_CODE` версии 18 по `(vendor_code, vendor_alarm_code)`, кардинальность `N:0..1`. При отсутствии: `alarm_family='UNKNOWN'`, `alarm_name='Unknown ' || vendor_alarm_code`, `is_service_affecting=false`, а `severity_code` переводится из source severity по таблице: `CRITICAL->CRITICAL`, `MAJOR->MAJOR`, `MINOR->MINOR`, `WARNING->WARNING`, `INDETERMINATE->UNKNOWN`; любое другое значение — `UNKNOWN`.
+3. При `event_type='CLEARED'` итоговый `severity_code='CLEAR'` независимо от справочника. При нескольких строках кода batch останавливается с `CORE_ALARM_CODE_DUPLICATE`.
+4. `mapping_status`: `COMPLETE`, если найдены оба справочника; `EQUIPMENT_MISSING`, `CODE_MISSING` или `BOTH_MISSING` согласно отсутствующим lookup. Fallback никогда не скрывается.
+
+#### Шаг 3. Нормализация и запись
 
 1. Значения полей формируются строго по таблице структуры. `alarm_name` берется из версии 18 и не копируется из свободного vendor text. Свободное описание и адреса интерфейсов не публикуются, поэтому в витрине нет IP, IMSI, MSISDN и учетных данных.
 2. `loaded_at_utc` равен времени начала batch. Партиции за последние 48 часов пересчитываются каждый час; полный 14-дневный replay выполняется раз в сутки. Более старый период — только параметризованный backfill.
@@ -70,7 +83,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 - HDFS-партиции: `event_date_utc=DATE(event_time_utc)` и `event_hour_utc=HOUR(event_time_utc)` в UTC.
 - Полный путь: `/data/prod/net/core_alarm_event/event_date_utc=YYYY-MM-DD/event_hour_utc=HH/`.
 
-### Структура данных
+### Описание колонок
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -96,7 +109,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 | event_date_utc | date | Дата события UTC; `NOT NULL` | Расчет | event_time_utc | timestamp | HDFS-партиция |
 | event_hour_utc | smallint | Час события UTC `0..23`; `NOT NULL` | Расчет | event_time_utc | timestamp | HDFS-партиция |
 
-### Пример данных
+### Тестовая выборка
 
 | alarm_event_id | alarm_id | source_sequence | event_type | event_time_utc | vendor_code | equipment_id | equipment_type | equipment_name | region_code | vendor_alarm_code | alarm_family | alarm_name | severity_code | is_service_affecting | mapping_status | ingest_time_utc | loaded_at_utc | event_date_utc | event_hour_utc |
 | :--- | :--- | ---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | ---: |
@@ -149,9 +162,9 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
+Понятие текущей версии определяется владельцем источника при каждом запуске.
 
-Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.
+Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.
 
 **В: Можно ли по таблице определить, активна ли авария сейчас?**  
 О: Нет. Это неизменяемый журнал изменений. Текущее состояние строится downstream по максимальному `source_sequence` каждого `(vendor_code, alarm_id)`.

@@ -1,95 +1,31 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_018",
-  "document_file": "corrupted/case_018.md",
-  "clean_document_id": "clean_04",
-  "clean_document_file": "clean/clean_04.md",
-  "generator_seed": 2026090318,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "28926024f2cb2cd0557696d2e6c3870f051e4b99cf034f2b372b5e6137a909a2",
-  "clean_document_sha256": "65444de4e63898855a029e0eec838276984212866dd2590849fea3f415bbb3ed",
-  "expected_error_count": 3,
-  "counts_by_source_type": {
-    "1": 1,
-    "2": 0,
-    "3": 2
-  },
-  "counts_by_difficulty": {
-    "low": 1,
-    "medium": 0,
-    "high": 2
-  },
-  "counts_by_error_type": {
-    "D02": 1,
-    "U03": 1,
-    "U06": 1
-  },
+  "source_clean_document": "clean_04.md",
+  "error_count": 3,
   "errors": [
     {
-      "instance_id": "case_018-E01",
-      "mutation_id": "D02_MISSING_CATALOG_LINK",
-      "error_type_id": "D02",
+      "error_type_id": "D06",
       "source_type": 1,
-      "difficulty": "low",
-      "evidence_quote": "Data Catalog: ссылка отсутствует",
-      "evidence_relation": "at",
-      "title": "Нет прямой ссылки на Data Catalog",
-      "problem": "У одного источника удалена прямая ссылка на карточку каталога.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Добавить точную ссылку на объект источника в Data Catalog.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "У одного источника удалена прямая ссылка на карточку каталога."
+      "difficulty": "medium",
+      "evidence_quote": "При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация.",
+      "title": "Не определены основной и резервный Kafka-кластеры",
+      "problem": "В таблице потеряно имя рабочего кластера, а в общих сведениях добавлен неидентифицированный резервный."
     },
     {
-      "instance_id": "case_018-E02",
-      "mutation_id": "U03_CONFLICTING_SOURCES",
-      "error_type_id": "U03",
+      "error_type_id": "U12",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "При расхождении значений между источниками допускается использовать значение любого из них.",
-      "evidence_relation": "at",
-      "title": "Не задан источник истины",
-      "problem": "При конфликте источников разрешен произвольный выбор.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Назначить авторитетный источник и детерминированное правило разрешения конфликтов.",
-      "affected_sections": [
-        "Системы-источники"
-      ],
-      "injected_change": "При конфликте источников разрешен произвольный выбор."
+      "evidence_quote": "При NULL status записывается значение UNKNOWN.",
+      "title": "Default не входит в допустимый домен",
+      "problem": "Для отсутствующего значения задан специальный код, который одновременно запрещен перечислением допустимых значений."
     },
     {
-      "instance_id": "case_018-E03",
-      "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
-      "error_type_id": "U06",
+      "error_type_id": "U04",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.",
-      "evidence_relation": "at",
-      "title": "Не определен порядок операций",
-      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
+      "evidence_quote": "Каждое прошедшее фильтр событие записывается отдельной строкой без агрегации.",
+      "title": "Для одного приемника заданы две гранулярности",
+      "problem": "Алгоритм публикует строки по событиям, а описание приемника требует суточный агрегат без правила преобразования между уровнями."
     }
   ]
 }

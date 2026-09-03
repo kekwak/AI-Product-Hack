@@ -1,118 +1,39 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_039",
-  "document_file": "corrupted/case_039.md",
-  "clean_document_id": "clean_08",
-  "clean_document_file": "clean/clean_08.md",
-  "generator_seed": 2026090339,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "2cb7d32bd6ac66c66b30b3cbe9a8f007fcf8ad9983cd95993c4e9aec8be1b0cf",
-  "clean_document_sha256": "286cab25657ac2b14acade624adda907b9690caf93a7c777bf3ccdcf7442aebb",
-  "expected_error_count": 4,
-  "counts_by_source_type": {
-    "1": 1,
-    "2": 0,
-    "3": 3
-  },
-  "counts_by_difficulty": {
-    "low": 0,
-    "medium": 3,
-    "high": 1
-  },
-  "counts_by_error_type": {
-    "D04": 1,
-    "U05": 1,
-    "U06": 1,
-    "U16": 1
-  },
+  "source_clean_document": "clean_08.md",
+  "error_count": 4,
   "errors": [
     {
-      "instance_id": "case_039-E01",
-      "mutation_id": "D04_VAGUE_FILTER",
-      "error_type_id": "D04",
+      "error_type_id": "D06",
       "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.",
-      "evidence_relation": "at",
-      "title": "Не описаны точные фильтры",
-      "problem": "Точные условия отбора заменены субъективным требованием о корректности записей.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Перечислить проверяемые условия включения и исключения данных.",
-      "affected_sections": [
-        "Шаг 1. Фильтрация данных"
-      ],
-      "injected_change": "Точные условия отбора заменены субъективным требованием о корректности записей."
+      "difficulty": "low",
+      "evidence_quote": "Kafka; кластер не указан",
+      "title": "Не указан Kafka-кластер",
+      "problem": "Для одного Kafka-источника удалено имя кластера."
     },
     {
-      "instance_id": "case_039-E02",
-      "mutation_id": "U05_AMBIGUOUS_MAPPING",
-      "error_type_id": "U05",
-      "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.",
-      "evidence_relation": "at",
-      "title": "Неоднозначен маппинг поля",
-      "problem": "Разрешено брать значение из любого одноименного атрибута без приоритета.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать точный источник и атрибут каждого целевого поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Разрешено брать значение из любого одноименного атрибута без приоритета."
-    },
-    {
-      "instance_id": "case_039-E03",
-      "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
-      "error_type_id": "U06",
+      "error_type_id": "U14",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.",
-      "evidence_relation": "at",
-      "title": "Не определен порядок операций",
-      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
+      "evidence_quote": "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.",
+      "title": "Не определена семантика повторного запуска",
+      "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк."
     },
     {
-      "instance_id": "case_039-E04",
-      "mutation_id": "U16_IMPOSSIBLE_ZERO_LATENCY",
-      "error_type_id": "U16",
+      "error_type_id": "U13",
       "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.",
-      "evidence_relation": "at",
-      "title": "Задано нереализуемое требование задержки",
-      "problem": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Указать измеримый ненулевой SLA и точку его измерения.",
-      "affected_sections": [
-        "Нефункциональные требования"
-      ],
-      "injected_change": "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить."
+      "difficulty": "high",
+      "evidence_quote": "Для каждой ожидаемой группы при пустом входе создается строка с нулевыми показателями без технического флага.",
+      "title": "Пустой вход превращается в реальные нулевые данные",
+      "problem": "При отсутствии источника алгоритм публикует синтетические нулевые строки без признака неполноты, скрывая сбой поставки."
+    },
+    {
+      "error_type_id": "U07",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Период M+1 начинается с timestamp >= end_M, включая ту же границу.",
+      "title": "Соседние периоды пересекаются",
+      "problem": "Конец одного расчетного периода и начало следующего включены одновременно, поэтому граничная запись считается дважды."
     }
   ]
 }

@@ -5,7 +5,7 @@
 | **Решаемая проблема** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. |
 | **Продуктовые метрики** | P95 end-to-end задержки от `session_end_ts` до публикации < 90 секунд; не менее 99,8% валидных событий обработано; 0 дублей `(FIELD_ALERT_ID, source_revision)` среди committed сообщений и один текущий key в materialized state потребителя; доля алертов с `UNKNOWN`-регионом < 0,2%. Окно измерения — календарные сутки UTC. |
 | **Заказчики** | Продукт «Проактивная забота», центр качества мобильной сети. |
-| **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. При любом пиковом объеме задержка обработки должна быть строго 0 секунд. |
+| **Нефункциональные требования** | Средняя нагрузка 45 тыс., пик 160 тыс. событий/с; доставка exactly-once в штатном режиме; checkpoint каждые 30 секунд; восстановление с последнего успешного checkpoint; Kafka retention источника 72 часа, приёмника 7 дней; доступность 99,95% в месяц. |
 | **Системы-источники** | Платформа `PGW_SESSION_ANALYTICS`, формирующая нормализованное событие окончания data-сессии. |
 | **Data Catalog** | [Продукт QoE Degradation Alert](https://datacatalog.corp.mts.ru/products/qoe-degradation-alert) |
 | **Исходники проекта** | [GitLab: realtime/qoe-degradation-alert](https://gitlab.corp.mts.ru/bigdata/realtime/qoe-degradation-alert) |
@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `TOPIC_DATA_SESSION_END_V3` | Kafka, кластер `kafka-dpi-prod-03` | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID. Kafka key — UTF-8 `session_id`; payload содержит `operation=UPSERT\|DELETE` и монотонный `source_revision`, DELETE несёт key-поля без QoE-показателей. |
+| `TOPIC_DATA_SESSION_END_V3` | Kafka; кластер не указан | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID. Kafka key — UTF-8 `session_id`; payload содержит `operation=UPSERT\|DELETE` и монотонный `source_revision`, DELETE несёт key-поля без QoE-показателей. |
 
 ### Источники обогащения данных
 
@@ -39,13 +39,36 @@
 
 ### Алгоритм обработки потока
 
-Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
+Пустой вход считается успешным расчетом.
 
 Время события — `session_end_ts`, epoch milliseconds UTC. Processing time используется только для SLA и `FIELD_PROC_TS`. Watermark: максимальный наблюдаемый `session_end_ts` минус 15 минут.
 
 #### Шаг 1. Фильтрация данных
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Период M+1 начинается с timestamp >= end_M, включая ту же границу.
+
+Период M включает записи с timestamp >= start_M и timestamp <= end_M.
+
+Сначала принять успешно декодированные change records с `operation IN ('UPSERT','DELETE')`, `session_id` по regex `^[A-Za-z0-9-]{16,64}$` и `source_revision >= 1`. Дедуплицировать по `session_id`: выбрать максимальный `source_revision`, затем максимальные `(kafka_partition, kafka_offset)`. Две записи с одинаковыми `session_id`, revision и разным payload блокируют Kafka-транзакцию. Winning `DELETE` формирует retract: null value по вычисленному из key `FIELD_ALERT_ID` и удаляет сохранённое состояние.
+
+Для winning `UPSERT` валидировать все условия:
+
+```text
+event_type = SESSION_END
+operation = UPSERT
+subscriber_segment = RETAIL
+is_test = false
+network_tech IN {LTE, NR}
+subscriber_token matches ^[0-9a-f]{64}$
+cell_id > 0
+session_start_ts <= session_end_ts
+session_end_ts <= processing_time + 2 minutes
+avg_throughput_kbps >= 0
+p95_rtt_ms BETWEEN 0 AND 60000
+packet_loss_pct BETWEEN 0.000 AND 100.000
+```
+
+Десериализационная ошибка, неизвестная schema ID, невалидная identity/revision или нарушение QoE-поля исключает запись до бизнес-логики и увеличивает отдельный счётчик причины; ранее опубликованное состояние при невалидной correction остаётся прежним до исправления источника. Валидный UPSERT, не прошедший только scope-условия `event_type`, `subscriber_segment`, `is_test` или `network_tech`, формирует retract ранее созданного key. Payload и subscriber token в журнал не пишутся. Пустой поток является штатным и не создаёт выходов. Недоступность Kafka или Schema Registry останавливает job и не продвигает committed offsets.
 
 #### Шаг 2. Обогащение данных
 
@@ -70,6 +93,8 @@
 
 #### Шаг 3. Классификация и формирование результата
 
+Для каждой ожидаемой группы при пустом входе создается строка с нулевыми показателями без технического флага.
+
 Проверки порога выполняются без предварительного округления:
 
 - `THROUGHPUT_LOW`, если `avg_throughput_kbps < min_throughput_kbps`;
@@ -88,14 +113,14 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 
 ### Формирование ключа (kafka) / партиции (hdfs)
 
+При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
+
 - Входной Kafka key: `session_id` UTF-8.
 - Выходной Kafka key: `FIELD_ALERT_ID` UTF-8; 96 partitions, partitioner `murmur2` стандартного Kafka producer. Порядок upsert/retract гарантирован только для одной сессии/ключа; null value означает удаление текущего состояния.
 - Конфигурация выхода: `cleanup.policy=compact,delete`, `retention.ms=604800000`, `min.compaction.lag.ms=0`; потребитель материализует последнее значение key.
 - HDFS не используется: HDFS-партиция и путь — `не применимо`.
 
 ### Структура данных
-
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
 
 Ниже описан non-null upsert payload. Retract имеет только обязательный Kafka key `FIELD_ALERT_ID` и null value, поэтому nullability полей payload к нему не применяется.
 

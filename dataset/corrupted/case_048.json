@@ -1,209 +1,71 @@
 {
-  "schema_version": "1.0",
   "document_id": "case_048",
-  "document_file": "corrupted/case_048.md",
-  "clean_document_id": "clean_10",
-  "clean_document_file": "clean/clean_10.md",
-  "generator_seed": 2026090348,
-  "generator_version": "synthetic-tz-v1",
-  "document_sha256": "cce413600c955d3e8eb598751e4b87841fd1c4a4d06cb1472efff4be6e2e5809",
-  "clean_document_sha256": "bb66c5706e315127f31a0502b906d4e0ecd2e1f63ea196a0f90442d19c34c2f7",
-  "expected_error_count": 8,
-  "counts_by_source_type": {
-    "1": 2,
-    "2": 0,
-    "3": 6
-  },
-  "counts_by_difficulty": {
-    "low": 2,
-    "medium": 2,
-    "high": 4
-  },
-  "counts_by_error_type": {
-    "D02": 1,
-    "D05": 1,
-    "U02": 1,
-    "U03": 1,
-    "U06": 1,
-    "U08": 1,
-    "U12": 1,
-    "U15": 1
-  },
+  "source_clean_document": "clean_10.md",
+  "error_count": 8,
   "errors": [
     {
-      "instance_id": "case_048-E01",
-      "mutation_id": "D02_MISSING_CATALOG_LINK",
-      "error_type_id": "D02",
+      "error_type_id": "D07",
       "source_type": 1,
       "difficulty": "low",
-      "evidence_quote": "Data Catalog: ссылка отсутствует",
-      "evidence_relation": "at",
-      "title": "Нет прямой ссылки на Data Catalog",
-      "problem": "У одного источника удалена прямая ссылка на карточку каталога.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Добавить точную ссылку на объект источника в Data Catalog.",
-      "affected_sections": [
-        "Источники данных"
-      ],
-      "injected_change": "У одного источника удалена прямая ссылка на карточку каталога."
+      "evidence_quote": "HDFS; путь не указан",
+      "title": "Не указан полный путь файлового приемника",
+      "problem": "Для одного HDFS-приемника удален полный путь хранения."
     },
     {
-      "instance_id": "case_048-E02",
-      "mutation_id": "D05_UNSPECIFIED_ENRICHMENT_STAGE",
-      "error_type_id": "D05",
+      "error_type_id": "D06",
       "source_type": 1,
       "difficulty": "low",
-      "evidence_quote": "Описание этого этапа будет согласовано после начала разработки.",
-      "evidence_relation": "at",
-      "title": "Этап не заполнен и не отмечен как неприменимый",
-      "problem": "Раздел обогащения оставлен без алгоритма и без явного «не применимо».",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Описать обогащение либо явно указать, что оно не применяется.",
-      "affected_sections": [
-        "Шаг 2. Обогащение данных"
-      ],
-      "injected_change": "Раздел обогащения оставлен без алгоритма и без явного «не применимо»."
+      "evidence_quote": "Kafka; кластер не указан",
+      "title": "Не указан Kafka-кластер",
+      "problem": "Для одного Kafka-источника удалено имя кластера."
     },
     {
-      "instance_id": "case_048-E03",
-      "mutation_id": "U03_CONFLICTING_SOURCES",
-      "error_type_id": "U03",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "При расхождении значений между источниками допускается использовать значение любого из них.",
-      "evidence_relation": "at",
-      "title": "Не задан источник истины",
-      "problem": "При конфликте источников разрешен произвольный выбор.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Назначить авторитетный источник и детерминированное правило разрешения конфликтов.",
-      "affected_sections": [
-        "Системы-источники"
-      ],
-      "injected_change": "При конфликте источников разрешен произвольный выбор."
-    },
-    {
-      "instance_id": "case_048-E04",
-      "mutation_id": "U12_UNSPECIFIED_UNITS",
-      "error_type_id": "U12",
-      "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "Единицы измерения числовых показателей определяются каждым потребителем самостоятельно.",
-      "evidence_relation": "at",
-      "title": "Не определены единицы числовых полей",
-      "problem": "Единицы значимых показателей переданы на усмотрение потребителя.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Зафиксировать единицу измерения и преобразование для каждого числового поля.",
-      "affected_sections": [
-        "Структура данных"
-      ],
-      "injected_change": "Единицы значимых показателей переданы на усмотрение потребителя."
-    },
-    {
-      "instance_id": "case_048-E05",
-      "mutation_id": "U02_UNDEFINED_ACTIVE",
-      "error_type_id": "U02",
-      "source_type": 3,
-      "difficulty": "medium",
-      "evidence_quote": "Во всех расчетах используются только активные записи источников.",
-      "evidence_relation": "at",
-      "title": "Не определен термин «активная запись»",
-      "problem": "Введен влияющий на выборку термин без формального определения.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P1",
-      "clarification_needed": "Определить проверяемые признаки активной записи.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Введен влияющий на выборку термин без формального определения."
-    },
-    {
-      "instance_id": "case_048-E06",
-      "mutation_id": "U06_ARBITRARY_OPERATION_ORDER",
-      "error_type_id": "U06",
-      "source_type": 3,
-      "difficulty": "high",
-      "evidence_quote": "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.",
-      "evidence_relation": "at",
-      "title": "Не определен порядок операций",
-      "problem": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Зафиксировать последовательность операций и слой применения каждого фильтра.",
-      "affected_sections": [
-        "Алгоритм обработки потока"
-      ],
-      "injected_change": "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных."
-    },
-    {
-      "instance_id": "case_048-E07",
-      "mutation_id": "U15_UNVERSIONED_SCHEMA_CHANGE",
       "error_type_id": "U15",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.",
-      "evidence_relation": "at",
-      "title": "Допущено несовместимое изменение схемы",
-      "problem": "Тип поля разрешено менять без новой версии контракта.",
-      "roles": [
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Определить правила версионирования, совместимости и миграции потребителей.",
-      "affected_sections": [
-        "FAQ"
-      ],
-      "injected_change": "Тип поля разрешено менять без новой версии контракта."
+      "evidence_quote": "Старые партиции и потребители остаются без изменений; план миграции не предусмотрен.",
+      "title": "Добавлено обязательное поле без миграции",
+      "problem": "Новая версия требует NOT NULL-поле, но не задает default, backfill истории и порядок обновления потребителей."
     },
     {
-      "instance_id": "case_048-E08",
-      "mutation_id": "U08_JOIN_CARDINALITY_GAP",
-      "error_type_id": "U08",
+      "error_type_id": "U17",
+      "source_type": 3,
+      "difficulty": "low",
+      "evidence_quote": "FIELD_BIZ_DATE STRING NOT NULL,",
+      "title": "Тип поля расходится с DDL",
+      "problem": "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры."
+    },
+    {
+      "error_type_id": "U06",
       "source_type": 3,
       "difficulty": "high",
-      "evidence_quote": "При нескольких совпадениях со справочником в результат передаются все найденные варианты.",
-      "evidence_relation": "at",
-      "title": "Не определена кардинальность обогащения",
-      "problem": "При нескольких совпадениях сохраняются все строки, что может размножить результат.",
-      "roles": [
-        "Data Analyst",
-        "Data Engineer",
-        "QA"
-      ],
-      "priority": "P0",
-      "clarification_needed": "Указать полный ключ, ожидаемую кардинальность и правило для нуля и нескольких совпадений.",
-      "affected_sections": [
-        "Шаг 2. Обогащение данных"
-      ],
-      "injected_change": "При нескольких совпадениях сохраняются все строки, что может размножить результат."
+      "evidence_quote": "Реализация сначала обогащает все записи, затем применяет входные фильтры.",
+      "title": "В документе заданы два порядка обработки",
+      "problem": "Схема требует фильтрацию до JOIN, а текст алгоритма — JOIN до фильтрации; результаты могут различаться."
+    },
+    {
+      "error_type_id": "U14",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.",
+      "title": "Не определена семантика повторного запуска",
+      "problem": "Повтор может выполнять append или overwrite и поэтому менять число строк."
+    },
+    {
+      "error_type_id": "U11",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Все поздние события автоматически включаются ближайшим replay без ограничений по возрасту.",
+      "title": "Позднее событие обрабатывается двумя способами",
+      "problem": "Одно правило исключает событие после watermark навсегда, другое требует включить его автоматическим replay."
+    },
+    {
+      "error_type_id": "U18",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Порог срабатывания, период сравнения и блокировка публикации определяются вручную после проверки.",
+      "title": "Контрольные показатели нельзя интерпретировать",
+      "problem": "Предлагается считать расхождения и дубли, но не заданы допустимые значения и действие при нарушении."
     }
   ]
 }
