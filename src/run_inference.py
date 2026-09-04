@@ -36,6 +36,7 @@ FULL_PROMPT = r"""Ты проводишь независимое pre-review ТЗ
 7. Не завершай анализ, пока всем 28 ID не присвоен внутренний PASS или FAIL. В ответ перенеси каждую позицию с FAIL и ни одной с PASS.
 8. Создавай замечание только по правилам «Когда создавать замечание». Объедини проявления одной корневой причины; разные причины не склеивай. Не придирайся к стилю и не выдумывай контекст.
 9. Пустой список допустим только когда все 28 позиций получили PASS.
+10. Невероятно важно разобрать каждый пункт, подумайть и написать о нем в CoT, проверку делать максимательно тщательно и размышлять.
 
 Требования к ответу:
 - evidence_quote — дословный фрагмент проверяемого документа, достаточный для поиска проблемного места; не пересказывай его;
@@ -271,7 +272,9 @@ def build_graph(model):
         response = await model.ainvoke(
             [("system", FULL_PROMPT), ("human", f"# ПРОВЕРЯЕМЫЙ ДОКУМЕНТ\n\n```\n{state['document']}\n```")]
         )
-        result = response["parsed"]
+        result = response.get("parsed")
+        if not isinstance(result, Findings):
+            raise ValueError(response.get("parsing_error") or "модель вернула пустой ответ")
         return {"findings": [item.model_dump() for item in result.errors]}
 
     return (
@@ -308,7 +311,7 @@ async def run(args: argparse.Namespace) -> int:
         model=args.model,
         api_key=os.getenv("OPENROUTER_API_KEY"),
         temperature=0,
-        max_tokens=8192,
+        max_tokens=32768,
         max_retries=1,
         reasoning={"effort": "high", "exclude": True},
         openrouter_provider={"require_parameters": True},
@@ -328,6 +331,8 @@ async def run(args: argparse.Namespace) -> int:
                             result = await graph.ainvoke(
                                 {"document": path.read_text(encoding="utf-8")}
                             )
+                        if not result["findings"] and attempt < args.retries:
+                            raise ValueError("пустой список ошибок")
                         (args.output / f"{path.stem}.json").write_text(
                             json.dumps(result["findings"], ensure_ascii=False, indent=2) + "\n",
                             encoding="utf-8",

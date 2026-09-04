@@ -1,25 +1,194 @@
-# AI-Product-Hack
+# AI Product Hack — проверка технических заданий
 
-- [Синтетический датасет](dataset/README.md): 10 чистых ТЗ и 50 размеченных кейсов.
-- [LLM-судья](docs/evaluation.md): matching предсказаний через OpenRouter и расчет TP/FP/FN, precision, recall и F1.
+Проект ищет ошибки в документации потоков и витрин данных, а затем измеряет качество поиска на синтетическом датасете.
 
-Код проекта находится непосредственно в `src/`, тесты — в `tests/`, примеры входа — в `examples/`.
+Пайплайн состоит из трех частей:
+
+1. `dataset-generate` создает чистые и поврежденные документы с ground truth.
+2. `infer-documents` проверяет Markdown-документы моделью через OpenRouter и сохраняет найденные ошибки.
+3. `evaluate-predictions` сопоставляет предсказания с ground truth и считает `TP`, `FP`, `FN`, precision, recall и F1.
+
+## Быстрый старт
+
+Нужны Python 3.12+, [uv](https://docs.astral.sh/uv/) и ключ OpenRouter.
+
+```bash
+uv sync
+export OPENROUTER_API_KEY='<ваш_ключ>'
+```
+
+Запустить инференс на первых 10 документах:
+
+```bash
+uv run infer-documents \
+  --limit 10 \
+  --concurrency 8 \
+  --output artifacts/predictions/minimax_m3_first10
+```
+
+Оценить эти же документы:
+
+```bash
+uv run evaluate-predictions \
+  --predictions artifacts/predictions/minimax_m3_first10 \
+  --limit 10 \
+  --workers 8 \
+  --output artifacts/evaluation/minimax_m3_first10.json
+```
+
+## Структура проекта
 
 ```text
 .
-├── src/
-│   ├── generate_dataset.py
-│   ├── evaluate_predictions.py
-│   └── paths.py
+├── case/                       # исходные материалы и критерии кейсодателя
 ├── dataset/
-│   ├── clean/            # 10 эталонов
-│   ├── corrupted/        # 50 MD + 50 JSON ground truth
-│   ├── error_catalog.json
-│   └── manifest.json
-├── tests/
-│   ├── test_dataset.py
-│   └── test_judge.py
-├── examples/predictions/
-├── docs/
-└── case/                 # исходные материалы кейсодателя
+│   ├── clean/                  # 10 чистых документов
+│   ├── corrupted/              # 50 пар: case_XXX.md + ground truth JSON
+│   ├── error_catalog.json      # каталог вариантов ошибок
+│   └── manifest.json           # распределение ошибок по кейсам
+├── src/
+│   ├── generate_dataset.py     # генератор датасета
+│   ├── run_inference.py        # LangGraph-инференсер
+│   ├── evaluate_predictions.py # LLM-судья и метрики
+│   └── paths.py                # пути проекта
+├── tests/                      # тесты датасета, инференса и судьи
+├── artifacts/                  # локальные предсказания и отчеты
+└── examples/                   # примеры файлов предсказаний
+```
+
+Подробное описание синтетического набора находится в [dataset/README.md](dataset/README.md).
+
+## Какие ошибки ищет модель
+
+Всего используется 28 классов:
+
+- `D01–D08` — обязательные доменные требования;
+- `T01` — несоответствие обязательному шаблону;
+- `U01–U19` — логика, полнота, согласованность и проверяемость.
+
+Полный inference-промпт вместе с шаблоном и описанием всех ошибок явно записан в `FULL_PROMPT` файла `src/run_inference.py`. Во время запуска критерии из других файлов не подгружаются.
+
+## Инференс
+
+По умолчанию используется модель `minimax/minimax-m3`. На каждый документ выполняется один LangGraph-вызов со structured output. Документы обрабатываются асинхронно; одновременно выполняется до восьми запросов.
+
+Весь датасет:
+
+```bash
+uv run infer-documents \
+  --output artifacts/predictions/minimax_m3 \
+  --concurrency 8
+```
+
+Один кейс:
+
+```bash
+uv run infer-documents \
+  --case case_001 \
+  --output artifacts/predictions/minimax_m3
+```
+
+Несколько кейсов:
+
+```bash
+uv run infer-documents \
+  --case case_001 \
+  --case case_002 \
+  --output artifacts/predictions/minimax_m3
+```
+
+Параметры:
+
+- `--input` — каталог входных `case_*.md`;
+- `--output` — каталог для JSON-предсказаний;
+- `--limit N` — взять первые `N` документов;
+- `--case case_XXX` — выбрать конкретный кейс, флаг можно повторять;
+- `--concurrency N` — число параллельных запросов, по умолчанию `8`;
+- `--retries N` — число повторов неуспешного ответа, по умолчанию `2`;
+- `--model MODEL` — модель OpenRouter.
+
+Модель также можно задать переменной окружения:
+
+```bash
+export INFERENCE_MODEL='minimax/minimax-m3'
+```
+
+Каждый результат сохраняется как `case_XXX.json`:
+
+```json
+[
+  {
+    "error_type_id": "D02",
+    "evidence_quote": "Data Catalog: ссылка отсутствует",
+    "title": "Нет ссылки на Data Catalog",
+    "problem": "Источник нельзя однозначно идентифицировать."
+  }
+]
+```
+
+## Оценка предсказаний
+
+Судья получает предсказания и ground truth одного документа и возвращает пары совпавших ошибок. Совпадение определяется по месту и корневой проблеме; одинаковый `error_type_id` не обязателен. Если модель предложила пересекающиеся пары, код выбирает максимальное one-to-one сопоставление, чтобы не раздувать `TP`.
+
+Цитата используется как подсказка. Отсутствующая или неуникальная цитата не становится автоматическим `FP`. Отсутствующий файл предсказаний считается пустым: все ошибки соответствующего кейса становятся `FN`.
+
+Один кейс:
+
+```bash
+uv run evaluate-predictions \
+  --predictions artifacts/predictions/minimax_m3 \
+  --case case_001 \
+  --output artifacts/evaluation/case_001.json
+```
+
+Весь датасет:
+
+```bash
+uv run evaluate-predictions \
+  --predictions artifacts/predictions/minimax_m3 \
+  --workers 8 \
+  --output artifacts/evaluation/minimax_m3.json
+```
+
+Параметры:
+
+- `--ground-truth` — каталог с ground truth, по умолчанию `dataset/corrupted`;
+- `--case` и `--limit` — выбор кейсов;
+- `--workers` — число параллельных запросов;
+- `--model` — модель OpenRouter для judge;
+- `--timeout` — таймаут одного запроса в секундах;
+- `--retries` — число контролируемых повторов каждого неуспешного запроса;
+- `--no-cache` — не использовать сохраненные ответы судьи.
+
+Модель judge можно задать отдельно:
+
+```bash
+export OPENROUTER_MODEL='minimax/minimax-m3'
+```
+
+Итоговый отчет содержит общие и покейсовые метрики, результаты по классам ошибок, найденные пары, `FP`, `FN`, токены и стоимость вызовов. Сетевой сбой одного кейса не останавливает остальные: после исчерпания повторов он попадает в `failed_cases`, а частичный отчет сохраняется.
+
+## Генерация датасета
+
+Датасет уже находится в репозитории. Для полного воспроизведения:
+
+```bash
+uv run dataset-generate
+```
+
+Команда заново формирует содержимое `dataset/clean`, `dataset/corrupted`, каталог ошибок и manifest. Не запускайте ее поверх ручных изменений датасета, которые нужно сохранить.
+
+## Тесты
+
+```bash
+uv run python -m unittest discover -s tests -v
+```
+
+Тесты проверяют структуру и воспроизводимость датасета, формат inference-ответа, LangGraph-пайплайн, matching и расчет метрик.
+
+Справка по любой команде:
+
+```bash
+uv run infer-documents --help
+uv run evaluate-predictions --help
 ```
