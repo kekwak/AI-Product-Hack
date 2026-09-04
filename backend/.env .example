@@ -1,0 +1,4 @@
+OPENROUTER_API_KEY=
+DJANGO_SECRET_KEY=replace-with-a-long-random-value
+DJANGO_DEBUG=1
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
