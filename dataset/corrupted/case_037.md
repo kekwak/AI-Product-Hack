@@ -14,7 +14,7 @@
 
 ### Источники данных
 
-| Описание источника | Тип источника | Ссылка на источник | Сериализация |
+| Служебная колонка 01 | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
 | `TOPIC_DATA_SESSION_END_V3` | Kafka; кластер не указан | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID. Kafka key — UTF-8 `session_id`; payload содержит `operation=UPSERT\|DELETE` и монотонный `source_revision`, DELETE несёт key-поля без QoE-показателей. |
 
@@ -25,7 +25,7 @@
 | `DWH_REF.DICT_CELL_REGION_SCD` | [Data Catalog: DICT_CELL_REGION_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_CELL_REGION_SCD) | PostgreSQL `ref-qoe-prod-01`, модель 3.0; Flink JDBC temporal lookup с cache TTL 5 минут, checkpoint хранит использованный `ref_snapshot_version`. SCD2-связь `cell_id` с `region_code`; UTC-интервалы `[valid_from_ts, valid_to_ts)`. |
 | `CFG_QOE.QOE_THRESHOLD_SCD` | [Data Catalog: QOE_THRESHOLD_SCD](https://datacatalog.corp.mts.ru/tables/CFG_QOE/QOE_THRESHOLD_SCD) | PostgreSQL `ref-qoe-prod-01`, модель 4.2; Flink JDBC lookup по версии, сохранённой в checkpoint. Пороги по `(network_tech, region_code)`; `region_code='*'` — обязательный global fallback. UTC-интервалы `[valid_from_ts, valid_to_ts)`. |
 
-### Результаты проекта
+### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -43,7 +43,7 @@
 
 #### Шаг 1. Фильтрация данных
 
-Дополнительно учитываются события только за последние 7 дней.
+Учитываются события не ранее 7 дней назад и не позже 2 часов вперед от текущего времени на стороне обработки; момент фиксации текущего времени и включение границ не определены.
 
 Дополнительные исключения команда определяет после анализа первых запусков.
 

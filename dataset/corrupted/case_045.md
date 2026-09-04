@@ -66,6 +66,8 @@ AND event_ts <= processing_ts + INTERVAL 5 MINUTES
 
 #### Шаг 3. Трансформация и агрегация
 
+Если исходный status отсутствует, в результат записывается UNKNOWN.
+
 - `FIELD_MONTH` — первое число месяца M (`DATE`) в UTC.
 - Нормализовать `vendor_name` и `os_family` только функцией `trim`; регистр и spelling задаёт справочник. Пустая после trim строка является дефектом справочника.
 - Преобразовать boolean `is_5g_capable`: `true → 'YES'`, `false → 'NO'`; fallback указан выше.
@@ -88,7 +90,7 @@ AND event_ts <= processing_ts + INTERVAL 5 MINUTES
 
 ### Структура данных
 
-Расчетный коэффициент должен сохранять ровно шесть знаков после запятой.
+Поле status допускает только значения ACTIVE и INACTIVE.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -117,8 +119,6 @@ AND event_ts <= processing_ts + INTERVAL 5 MINUTES
 | 2026-07-01 | UNKNOWN | ZTE | Android | YES | 615 | 2026-08-16 00:05:44 |
 
 ### DDL
-
-Для этого коэффициента используется DECIMAL с двумя знаками после запятой; режим округления не определен.
 
 ```sql
 CREATE TABLE CDM_COMM.TABLE_DEVICE_BASE_MONTHLY (

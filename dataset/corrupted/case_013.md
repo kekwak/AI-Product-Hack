@@ -46,6 +46,8 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 
 Подтвержденной считается запись, прошедшая синтаксическую валидацию.
 
+Одна строка результата может соответствовать событию, объекту или периоду; окончательная гранулярность в документе не определена.
+
 Гранулярность — `(vendor_code, alarm_id, source_sequence)`. Это событие изменения, а не текущее состояние. Huawei-поля нормализуются так: `notification_id -> alarm_id`, `notification_type -> event_type`, `occurred_at_ms -> event_time_utc`, `ne_id -> equipment_id`, `probable_cause -> vendor_alarm_code`, `sequence_no -> source_sequence`, `severity -> source_severity`. Nokia: `notification_id`, `change_type`, `event_time_ms`, `managed_object_id`, `alarm_code`, `sequence_number`, `perceived_severity -> source_severity`. `vendor_code` задается ветвью источника (`HUAWEI` или `NOKIA`), а не payload.
 
 #### Шаг 1. Фильтрация данных
@@ -73,8 +75,6 @@ JOIN выполняется только по полю normalized_join_key.
 4. Источник не поддерживает tombstone или физическое удаление. Исправление выполняется повторной публикацией того же бизнес-ключа с более поздним `ingest_time_utc` и применяется при replay. Если в будущем появится операция удаления, до выпуска major-версии такие сообщения блокируются как несовместимая схема.
 
 ### Формирование ключа (kafka) / партиции (hdfs)
-
-В результате допускается несколько строк с одинаковым бизнес-ключом; отличающий атрибут и правило уникальности не заданы.
 
 - Huawei Kafka key: `equipment_id|alarm_id`; Nokia Kafka key: `managed_object_id|notification_id`. Обе части непустые, разделитель `|` запрещен внутри частей.
 - Бизнес-ключ результата: `(vendor_code, alarm_id, source_sequence)`.

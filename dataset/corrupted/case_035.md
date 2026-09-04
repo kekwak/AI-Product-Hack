@@ -95,13 +95,13 @@ AND charge_rub >= 0
 - HDFS/Iceberg partition transform: `days(FIELD_BIZ_DATE)`. Полный путь: `/warehouse/cdm/roam/roaming_usage_daily/`.
 - Сортировка файлов внутри партиции: `(FIELD_HOME_REGION_CODE, FIELD_VISITED_COUNTRY_CODE, FIELD_SERVICE_TYPE)`; она не меняет бизнес-смысл ключа.
 
-### Структура данных
+### Технические материалы
 
 В результат дополнительно передаются исходные персональные идентификаторы без токенизации.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Служебная колонка 04** |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
 | FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; `NOT NULL` | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
 | FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; `NOT NULL` | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
 | FIELD_VISITED_COUNTRY_CODE | CHAR(2) | ISO alpha-2 или `ZZ`; `NOT NULL` | `DICT_MCC_COUNTRY_SCD` | `country_code` | CHAR(2) | Temporal JOIN, fallback `ZZ` |

@@ -48,7 +48,7 @@ VOICE_CDR_GATEWAY -> Kafka kafka-voice-prod-02 -> Flink -> dedup/revisions
 
 #### Шаг 1. Фильтрация данных
 
-Некорректную запись разрешается либо исключить, либо сохранить без изменений.
+Запись с неразбираемым числом или timestamp можно сохранить либо отбросить; правило выбора, quarantine, логирование и влияние на публикацию не определены.
 
 1. Неуспешная десериализация или неизвестная версия схемы вызывает 3 retry через 15, 45 и 120 секунд; после них Kafka partition останавливается до вмешательства, offset не фиксируется, создается алерт `VOLTE_SCHEMA_BLOCKED`.
 2. Для `UPSERT` обязательны: непустые `event_id`, `call_id`, `serving_cell_id`; `revision >= 1`; `access_type='VOLTE'`; `subscriber_type='MASS'`; `call_start_time_utc <= call_end_time_utc`; вычисленная длительность `FLOOR((call_end_time_utc-call_start_time_utc)/1000)` находится в `0..14400` секунд; `setup_result IN ('SUCCESS','FAILED')`; непустой `release_cause_code`. `mos_avg`, если задан, должен быть `1.00..5.00`. Нарушившая запись исключается и учитывается в `rejected_calls_total{reason}`.

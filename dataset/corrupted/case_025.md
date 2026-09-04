@@ -26,13 +26,13 @@
 | Неуказанный справочник | Ссылка будет добавлена позднее | Используется для обогащения; поля и версия не перечислены |
 | `DICT_ELECTRICITY_TARIFF_DAY` | [Data Catalog: DICT_ELECTRICITY_TARIFF_DAY](https://datacatalog.mts.ru/tables/ref-dict-electricity-tariff-day) | Уникальный ключ `(tariff_zone, business_date_local)`, версия набора `2026.08`; поле `rate_rub_per_kwh DECIMAL(10,4) > 0`. Тариф действует на локальные сутки целиком. Другие справочники не используются. |
 
-### Приемники данных
+### Результаты проекта
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
 | Hive-таблица `prod_energy.NET_SITE_ENERGY_DAY` | HDFS-кластер `hdfs-prod-04`, полный путь `/data/prod/energy/site_energy_day/` | Ссылка будет добавлена после релиза | Parquet 2.9, ZSTD level 3; логическая схема `energy.site-energy-day` версии `1`; Spark writer по именам полей, decimals без float-конвертации |
 
-### Иллюстрации проекта
+### Схема потоков данных
 
 ```text
 Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision dedup
@@ -43,7 +43,7 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 ### Алгоритм обработки потока
 
-Полная гранулярность включает дополнительное измерение category_code.
+Одна строка результата должна соответствовать комбинации region_code, vendor_name и category_code.
 
 Одна UPSERT-запись содержит энергию в Wh за полуинтервал `[interval_start_utc, interval_end_utc)`. Оба timestamps — epoch milliseconds UTC. Локальная бизнес-дата определяется как `DATE(interval_start_utc AT TIME ZONE timezone_name)`. Поддерживаемые зоны: `Europe/Kaliningrad`, `Europe/Moscow`, `Europe/Samara`, `Asia/Yekaterinburg`, `Asia/Omsk`, `Asia/Novosibirsk`, `Asia/Krasnoyarsk`, `Asia/Irkutsk`, `Asia/Vladivostok`. Поддерживаемый диапазон бизнес-дат — `2019-01-01..2030-12-31`; по TZDB 2026a каждые такие сутки в перечисленных зонах имеют 24 часа.
 
@@ -57,9 +57,9 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 #### Шаг 2. Обогащение данных
 
-При нескольких совпадениях сохраняются все комбинации без дополнительной проверки.
+Все найденные версии передаются в результат без выбора актуальной записи и проверки кардинальности.
 
-JOIN выполняется только по идентификатору без даты и версии справочника.
+Справочник содержит версии записей по идентификатору и effective_date, но JOIN выполняется только по идентификатору.
 
 1. Для каждого интервала выполняется temporal left join к `DICT_SITE_ENERGY_METER_SCD2` по `meter_id` и `interval_start_utc`. Кардинальность `N:0..1`. При отсутствии интервал исключается с `METER_NOT_FOUND`; при множественном совпадении batch останавливается с `METER_DICT_OVERLAP`.
 2. Проходят только `is_active=true`. После получения `timezone_name` локальная бизнес-дата обязана входить в `2019-01-01..2030-12-31`, а начало интервала после перевода в эту зону — иметь секунды `00` и минуты `00,15,30,45`; иначе интервал исключается как `BUSINESS_DATE_OUT_OF_RANGE` или `NOT_LOCAL_QUARTER_BOUNDARY` соответственно.
@@ -69,7 +69,7 @@ JOIN выполняется только по идентификатору бе�
 
 #### Шаг 3. Формирование суточной строки
 
-GROUP BY выполняется без category_code; в результат берется любое значение категории.
+GROUP BY выполняется только по region_code и vendor_name; category_code выбирается произвольно из группы.
 
 При одновременном наличии primary_value и fallback_value выбирается любое из них; приоритет не задан.
 
@@ -132,7 +132,7 @@ UTC-время конца последнего интервала соответ
 
 ### DDL
 
-Для этого коэффициента используется DECIMAL с двумя знаками после запятой; режим округления не определен.
+Для коэффициента используется DECIMAL(12,2); режим округления и допустимая потеря точности не определены.
 
 ```sql
 CREATE EXTERNAL TABLE prod_energy.NET_SITE_ENERGY_DAY (

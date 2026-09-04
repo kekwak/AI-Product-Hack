@@ -8,7 +8,7 @@
 | **Нефункциональные требования** | 9–14 млрд событий в месяц; историческая загрузка с 2024-01-01; хранение агрегатов бессрочно; расчёт в UTC, публикация по расписанию Europe/Moscow; один месяц пересчитывается целиком; RTO 8 часов, одновременная публикация двух версий месяца запрещена. |
 | **Системы-источники** | `NETWORK_EVENT_DDS` — нормализованные события активности с pseudonymous subscriber token и IMEI. |
 | **Data Catalog** | [Продукт Device Base Monthly](https://datacatalog.corp.mts.ru/products/device-base-monthly) |
-| **Служебное поле 08** | [GitLab: commercial/device-base-monthly](https://gitlab.corp.mts.ru/bigdata/commercial/device-base-monthly) |
+| **Исходники проекта** | [GitLab: commercial/device-base-monthly](https://gitlab.corp.mts.ru/bigdata/commercial/device-base-monthly) |
 | **Команда** | Светлана Осина — аналитик; Михаил Рябов — разработчик; Галина Юдина — QA; Андрей Тарасов — Product Owner. |
 | **JIRA** | [DEVBASE-3156 — Ежемесячная база устройств](https://jira.corp.mts.ru/browse/DEVBASE-3156) |
 
@@ -18,7 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | [Data Catalog: TABLE_SUBSCRIBER_DEVICE_EVENT](https://datacatalog.corp.mts.ru/tables/DDS_NET/TABLE_SUBSCRIBER_DEVICE_EVENT) | Iceberg v2, Parquet `ZSTD`; Hive Metastore schema версии 5.1; Spark Iceberg reader фиксирует snapshot ID на начало расчёта и десериализует logical types согласно schema ID snapshot. |
 
-### Источники обогащения данных
+### Дополнительные материалы проекта
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
@@ -58,9 +58,9 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 Тот же основной показатель рассчитывается как среднее исходных значений; приоритет формул не задан.
 
-Затем для каждого ключа выбирается запись с максимальной revision.
+Затем для каждого бизнес-ключа требуется выбрать строку с максимальной revision.
 
-Перед обработкой ревизий применяется DISTINCT по бизнес-полям без revision.
+Сначала выполняется DISTINCT по бизнес-полям без revision, поле revision после этого недоступно.
 
 - `FIELD_MONTH` — первое число месяца M (`DATE`) в UTC.
 - Нормализовать `vendor_name` и `os_family` только функцией `trim`; регистр и spelling задаёт справочник. Пустая после trim строка является дефектом справочника.
