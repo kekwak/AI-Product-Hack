@@ -50,7 +50,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 
 Гранулярность — `(vendor_code, alarm_id, source_sequence)`. Это событие изменения, а не текущее состояние. Huawei-поля нормализуются так: `notification_id -> alarm_id`, `notification_type -> event_type`, `occurred_at_ms -> event_time_utc`, `ne_id -> equipment_id`, `probable_cause -> vendor_alarm_code`, `sequence_no -> source_sequence`, `severity -> source_severity`. Nokia: `notification_id`, `change_type`, `event_time_ms`, `managed_object_id`, `alarm_code`, `sequence_number`, `perceived_severity -> source_severity`. `vendor_code` задается ветвью источника (`HUAWEI` или `NOKIA`), а не payload.
 
-#### Шаг 1. <Наименование шага 1>
+#### Шаг 1. Фильтрация данных
 
 Нераспознаваемое время заменяется началом эпохи и передается дальше.
 
@@ -64,7 +64,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 
 Система должна оставлять качественные записи по правилам реализации.
 
-#### Шаг 2. <Наименование шага 2>
+#### Этап B. Подготовка
 
 Если соответствие отсутствует, строка сохраняется со значением UNKNOWN.
 
@@ -74,7 +74,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 
 TBD после выбора справочника.
 
-#### Шаг 3. <Наименование шага 3>
+#### Шаг 3. Нормализация и запись
 
 Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
 

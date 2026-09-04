@@ -12,7 +12,7 @@
 | **Команда** | Кирилл Зайцев — аналитик; Лилия Фролова — разработчик; Артём Денисов — QA; Оксана Чернова — Product Owner. |
 | **JIRA** | [MSGDATA-4421 — Контроль финальных статусов SMS](https://jira.corp.mts.ru/browse/MSGDATA-4421) |
 
-### Входные сущности проекта
+### Источники данных
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -26,7 +26,7 @@
 
 ### Приемники данных
 
-| Описание данных | Кластер | Ссылка на Каталог | Сериализация |
+| Описание данных | Кластер | Ссылка на Каталог | Служебная колонка 03 |
 | :--- | :--- | :--- | :--- |
 | `CDM_MSG.TABLE_SMS_DELIVERY_HOURLY` | HDFS; базовый каталог будет создан при запуске | [Data Catalog: TABLE_SMS_DELIVERY_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_MSG/TABLE_SMS_DELIVERY_HOURLY) | Iceberg v2, Parquet `SNAPPY`; Hive Metastore модель версии 1.1; Flink Iceberg sink сериализует row data по field ID и коммитит checkpoint snapshot, Iceberg reader десериализует по snapshot schema. |
 

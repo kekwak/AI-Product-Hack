@@ -12,19 +12,19 @@
 | **Команда** | Павел Миронов — аналитик; Ольга Титова — разработчик; Алексей Громов — QA; Елена Соколова — владелец продукта. |
 | **JIRA** | [ROAMDATA-2084 — Суточные агрегаты роуминга](https://jira.corp.mts.ru/browse/ROAMDATA-2084) |
 
-### Поставщики
+### Источники данных
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
 | `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | JSON; схема, версия и framing не указаны |
 
-### Lookup-объекты
+### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
 | Корпоративный справочник | Ссылка отсутствует | Используется актуальная версия с необходимыми полями |
 
-### Публикации
+### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -110,7 +110,7 @@ AND charge_rub >= 0
 | FIELD_CHARGE_RUB | DECIMAL(24,4) | Точная сумма начислений в RUB, >= 0; `NOT NULL` | `TABLE_ROAMING_CDR` | `charge_rub` | DECIMAL(20,4) | Сумма без округления |
 | FIELD_PROC_TS | TIMESTAMP | Время коммита UTC; `NOT NULL` | Spark | `processing_ts` | TIMESTAMP | Одинаково в пределах запуска D |
 
-### Пример данных
+### Контрольный фрагмент
 
 | FIELD_BIZ_DATE | FIELD_HOME_REGION_CODE | FIELD_VISITED_COUNTRY_CODE | FIELD_SERVICE_TYPE | FIELD_SESSIONS_CNT | FIELD_USERS_CNT | FIELD_TRAFFIC_MB | FIELD_CHARGE_RUB | FIELD_PROC_TS |
 | :--- | :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- |

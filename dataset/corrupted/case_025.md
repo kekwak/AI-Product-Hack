@@ -31,7 +31,7 @@
 | :--- | :--- | :--- | :--- |
 | Hive-таблица `prod_energy.NET_SITE_ENERGY_DAY` | HDFS; путь не указан | [Data Catalog: NET_SITE_ENERGY_DAY](https://datacatalog.mts.ru/tables/prod-energy-net-site-energy-day) | Parquet 2.9, ZSTD level 3; логическая схема `energy.site-energy-day` версии `1`; Spark writer по именам полей, decimals без float-конвертации |
 
-### Общая архитектура
+### Схема потоков данных
 
 ```text
 Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision dedup
@@ -46,7 +46,7 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 Одна UPSERT-запись содержит энергию в Wh за полуинтервал `[interval_start_utc, interval_end_utc)`. Оба timestamps — epoch milliseconds UTC. Локальная бизнес-дата определяется как `DATE(interval_start_utc AT TIME ZONE timezone_name)`. Поддерживаемые зоны: `Europe/Kaliningrad`, `Europe/Moscow`, `Europe/Samara`, `Asia/Yekaterinburg`, `Asia/Omsk`, `Asia/Novosibirsk`, `Asia/Krasnoyarsk`, `Asia/Irkutsk`, `Asia/Vladivostok`. Поддерживаемый диапазон бизнес-дат — `2019-01-01..2030-12-31`; по TZDB 2026a каждые такие сутки в перечисленных зонах имеют 24 часа.
 
-#### Шаг 1. Фильтрация данных
+#### Этап A. Подготовка
 
 Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.
 

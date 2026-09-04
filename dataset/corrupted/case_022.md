@@ -31,7 +31,7 @@
 | :--- | :--- | :--- | :--- |
 | Hive-таблица `prod_energy.NET_SITE_ENERGY_DAY` | HDFS-кластер `hdfs-prod-04`, полный путь `/data/prod/energy/site_energy_day/` | Карточка каталога не указана для результата | Parquet 2.9, ZSTD level 3; логическая схема `energy.site-energy-day` версии `1`; Spark writer по именам полей, decimals без float-конвертации |
 
-### Архитектурный набросок
+### Схема потоков данных
 
 ```text
 Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision dedup
@@ -40,7 +40,7 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
                                                                   -> local-day aggregation -> HDFS NET_SITE_ENERGY_DAY
 ```
 
-### Внутренняя реализация
+### Алгоритм обработки потока
 
 Одна UPSERT-запись содержит энергию в Wh за полуинтервал `[interval_start_utc, interval_end_utc)`. Оба timestamps — epoch milliseconds UTC. Локальная бизнес-дата определяется как `DATE(interval_start_utc AT TIME ZONE timezone_name)`. Поддерживаемые зоны: `Europe/Kaliningrad`, `Europe/Moscow`, `Europe/Samara`, `Asia/Yekaterinburg`, `Asia/Omsk`, `Asia/Novosibirsk`, `Asia/Krasnoyarsk`, `Asia/Irkutsk`, `Asia/Vladivostok`. Поддерживаемый диапазон бизнес-дат — `2019-01-01..2030-12-31`; по TZDB 2026a каждые такие сутки в перечисленных зонах имеют 24 часа.
 
@@ -133,7 +133,7 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 UTC-время конца последнего интервала соответствует следующей локальной полуночи каждой зоны. Последняя строка показывает допустимое отсутствие тарифа без потери энергии.
 
-### DDL
+### Техническое приложение
 
 ```sql
 CREATE EXTERNAL TABLE prod_energy.NET_SITE_ENERGY_DAY (

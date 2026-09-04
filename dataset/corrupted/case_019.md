@@ -9,10 +9,10 @@
 | **Системы-источники** | `IPMPLS_TELEMETRY_COLLECTOR` — унифицированные SNMP/gNMI-счетчики интерфейсов маршрутизаторов. |
 | **Data Catalog** | [Карточка NET_TRANSPORT_LINK_HOUR](https://datacatalog.mts.ru/data-products/net-transport-link-hour) |
 | **Исходники проекта** | [GitLab: transport-link-hour](https://gitlab.mts.ru/bigdata/transport/transport-link-hour) |
-| **Команда** | Роман Зайцев — аналитик; Алина Тихонова — разработчик; Денис Крылов — QA. |
+| **Служебное поле 09** | Роман Зайцев — аналитик; Алина Тихонова — разработчик; Денис Крылов — QA. |
 | **JIRA** | [TRANSPORT-1208](https://jira.mts.ru/browse/TRANSPORT-1208) |
 
-### Входной контур
+### Источники данных
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -24,7 +24,7 @@
 | :--- | :--- | :--- |
 | `DICT_TRANSPORT_LINK_SCD2` | [Data Catalog: DICT_TRANSPORT_LINK_SCD2](https://datacatalog.mts.ru/tables/ref-dict-transport-link-scd2) | Ключ `(device_id, interface_name)` и полуинтервал `[valid_from_utc, valid_to_utc)`. Возвращает `link_id`, `region_code`, `capacity_mbps`, `endpoint_role`, `is_active`. `capacity_mbps > 0`; версии не пересекаются и начинают действие только на границе часа UTC. Snapshot фиксируется для batch. Другие справочники не используются. |
 
-### Выходной контур
+### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |

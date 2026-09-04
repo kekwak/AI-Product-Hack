@@ -20,7 +20,7 @@
 
 ### Источники обогащения данных
 
-| Описание источника | Ссылка | Описание |
+| Описание источника | Ссылка | Служебная колонка 02 |
 | :--- | :--- | :--- |
 | Корпоративный справочник | Ссылка отсутствует | Используется актуальная версия с необходимыми полями |
 
@@ -32,7 +32,7 @@
 | :--- | :--- | :--- | :--- |
 | `CDM_MSG.TABLE_SMS_DELIVERY_HOURLY` | HDFS-кластер указан в runtime; полный путь отсутствует | [Data Catalog: TABLE_SMS_DELIVERY_HOURLY](https://datacatalog.corp.mts.ru/tables/CDM_MSG/TABLE_SMS_DELIVERY_HOURLY) | Формат файла выбирается writer по умолчанию |
 
-### Общая архитектура
+### Схема потоков данных
 
 `SMS_STATUS_HUB` → `kafka-messaging-prod-02.TOPIC_SMS_FINAL_STATUS_V2` → Flink `sms-delivery-hourly-v2` → валидация/дедупликация → temporal JOIN маршрута → часовая агрегация → Iceberg `TABLE_SMS_DELIVERY_HOURLY`.
 

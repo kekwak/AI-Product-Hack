@@ -68,7 +68,7 @@ AND final_status_ts <= processing_ts + INTERVAL 2 MINUTES
 
 NULL не проходит соответствующее условие. Ошибки schema/JSON, enum, времени и обязательных полей исключаются и учитываются раздельно; payload, адреса и текст не журналируются. Поля MSISDN и message body отсутствуют в контракте источника. Пустой поток штатен; недоступность Kafka или Schema Registry приостанавливает job без commit offsets.
 
-#### Шаг 2. Обогащение данных
+#### Этап B. Подготовка
 
 При нескольких совпадениях со справочником в результат передаются все найденные варианты.
 
@@ -111,21 +111,21 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
 
-| Приемники |  |  | Источники |  |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
-| FIELD_BIZ_DATE | DATE | UTC-дата final status; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT |
-| FIELD_HOUR_UTC | TINYINT | UTC-час 0–23; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT |
-| FIELD_REGION_CODE | STRING | Регион либо `UNKNOWN`; `NOT NULL` | `DICT_SMS_ROUTE_SCD` | `region_code` | STRING |
-| FIELD_DIRECTION | STRING | `MO` или `MT`; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `direction` | STRING |
-| FIELD_TRAFFIC_CHANNEL | STRING | `P2P`, `A2P`, `SERVICE` или `UNKNOWN`; `NOT NULL` | `DICT_SMS_ROUTE_SCD` | `traffic_channel` | STRING |
-| FIELD_MESSAGES_CNT | BIGINT | Все финальные сообщения группы, >0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `message_id` | STRING |
-| FIELD_DELIVERED_CNT | BIGINT | Доставленные, >=0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `status` | STRING |
-| FIELD_FAILED_CNT | BIGINT | Ошибка доставки, >=0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `status` | STRING |
-| FIELD_EXPIRED_CNT | BIGINT | Истёк TTL, >=0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `status` | STRING |
-| FIELD_DELIVERY_RATE_PCT | DECIMAL(7,4) | Доля доставленных в процентах 0–100; `NOT NULL` | Расчёт | счётчики | Не применимо: расчёт |
-| FIELD_IS_FINAL | BOOLEAN | Финализирован ли час; `NOT NULL` | Flink | watermark | Не применимо: системное состояние |
-| FIELD_PROC_TS | TIMESTAMP | UTC-время snapshot commit; `NOT NULL` | Flink | `commit_ts` | TIMESTAMP |
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
+| FIELD_BIZ_DATE | DATE | UTC-дата final status; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT | Epoch ms → date |
+| FIELD_HOUR_UTC | TINYINT | UTC-час 0–23; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT | Epoch ms → hour |
+| FIELD_REGION_CODE | STRING | Регион либо `UNKNOWN`; `NOT NULL` | `DICT_SMS_ROUTE_SCD` | `region_code` | STRING | Temporal JOIN/fallback |
+| FIELD_DIRECTION | STRING | `MO` или `MT`; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `direction` | STRING | Валидированный enum |
+| FIELD_TRAFFIC_CHANNEL | STRING | `P2P`, `A2P`, `SERVICE` или `UNKNOWN`; `NOT NULL` | `DICT_SMS_ROUTE_SCD` | `traffic_channel` | STRING | Temporal JOIN/fallback |
+| FIELD_MESSAGES_CNT | BIGINT | Все финальные сообщения группы, >0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `message_id` | STRING | `COUNT(*)` после дедупликации |
+| FIELD_DELIVERED_CNT | BIGINT | Доставленные, >=0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `status` | STRING | `COUNT_IF(DELIVERED)` |
+| FIELD_FAILED_CNT | BIGINT | Ошибка доставки, >=0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `status` | STRING | `COUNT_IF(FAILED)` |
+| FIELD_EXPIRED_CNT | BIGINT | Истёк TTL, >=0; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `status` | STRING | `COUNT_IF(EXPIRED)` |
+| FIELD_DELIVERY_RATE_PCT | DECIMAL(7,4) | Доля доставленных в процентах 0–100; `NOT NULL` | Расчёт | счётчики | Не применимо: расчёт | Half-up до 4 знаков |
+| FIELD_IS_FINAL | BOOLEAN | Финализирован ли час; `NOT NULL` | Flink | watermark | Не применимо: системное состояние | `true` после H+31 минуты |
+| FIELD_PROC_TS | TIMESTAMP | UTC-время snapshot commit; `NOT NULL` | Flink | `commit_ts` | TIMESTAMP | Одинаково для snapshot |
 
 ### Пример данных
 

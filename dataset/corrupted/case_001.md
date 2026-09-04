@@ -25,7 +25,7 @@
 | :--- | :--- | :--- |
 | Корпоративный справочник | Ссылка отсутствует | Используется актуальная версия с необходимыми полями |
 
-### Приемники данных
+### Результаты проекта
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -101,22 +101,22 @@ Replay использует отдельные выгрузочные фильт
 
 Допустимые значения status: ACTIVE и INACTIVE.
 
-| Приемники |  |  | Источники |  |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
-| cell_id | string | Идентификатор LTE-сектора; обязательность поля `cell_id` не определена | cell-state | cell_id | string |
-| minute_start_utc | timestamp | Начало минуты UTC; обязательность поля `minute_start_utc` не определена | cell-state | event_time_utc | long |
-| site_id | string | Идентификатор площадки; обязательность поля `site_id` не определена | DICT_LTE_CELL_SCD2 | site_id | string |
-| region_code | string | Код макрорегиона; `NOT NULL` | DICT_LTE_CELL_SCD2 | region_code | string |
-| vendor_code | string | Производитель оборудования; `NOT NULL` | DICT_LTE_CELL_SCD2 | vendor_code | string |
-| availability_pct | decimal(5,2) | Доля UP-сэмплов, проценты `0.00..100.00`; `NOT NULL` | Расчет | state_code | string |
-| traffic_mb | decimal(18,3) | Суммарный трафик, MiB, `>=0`; `NOT NULL` | traffic-counter | bytes_total | long |
-| sample_count | bigint | Число уникальных state-событий, `>0`; `NOT NULL` | cell-state | event_id | string |
-| has_sample_gap | boolean | Признак `sample_count < 6`; `NOT NULL` | Расчет | sample_count | bigint |
-| source_max_event_time_utc | timestamp | Максимальное время учтенного события UTC; `NOT NULL` | Оба Kafka-источника | event_time_utc | long |
-| loaded_at_utc | timestamp | Время начала записи партиции UTC; `NOT NULL` | Система обработки | batch_started_at | timestamp |
-| event_date_utc | date | Дата минуты UTC; `NOT NULL` | Расчет | minute_start_utc | timestamp |
-| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | minute_start_utc | timestamp |
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
+| cell_id | string | Идентификатор LTE-сектора; обязательность поля `cell_id` не определена | cell-state | cell_id | string | Часть бизнес-ключа; непустая строка длиной 1–64 |
+| minute_start_utc | timestamp | Начало минуты UTC; обязательность поля `minute_start_utc` не определена | cell-state | event_time_utc | long | `FLOOR_TO_MINUTE(FROM_EPOCH_MS(event_time_utc))`; часть ключа |
+| site_id | string | Идентификатор площадки; обязательность поля `site_id` не определена | DICT_LTE_CELL_SCD2 | site_id | string | Версия справочника на event time |
+| region_code | string | Код макрорегиона; `NOT NULL` | DICT_LTE_CELL_SCD2 | region_code | string | Enum `CENTER,NORTHWEST,SOUTH,VOLGA,URAL,SIBERIA,FAR_EAST` |
+| vendor_code | string | Производитель оборудования; `NOT NULL` | DICT_LTE_CELL_SCD2 | vendor_code | string | Enum `ERICSSON,HUAWEI,NOKIA,ZTE` |
+| availability_pct | decimal(5,2) | Доля UP-сэмплов, проценты `0.00..100.00`; `NOT NULL` | Расчет | state_code | string | Формула шага 3 |
+| traffic_mb | decimal(18,3) | Суммарный трафик, MiB, `>=0`; `NOT NULL` | traffic-counter | bytes_total | long | 0.000 при отсутствии traffic |
+| sample_count | bigint | Число уникальных state-событий, `>0`; `NOT NULL` | cell-state | event_id | string | `COUNT(*)` после дедупликации |
+| has_sample_gap | boolean | Признак `sample_count < 6`; `NOT NULL` | Расчет | sample_count | bigint | `true` или `false` |
+| source_max_event_time_utc | timestamp | Максимальное время учтенного события UTC; `NOT NULL` | Оба Kafka-источника | event_time_utc | long | Максимум присоединенных ветвей |
+| loaded_at_utc | timestamp | Время начала записи партиции UTC; `NOT NULL` | Система обработки | batch_started_at | timestamp | Одинаково для строк одного batch |
+| event_date_utc | date | Дата минуты UTC; `NOT NULL` | Расчет | minute_start_utc | timestamp | HDFS-партиция |
+| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | minute_start_utc | timestamp | HDFS-партиция |
 
 ### Пример данных
 
@@ -196,7 +196,7 @@ TBLPROPERTIES (
 
 Контракт версии 1 допускает только добавление `NULLABLE`-поля после регистрации версии 2 и двухнедельного уведомления потребителей. Переименование, удаление, смена типа или смысла требует новой таблицы и backfill. Чтение витрины разрешено группам `NOC_READ` и `NET_DATA_ENGINEERING`; персональных данных в составе нет. В примеры и технические метрики payload не записывается.
 
-### Журнал документа
+### История изменений
 
 | Версия | Дата | Изменение | Автор |
 | :--- | :--- | :--- | :--- |

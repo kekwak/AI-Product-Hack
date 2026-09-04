@@ -100,21 +100,21 @@ normalized_source_value передается в приемник без допо
 
 Поле total_count переименовывается в successful_count и начинает учитывать только успешные записи.
 
-| Приемники |  |  | Источники |  |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
-| FIELD_BIZ_DATE | DATE | Дата часа UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT |
-| FIELD_HOUR_UTC | TINYINT | Час UTC, 0–23; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT |
-| FIELD_REGION_CODE | STRING | Код региона или `UNKNOWN`; `NOT NULL`, 2–16 символов | `DICT_RAN_SITE_SCD` | `region_code` | STRING |
-| FIELD_SITE_ID | STRING | Идентификатор площадки; `NOT NULL`, 1–32 символа | `TOPIC_RAN_ALARM_V2` | `site_id` | STRING |
-| FIELD_VENDOR_NAME | STRING | Вендор или `UNKNOWN`; `NOT NULL`, до 64 символов | `DICT_RAN_SITE_SCD` | `vendor_name` | STRING |
-| FIELD_SEVERITY | STRING | `CRITICAL`, `MAJOR`, `MINOR`, `WARNING`; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `severity` | STRING |
-| FIELD_ALARM_CODE | STRING | Код аварии; `NOT NULL`, 2–32 символа | `TOPIC_RAN_ALARM_V2` | `alarm_code` | STRING |
-| FIELD_ALARMS_CNT | BIGINT | Число уникальных `alarm_id`, > 0; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `alarm_id` | STRING |
-| FIELD_AFFECTED_CELLS_CNT | BIGINT | Число уникальных `cell_id`, > 0; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `cell_id` | STRING |
-| FIELD_FIRST_EVENT_TS | TIMESTAMP | Минимальное event time группы, UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT |
-| FIELD_LAST_EVENT_TS | TIMESTAMP | Максимальное event time группы, UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT |
-| FIELD_PROC_TS | TIMESTAMP | Время успешного запуска, UTC; `NOT NULL` | Spark | `processing_ts` | TIMESTAMP |
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Служебная колонка 04** |
+| FIELD_BIZ_DATE | DATE | Дата часа UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT | Epoch ms → UTC date |
+| FIELD_HOUR_UTC | TINYINT | Час UTC, 0–23; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT | Epoch ms → UTC hour |
+| FIELD_REGION_CODE | STRING | Код региона или `UNKNOWN`; `NOT NULL`, 2–16 символов | `DICT_RAN_SITE_SCD` | `region_code` | STRING | Fallback `UNKNOWN` при отсутствии JOIN |
+| FIELD_SITE_ID | STRING | Идентификатор площадки; `NOT NULL`, 1–32 символа | `TOPIC_RAN_ALARM_V2` | `site_id` | STRING | Без преобразования |
+| FIELD_VENDOR_NAME | STRING | Вендор или `UNKNOWN`; `NOT NULL`, до 64 символов | `DICT_RAN_SITE_SCD` | `vendor_name` | STRING | Fallback `UNKNOWN` |
+| FIELD_SEVERITY | STRING | `CRITICAL`, `MAJOR`, `MINOR`, `WARNING`; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `severity` | STRING | Валидируется фильтром |
+| FIELD_ALARM_CODE | STRING | Код аварии; `NOT NULL`, 2–32 символа | `TOPIC_RAN_ALARM_V2` | `alarm_code` | STRING | Валидируется regex |
+| FIELD_ALARMS_CNT | BIGINT | Число уникальных `alarm_id`, > 0; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `alarm_id` | STRING | `COUNT(DISTINCT alarm_id)` |
+| FIELD_AFFECTED_CELLS_CNT | BIGINT | Число уникальных `cell_id`, > 0; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `cell_id` | STRING | `COUNT(DISTINCT cell_id)` |
+| FIELD_FIRST_EVENT_TS | TIMESTAMP | Минимальное event time группы, UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT | Epoch ms → timestamp UTC |
+| FIELD_LAST_EVENT_TS | TIMESTAMP | Максимальное event time группы, UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT | Не раньше `FIELD_FIRST_EVENT_TS` |
+| FIELD_PROC_TS | TIMESTAMP | Время успешного запуска, UTC; `NOT NULL` | Spark | `processing_ts` | TIMESTAMP | Одинаково для всех строк snapshot запуска |
 
 ### Пример данных
 
@@ -186,7 +186,7 @@ Debug-таблица ежедневно копируется в бессрочн
 
 **Есть ли чувствительные данные?** Нет. Абонентские идентификаторы и содержимое сообщений отсутствуют. Доступ на чтение выдаётся группе `net_ops_analytics`; технические журналы содержат только event ID и Kafka coordinates и хранятся 30 дней.
 
-### Журнал документа
+### История изменений
 
 | Версия | Дата | Автор | Изменение |
 | :--- | :--- | :--- | :--- |

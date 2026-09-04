@@ -18,7 +18,7 @@
 | :--- | :--- | :--- | :--- |
 | `TOPIC_RAN_ALARM_V2`, полные имена топика одинаковы во всех регионах; регион содержится в payload | Kafka, кластер `kafka-net-prod-01` | [Data Catalog: TOPIC_RAN_ALARM_V2](https://datacatalog.corp.mts.ru/kafka/kafka-net-prod-01/TOPIC_RAN_ALARM_V2) | JSON; схема, версия и framing не указаны |
 
-### Источники обогащения данных
+### Дополнительные материалы проекта
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
@@ -103,7 +103,7 @@ TBD после согласования выходного расчета.
 | FIELD_LAST_EVENT_TS | TIMESTAMP | Максимальное event time группы, UTC; `NOT NULL` | `TOPIC_RAN_ALARM_V2` | `event_ts` | BIGINT | Не раньше `FIELD_FIRST_EVENT_TS` |
 | FIELD_PROC_TS | TIMESTAMP | Время успешного запуска, UTC; `NOT NULL` | Spark | `processing_ts` | TIMESTAMP | Одинаково для всех строк snapshot запуска |
 
-### Демонстрационный фрагмент
+### Пример данных
 
 | FIELD_BIZ_DATE | FIELD_HOUR_UTC | FIELD_REGION_CODE | FIELD_SITE_ID | FIELD_VENDOR_NAME | FIELD_SEVERITY | FIELD_ALARM_CODE | FIELD_ALARMS_CNT | FIELD_AFFECTED_CELLS_CNT | FIELD_FIRST_EVENT_TS | FIELD_LAST_EVENT_TS | FIELD_PROC_TS |
 | :--- | ---: | :--- | :--- | :--- | :--- | :--- | ---: | ---: | :--- | :--- | :--- |

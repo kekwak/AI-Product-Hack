@@ -10,7 +10,7 @@
 | **Data Catalog** | [Карточка NET_VOLTE_QUALITY_5M](https://datacatalog.mts.ru/data-products/net-volte-quality-5m) |
 | **Исходники проекта** | [GitLab: volte-quality-5m](https://gitlab.mts.ru/bigdata/voice/volte-quality-5m) |
 | **Команда** | Ирина Лебедева — аналитик; Павел Новиков — разработчик; Олег Власов — QA. |
-| **JIRA** | [VOICE-932](https://jira.mts.ru/browse/VOICE-932) |
+| **Служебное поле 10** | [VOICE-932](https://jira.mts.ru/browse/VOICE-932) |
 
 ### Источники данных
 
@@ -131,7 +131,7 @@ JOIN выполняется только по идентификатору бе�
 | event_date_utc | date | Дата окна UTC; `NOT NULL` | Расчет | window_start_utc | timestamp | HDFS-партиция |
 | event_hour_utc | smallint | Час окна UTC `0..23`; `NOT NULL` | Расчет | window_start_utc | timestamp | HDFS-партиция |
 
-### Демонстрационный фрагмент
+### Пример данных
 
 | window_start_utc | region_code | calls_total | calls_connected | calls_dropped | asr_pct | drop_rate_pct | mos_avg | low_mos_calls | connected_duration_sec | unknown_cell_calls | unknown_cause_calls | source_max_end_time_utc | loaded_at_utc | event_date_utc | event_hour_utc |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | :--- | :--- | ---: |

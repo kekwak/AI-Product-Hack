@@ -8,7 +8,7 @@
 | **Нефункциональные требования** | Средний поток — 25 000 событий/с, пик — 80 000 событий/с. Event time и все календарные границы — UTC. Watermark — 20 минут. Kafka retention — 7 суток, HDFS retention — 25 месяцев. Повторный расчет суток — до 45 минут. Конвейер должен обрабатывать повторную доставку без изменения результата. Watermark закрывает расчет только через 30 минут после периода. |
 | **Системы-источники** | `VOICE_CDR_GATEWAY` — нормализованные финальные записи IMS/VoLTE о завершенных вызовах. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
 | **Data Catalog** | [Карточка NET_VOLTE_QUALITY_5M](https://datacatalog.mts.ru/data-products/net-volte-quality-5m) |
-| **Исходники проекта** | [GitLab: volte-quality-5m](https://gitlab.mts.ru/bigdata/voice/volte-quality-5m) |
+| **Служебное поле 08** | [GitLab: volte-quality-5m](https://gitlab.mts.ru/bigdata/voice/volte-quality-5m) |
 | **Команда** | Ирина Лебедева — аналитик; Павел Новиков — разработчик; Олег Власов — QA. |
 | **JIRA** | [VOICE-932](https://jira.mts.ru/browse/VOICE-932) |
 
@@ -77,7 +77,7 @@ VOICE_CDR_GATEWAY -> Kafka kafka-voice-prod-02 -> Flink -> dedup/revisions
 
 Описание появится после проверки прототипа.
 
-### Технические параметры размещения
+### Формирование ключа (kafka) / партиции (hdfs)
 
 При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.
 

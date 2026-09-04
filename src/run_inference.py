@@ -1,3 +1,159 @@
+#!/usr/bin/env python3
+"""Single-call LangGraph inference over corrupted dataset documents."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any, NotRequired, Protocol, TypedDict
+
+from langchain_openrouter import ChatOpenRouter
+from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, ConfigDict
+from tqdm import tqdm
+
+from paths import ARTIFACTS_DIR, DATASET_DIR
+
+MODEL = "minimax/minimax-m3"
+FULL_PROMPT = r"""Ты проводишь независимое pre-review ТЗ на поток или витрину данных глазами Data Analyst, Data Engineer и QA.
+
+Цель — max recall значимых ошибок. Ниже без сокращений вставлены шаблон и два нормативных файла с полным описанием D01–D08, T01 и U01–U19. Проверь каждый их пункт; пересказ или замена критериев не допускаются.
+
+Обязательный внутренний проход внутри единственного вызова:
+1. Мысленно восстанови назначение, гранулярность, источники, приемники и полный алгоритм.
+2. Создай внутренний чек-лист ровно из 28 ID в таком порядке:
+   D01, D02, D03, D04, D05, D06, D07, D08,
+   T01,
+   U01, U02, U03, U04, U05, U06, U07, U08, U09, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19.
+3. Обязательно обработай каждый ID без пропусков. Для каждого: прочитай его полное определение ниже, проверь все относящиеся к нему места документа и мысленно поставь PASS либо FAIL с конкретным доказательством.
+4. Для T01 отдельно сверь каждый обязательный раздел, поле, шаг, таблицу, колонку, 10 строк примера, DDL, FAQ и историю изменений с приложенным шаблоном. Все нарушения T01 объедини в одно замечание.
+5. Для каждого U-критерия примени обычный случай, границу, отсутствие, множественность, повтор/порядок и изменение/сбой, если состояние применимо.
+6. Сверь между собой текст, таблицы, схему, алгоритм, DDL, примеры и FAQ. Отдельно ищи локальные фразы, противоречащие другим частям документа.
+7. Не завершай анализ, пока всем 28 ID не присвоен внутренний PASS или FAIL. В ответ перенеси каждую позицию с FAIL и ни одной с PASS.
+8. Создавай замечание только по правилам «Когда создавать замечание». Объедини проявления одной корневой причины; разные причины не склеивай. Не придирайся к стилю и не выдумывай контекст.
+9. Пустой список допустим только когда все 28 позиций получили PASS.
+
+Требования к ответу:
+- evidence_quote — дословный фрагмент проверяемого документа, достаточный для поиска проблемного места; не пересказывай его;
+- title — короткое название конкретной ошибки по контексту документа;
+- problem — кратко объясни неоднозначность/противоречие и возможное последствие; не предлагай автоисправление;
+- если ошибок нет, верни пустой errors;
+- не раскрывай рассуждения и не добавляй текст вне структурированного ответа.
+
+Ниже приведены нормативные первоисточники. Следуй им буквально; не добавляй собственные классы ошибок.
+
+# ПЕРВОИСТОЧНИК: Шаблоны документации.md
+
+```
+# Потоковые данные/витрины
+
+| **Общие сведения** | Краткое описание потока данных |
+| :--- | :--- |
+| **Решаемая проблема** | Краткое описание причин создания потока данных и задач, которые предполагается решать с ее помощью |
+| **Продуктовые метрики** | Список метрик, которые изменятся при реализации/работе потока |
+| **Заказчики** | Продукт или подразделение - заказчик |
+| **Нефункциональные требования** | Например:<br>• объем данных<br>• задержки |
+| **Системы-источники** | Перечень и краткое описание источников данных для построения потока |
+| **Data Catalog** | Ссылка |
+| **Исходники проекта** | Ссылка на Git Lab |
+| **Команда** | Фамилия Имя аналитика - аналитик<br><br>Фамилия Имя разработчика - разработчик |
+| **JIRA** | |
+
+### Источники данных
+
+| Описание источника | Тип источника | Ссылка на источник | Сериализация |
+| :--- | :--- | :--- | :--- |
+| | | | |
+
+### Источники обогащения данных
+
+| Описание источника | Ссылка | Описание |
+| :--- | :--- | :--- |
+| | | |
+
+### Приемники данных
+
+| Описание данных | Кластер | Ссылка на Каталог | Сериализация |
+| :--- | :--- | :--- | :--- |
+| | | | |
+
+### Схема потоков данных
+
+### Алгоритм обработки потока
+Детальное пошаговое описание алгоритма обработки потоковых данных: фильтрация, трансформация, обогащение.
+
+#### Шаг 1. Фильтрация данных
+Описание условий фильтрации данных из источника.
+
+#### Шаг 2. Обогащение данных
+Описание алгоритма обогащения данных.
+
+#### Шаг 3. <Наименование шага 3>
+Описание преобразований, выполняемых на шаге 3.
+
+### Формирование ключа (kafka) / партиции (hdfs)
+
+### Структура данных
+
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
+| | | | | | | |
+
+### Пример данных
+10 строк из таблицы вставляем в макрос раскрыть
+
+### DDL
+DDL схема таблицы
+
+### FAQ
+Описание нюансов витрины не очевидных бизнес-пользователям.
+
+### История изменений
+
+
+# ПЕРВОИСТОЧНИК: errors-type-D-T.md
+
+```
+# Ошибки типа 1 и типа 2
+
+Короткий справочник обязательных проверок. Универсальные логические ошибки проверяются отдельно.
+
+## Тип 1 — доменные ошибки
+
+| ID | Ошибка | Что проверить |
+|---|---|---|
+| **D01** | Неполная спецификация сериализации | Для каждого входного и выходного потока указаны формат, схема/модель и способ сериализации или десериализации. |
+| **D02** | Нет прямой ссылки на Data Catalog | Для каждого источника и приемника есть конкретная ссылка на соответствующий объект в каталоге. |
+| **D03** | Не указана обязательность поля | Для каждого поля витрины явно задано `NOT NULL` или `NULLABLE`. |
+| **D04** | Не описаны типовые фильтры | Зафиксированы точные условия фильтрации при построении витрины и выгрузке данных. |
+| **D05** | Отсутствующий этап не обозначен явно | Все предусмотренные этапы сохранены; если фильтрация, обогащение или другая обработка отсутствует, написано «не применимо» или «нет». |
+| **D06** | Не указан Kafka-кластер | Для каждого потокового источника и приемника указано точное имя Kafka-кластера. |
+| **D07** | Неполное описание файлового хранилища | Для каждого файлового приемника указан полный путь в HDFS и формат хранения. |
+| **D08** | Не перечислены справочники | Указаны все справочники и нормативно-справочные данные, используемые при формировании витрины; при их отсутствии это написано явно. |
+```
+
+## Тип 2 — ошибки соответствия шаблону
+
+### T01 — отсутствует элемент обязательной структуры документа
+
+Проверяемый документ должен полностью соответвовать шаблону документа.
+
+Отсутствие любого перечисленного поля, раздела, подраздела, шага, таблицы или обязательной колонки считается ошибкой `T01`. Если раздел, этап или поле не применимы к конкретному документу, их нельзя удалять или оставлять пустыми: элемент сохраняется, а внутри явно указывается «не применимо» или «нет».
+
+## Что не считать ошибкой
+
+- Дополнительные разделы разрешены.
+- Формулировка заголовка может отличаться, если его соответствие шаблону однозначно определяется по смыслу.
+```
+
+# ПЕРВОИСТОЧНИК: errors-type-U.md
+
+```
 # Универсальный чек-лист логики и согласованности ТЗ
 
 ## Назначение
@@ -86,3 +242,115 @@
 - результат детерминирован при повторе, множественности и изменении порядка данных;
 - все представления документа согласованы;
 - по документу можно реализовать решение и построить объективные тесты без скрытых решений исполнителя.
+```
+"""
+
+
+class Finding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    error_type_id: str
+    evidence_quote: str
+    title: str
+    problem: str
+
+
+class Findings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    errors: list[Finding]
+
+
+class State(TypedDict):
+    document: str
+    findings: list[dict[str, str]]
+
+
+def build_graph(model):
+    async def infer(state: State) -> State:
+        response = await model.ainvoke(
+            [("system", FULL_PROMPT), ("human", f"# ПРОВЕРЯЕМЫЙ ДОКУМЕНТ\n\n```\n{state['document']}\n```")]
+        )
+        result = response["parsed"]
+        return {"findings": [item.model_dump() for item in result.errors]}
+
+    return (
+        StateGraph(State)
+        .add_node("infer", infer)
+        .add_edge(START, "infer")
+        .add_edge("infer", END)
+        .compile()
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="One-shot LangGraph inference over dataset documents")
+    parser.add_argument("--input", type=Path, default=DATASET_DIR / "corrupted")
+    parser.add_argument("--output", type=Path, default=ARTIFACTS_DIR / "predictions" / "minimax_m3")
+    parser.add_argument("--case", action="append", dest="cases")
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--model", default=os.getenv("INFERENCE_MODEL", MODEL))
+    parser.add_argument("--concurrency", type=int, default=8)
+    parser.add_argument("--retries", type=int, default=2)
+    return parser.parse_args()
+
+
+async def run(args: argparse.Namespace) -> int:
+    documents = sorted(args.input.glob("case_*.md"))
+    if args.cases:
+        documents = [path for path in documents if path.stem in set(args.cases)]
+    documents = documents[: args.limit] if args.limit else documents
+    if not documents:
+        print("ERROR: документы не найдены", file=sys.stderr)
+        return 2
+
+    chat = ChatOpenRouter(
+        model=args.model,
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        temperature=0,
+        max_tokens=8192,
+        max_retries=1,
+        reasoning={"effort": "high", "exclude": True},
+        openrouter_provider={"require_parameters": True},
+    )
+
+    llm = chat.with_structured_output(Findings, method="json_schema", strict=True, include_raw=True)
+    graph = build_graph(llm)
+    args.output.mkdir(parents=True, exist_ok=True)
+    semaphore = asyncio.Semaphore(args.concurrency)
+
+    with tqdm(total=len(documents), desc="Inference", unit="doc") as progress:
+        async def infer_document(path: Path) -> str | None:
+            try:
+                for attempt in range(args.retries + 1):
+                    try:
+                        async with semaphore:
+                            result = await graph.ainvoke(
+                                {"document": path.read_text(encoding="utf-8")}
+                            )
+                        (args.output / f"{path.stem}.json").write_text(
+                            json.dumps(result["findings"], ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8",
+                        )
+                        return None
+                    except Exception as error:
+                        if attempt == args.retries:
+                            return f"{path.stem}: {str(error).splitlines()[0]}"
+                        await asyncio.sleep(2**attempt)
+            finally:
+                progress.update()
+
+        errors = [error for error in await asyncio.gather(
+            *(infer_document(path) for path in documents)
+        ) if error]
+    for error in errors:
+        print(f"ERROR: {error}", file=sys.stderr)
+    return bool(errors)
+
+
+def main() -> int:
+    return asyncio.run(run(parse_args()))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

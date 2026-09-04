@@ -34,7 +34,7 @@
 | :--- | :--- | :--- | :--- |
 | Hive-таблица `prod_net.NET_CORE_ALARM_EVENT` | HDFS-кластер указан в runtime; полный путь отсутствует | [Data Catalog: NET_CORE_ALARM_EVENT](https://datacatalog.mts.ru/tables/prod-net-core-alarm-event) | Формат файла выбирается writer по умолчанию |
 
-### Схема потоков данных
+### Иллюстрации проекта
 
 ```text
 Huawei EMS -> JSON/Kafka ---\
@@ -83,7 +83,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 - HDFS-партиции: `event_date_utc=DATE(event_time_utc)` и `event_hour_utc=HOUR(event_time_utc)` в UTC.
 - Полный путь: `/data/prod/net/core_alarm_event/event_date_utc=YYYY-MM-DD/event_hour_utc=HH/`.
 
-### Описание колонок
+### Структура данных
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -109,7 +109,7 @@ Nokia EMS  -> Avro/Kafka ---/                                      |-> DICT_CORE
 | event_date_utc | date | Дата события UTC; `NOT NULL` | Расчет | event_time_utc | timestamp | HDFS-партиция |
 | event_hour_utc | smallint | Час события UTC `0..23`; `NOT NULL` | Расчет | event_time_utc | timestamp | HDFS-партиция |
 
-### Тестовая выборка
+### Пример данных
 
 | alarm_event_id | alarm_id | source_sequence | event_type | event_time_utc | vendor_code | equipment_id | equipment_type | equipment_name | region_code | vendor_alarm_code | alarm_family | alarm_name | severity_code | is_service_affecting | mapping_status | ingest_time_utc | loaded_at_utc | event_date_utc | event_hour_utc |
 | :--- | :--- | ---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | ---: |

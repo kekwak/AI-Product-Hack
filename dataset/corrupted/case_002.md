@@ -12,20 +12,20 @@
 | **Команда** | Анна Орлова — аналитик; Михаил Соколов — разработчик; Елена Белова — QA. |
 | **JIRA** | [NETDATA-1842](https://jira.mts.ru/browse/NETDATA-1842) |
 
-### Поставщики
+### Источники данных
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
 | Снимок состояния LTE-сектора, topic `net.ran.lte.cell-state.v1`; Kafka key — UTF-8 `cell_id`; producer гарантирует один `event_id` для логического события | Kafka; кластер выбирается окружением | [Data Catalog: net.ran.lte.cell-state.v1](https://datacatalog.mts.ru/topics/net-ran-lte-cell-state-v1) | JSON; схема, версия и framing не указаны |
 | Счетчик трафика LTE-сектора, topic `net.ran.lte.traffic-counter.v1`; Kafka key — UTF-8 `cell_id` | Kafka; кластер выбирается конфигурацией | [Data Catalog: net.ran.lte.traffic-counter.v1](https://datacatalog.mts.ru/topics/net-ran-lte-traffic-counter-v1) | Apache Avro 1.11, subject `net.ran.lte.traffic-counter-value`, schema ID `4110`, версия `2`; Confluent wire format, reader использует exact schema v2 |
 
-### Lookup-объекты
+### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
 | Неуказанный справочник | Ссылка будет добавлена позднее | Используется для обогащения; поля и версия не перечислены |
 
-### Публикации
+### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -75,7 +75,7 @@ normalized_source_value передается в приемник без допо
 
 TBD после согласования выходного расчета.
 
-### Формирование ключа (kafka) / партиции (hdfs)
+### Параметры выполнения
 
 При построении бизнес-ключа source_channel намеренно не учитывается.
 

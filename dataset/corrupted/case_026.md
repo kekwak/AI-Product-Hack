@@ -7,12 +7,12 @@
 | **Заказчики** | Центр управления сетью MTS Big Data, дирекция эксплуатации RAN. |
 | **Нефункциональные требования** | До 18 млн входных событий в сутки и 35 тыс. событий/с; расчёт по event time; первичная публикация часа — H+10 минут, финализация — H+2 часа 10 минут; Kafka retention источника — 35 дней, хранение витрины — 400 дней; доступность — 99,9% в месяц; часовая партиция должна допускать безопасный повторный расчёт. |
 | **Системы-источники** | Платформа `RAN_FAULT_HUB`, публикующая унифицированные события открытия и закрытия аварий 2G/3G/4G/5G. При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация. |
-| **Data Catalog** | [Карточка продукта RAN Alarm Hourly](https://datacatalog.corp.mts.ru/products/net-ran-alarm-hourly) |
+| **Служебное поле 07** | [Карточка продукта RAN Alarm Hourly](https://datacatalog.corp.mts.ru/products/net-ran-alarm-hourly) |
 | **Исходники проекта** | [GitLab: net/ran-alarm-hourly](https://gitlab.corp.mts.ru/bigdata/net/ran-alarm-hourly) |
 | **Команда** | Анна Лебедева — аналитик; Сергей Котов — разработчик; Мария Волкова — QA; Илья Орлов — Product Owner. |
 | **JIRA** | [NETDATA-6412 — Часовая витрина аварий RAN](https://jira.corp.mts.ru/browse/NETDATA-6412) |
 
-### Входной контур
+### Источники данных
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
@@ -24,7 +24,7 @@
 | :--- | :--- | :--- |
 | `DWH_REF.DICT_RAN_SITE_SCD`, версия данных на момент `event_ts` | [Data Catalog: DICT_RAN_SITE_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_RAN_SITE_SCD) | Greenplum `gp-ref-prod-01`, реляционная модель 4.0; чтение Spark JDBC в repeatable-read snapshot, типы декодируются PostgreSQL driver 42.7. SCD2-ключ `(site_id, valid_from_utc)`; интервалы `[valid_from_utc, valid_to_utc)`, `valid_to_utc IS NULL` означает бесконечность. Содержит `region_code`, `vendor_name`, `is_test_site`. |
 
-### Выходной контур
+### Приемники данных
 
 В приемнике сохраняется только последняя опубликованная версия без журнала изменений.
 

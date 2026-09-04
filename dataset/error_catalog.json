@@ -192,132 +192,244 @@
     "problem": "В карточке обогащения одновременно потеряны идентификатор справочника, ссылка и версия используемого среза."
   },
   {
-    "mutation_id": "T01_RENAME_FAQ",
+    "mutation_id": "T01_RENAME_DOCUMENT_TITLE",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел FAQ переименован в несопоставимый заголовок."
+    "title": "Отсутствует заголовок документа",
+    "problem": "Заголовок документа о потоковых данных или витрине заменен несопоставимым служебным заголовком."
+  },
+  {
+    "mutation_id": "T01_RENAME_GENERAL_INFO",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Общие сведения»",
+    "problem": "Название обязательного поля «Общие сведения» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_PROBLEM",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Решаемая проблема»",
+    "problem": "Название обязательного поля «Решаемая проблема» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_PRODUCT_METRICS",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Продуктовые метрики»",
+    "problem": "Название обязательного поля «Продуктовые метрики» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_CUSTOMERS",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Заказчики»",
+    "problem": "Название обязательного поля «Заказчики» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_NFR",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Нефункциональные требования»",
+    "problem": "Название обязательного поля «Нефункциональные требования» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_SOURCE_SYSTEMS",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Системы-источники»",
+    "problem": "Название обязательного поля «Системы-источники» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_DATA_CATALOG",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Data Catalog»",
+    "problem": "Название обязательного поля «Data Catalog» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_PROJECT_SOURCES",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Исходники проекта»",
+    "problem": "Название обязательного поля «Исходники проекта» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_TEAM",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «Команда»",
+    "problem": "Название обязательного поля «Команда» заменено несопоставимой служебной меткой."
+  },
+  {
+    "mutation_id": "T01_RENAME_JIRA",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует поле «JIRA»",
+    "problem": "Название обязательного поля «JIRA» заменено несопоставимой служебной меткой."
   },
   {
     "mutation_id": "T01_RENAME_SOURCES",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел источников переименован."
+    "title": "Отсутствует раздел «Источники данных»",
+    "problem": "Обязательный раздел «Источники данных» переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_SOURCES_COLUMN",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Отсутствует колонка таблицы источников",
+    "problem": "Обязательная колонка «Описание источника» заменена несопоставимым служебным названием."
+  },
+  {
+    "mutation_id": "T01_RENAME_ENRICHMENT_SOURCES",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует раздел «Источники обогащения данных»",
+    "problem": "Обязательный раздел «Источники обогащения данных» переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_ENRICHMENT_COLUMN",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Отсутствует колонка таблицы источников обогащения",
+    "problem": "Обязательная колонка «Описание» заменена несопоставимым служебным названием."
   },
   {
     "mutation_id": "T01_RENAME_RECEIVERS",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел приемников переименован."
+    "title": "Отсутствует раздел «Приемники данных»",
+    "problem": "Обязательный раздел «Приемники данных» переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_RECEIVERS_COLUMN",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Отсутствует колонка таблицы приемников",
+    "problem": "Обязательная колонка «Сериализация» заменена несопоставимым служебным названием."
   },
   {
     "mutation_id": "T01_RENAME_FLOW",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "Нарушен обязательный шаблон",
-    "problem": "Обязательный раздел схемы потока переименован."
+    "title": "Отсутствует раздел «Схема потоков данных»",
+    "problem": "Обязательный раздел «Схема потоков данных» переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_ALGORITHM",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует раздел «Алгоритм обработки потока»",
+    "problem": "Обязательный раздел «Алгоритм обработки потока» переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_FILTER_STEP",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует шаг фильтрации данных",
+    "problem": "Обязательный шаг 1 с описанием фильтрации переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_ENRICHMENT_STEP",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует шаг обогащения данных",
+    "problem": "Обязательный шаг 2 с описанием обогащения переименован в несопоставимый заголовок."
   },
   {
     "mutation_id": "T01_STEP3_PLACEHOLDER",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "В шаблоне остался плейсхолдер",
-    "problem": "Название третьего шага заменено незаполненной подсказкой шаблона."
+    "title": "Не указан третий шаг преобразования",
+    "problem": "Название обязательного третьего шага заменено незаполненным плейсхолдером."
   },
   {
     "mutation_id": "T01_RENAME_KEYS",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "Нарушен обязательный шаблон",
-    "problem": "Раздел формирования Kafka key/HDFS partition невозможно сопоставить по названию."
+    "title": "Отсутствует раздел формирования ключа или партиции",
+    "problem": "Обязательный раздел формирования Kafka key или HDFS partition переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_STRUCTURE",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "low",
+    "title": "Отсутствует раздел «Структура данных»",
+    "problem": "Обязательный раздел «Структура данных» переименован в несопоставимый заголовок."
+  },
+  {
+    "mutation_id": "T01_RENAME_STRUCTURE_COLUMN",
+    "error_type_id": "T01",
+    "source_type": 2,
+    "difficulty": "medium",
+    "title": "Отсутствует колонка таблицы структуры данных",
+    "problem": "Обязательная колонка «Комментарий» заменена несопоставимым служебным названием."
   },
   {
     "mutation_id": "T01_RENAME_EXAMPLE",
     "error_type_id": "T01",
     "source_type": 2,
     "difficulty": "low",
-    "title": "Нарушен обязательный шаблон",
-    "problem": "Раздел примера данных переименован в несопоставимый заголовок."
+    "title": "Отсутствует раздел «Пример данных»",
+    "problem": "Обязательный раздел «Пример данных» переименован в несопоставимый заголовок."
   },
   {
-    "mutation_id": "T01_DROP_STRUCTURE_COLUMN",
+    "mutation_id": "T01_SHORT_EXAMPLE",
     "error_type_id": "T01",
     "source_type": 2,
-    "difficulty": "medium",
-    "title": "Нарушена таблица обязательного шаблона",
-    "problem": "Из таблицы маппинга удалена обязательная колонка комментариев."
+    "difficulty": "low",
+    "title": "В примере данных меньше десяти строк",
+    "problem": "Из обязательного примера данных удалена одна строка, поэтому вместо десяти строк осталось девять."
   },
   {
-    "mutation_id": "T01_RENAME_SOURCE_AND_RECEIVER",
+    "mutation_id": "T01_RENAME_DDL",
     "error_type_id": "T01",
     "source_type": 2,
-    "difficulty": "medium",
-    "title": "Не распознаются входы и выходы",
-    "problem": "Одновременно переименованы два обязательных раздела шаблона: источники и приемники."
+    "difficulty": "low",
+    "title": "Отсутствует раздел «DDL»",
+    "problem": "Обязательный раздел «DDL» переименован в несопоставимый заголовок."
   },
   {
-    "mutation_id": "T01_RENAME_FLOW_AND_ALGORITHM",
+    "mutation_id": "T01_RENAME_FAQ",
     "error_type_id": "T01",
     "source_type": 2,
-    "difficulty": "medium",
-    "title": "Нарушена структура описания обработки",
-    "problem": "Схема потока и алгоритм обработки одновременно вынесены под нестандартные заголовки."
+    "difficulty": "low",
+    "title": "Отсутствует раздел «FAQ»",
+    "problem": "Обязательный раздел «FAQ» переименован в несопоставимый заголовок."
   },
   {
-    "mutation_id": "T01_RENAME_STRUCTURE_AND_EXAMPLE",
+    "mutation_id": "T01_RENAME_CHANGE_HISTORY",
     "error_type_id": "T01",
     "source_type": 2,
-    "difficulty": "medium",
-    "title": "Не распознаются контракт и пример",
-    "problem": "Обязательные разделы структуры результата и примера данных получили несопоставимые названия."
-  },
-  {
-    "mutation_id": "T01_RENAME_DDL_AND_FAQ",
-    "error_type_id": "T01",
-    "source_type": 2,
-    "difficulty": "medium",
-    "title": "Потеряны два обязательных раздела",
-    "problem": "DDL и FAQ присутствуют по содержанию, но их обязательные заголовки заменены произвольными."
-  },
-  {
-    "mutation_id": "T01_ALL_STEPS_AS_PLACEHOLDERS",
-    "error_type_id": "T01",
-    "source_type": 2,
-    "difficulty": "high",
-    "title": "Не заполнены названия этапов алгоритма",
-    "problem": "Все три обязательных шага сохранены как шаблонные плейсхолдеры вместо фактических названий."
-  },
-  {
-    "mutation_id": "T01_RENAME_KEYS_AND_HISTORY",
-    "error_type_id": "T01",
-    "source_type": 2,
-    "difficulty": "medium",
-    "title": "Нарушены технический и служебный разделы",
-    "problem": "Раздел ключей/партиций и история изменений переименованы так, что не сопоставляются с шаблоном."
-  },
-  {
-    "mutation_id": "T01_RENAME_THREE_DATA_SECTIONS",
-    "error_type_id": "T01",
-    "source_type": 2,
-    "difficulty": "high",
-    "title": "Нарушен блок описания данных",
-    "problem": "Сразу три обязательных раздела источников, справочников и приемников заменены внутренними названиями."
-  },
-  {
-    "mutation_id": "T01_DROP_COLUMN_AND_RENAME_HISTORY",
-    "error_type_id": "T01",
-    "source_type": 2,
-    "difficulty": "high",
-    "title": "Одновременно нарушены таблица и служебный раздел",
-    "problem": "У таблицы структуры удалена обязательная колонка, а история изменений переименована."
+    "difficulty": "low",
+    "title": "Отсутствует раздел «История изменений»",
+    "problem": "Обязательный раздел «История изменений» переименован в несопоставимый заголовок."
   },
   {
     "mutation_id": "U01_SCOPE_OUTPUT_GAP",

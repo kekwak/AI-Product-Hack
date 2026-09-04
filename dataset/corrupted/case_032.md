@@ -30,7 +30,7 @@
 
 В приемнике сохраняется только последняя опубликованная версия без журнала изменений.
 
-| Описание данных | Кластер | Ссылка на Каталог | Сериализация |
+| Описание данных | Кластер | Ссылка на Каталог | Служебная колонка 03 |
 | :--- | :--- | :--- | :--- |
 | `CDM_ROAM.TABLE_ROAMING_USAGE_DAILY` | HDFS; путь не указан | Карточка каталога не указана для результата | Apache Iceberg v2, Parquet `ZSTD`; целевая модель версии 1.0 в Hive Metastore; сериализация Spark DataFrame writer v2 с атомарным `overwritePartitions`, чтение Iceberg reader по snapshot metadata. |
 
@@ -115,18 +115,18 @@ JOIN выполняется только по идентификатору бе�
 
 В результат дополнительно передаются исходные персональные идентификаторы без токенизации.
 
-| Приемники |  |  | Источники |  |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
-| FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; обязательность поля `FIELD_BIZ_DATE` не определена | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP |
-| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена | `TABLE_ROAMING_CDR` | `home_region_code` | STRING |
-| FIELD_VISITED_COUNTRY_CODE | CHAR(2) | ISO alpha-2 или `ZZ`; обязательность поля `FIELD_VISITED_COUNTRY_CODE` не определена | `DICT_MCC_COUNTRY_SCD` | `country_code` | CHAR(2) |
-| FIELD_SERVICE_TYPE | STRING | `VOICE`, `SMS` или `DATA`; `NOT NULL` | `TABLE_ROAMING_CDR` | `service_type` | STRING |
-| FIELD_SESSIONS_CNT | BIGINT | Число финальных уникальных CDR, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `cdr_id` | STRING |
-| FIELD_USERS_CNT | BIGINT | Число уникальных токенов, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `subscriber_token` | STRING |
-| FIELD_TRAFFIC_MB | DECIMAL(20,3) | Трафик MiB, >= 0; `NOT NULL` | `TABLE_ROAMING_CDR` | `uplink_bytes`, `downlink_bytes` | BIGINT |
-| FIELD_CHARGE_RUB | DECIMAL(24,4) | Точная сумма начислений в RUB, >= 0; `NOT NULL` | `TABLE_ROAMING_CDR` | `charge_rub` | DECIMAL(20,4) |
-| FIELD_PROC_TS | TIMESTAMP | Время коммита UTC; `NOT NULL` | Spark | `processing_ts` | TIMESTAMP |
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
+| FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; обязательность поля `FIELD_BIZ_DATE` не определена | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
+| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
+| FIELD_VISITED_COUNTRY_CODE | CHAR(2) | ISO alpha-2 или `ZZ`; обязательность поля `FIELD_VISITED_COUNTRY_CODE` не определена | `DICT_MCC_COUNTRY_SCD` | `country_code` | CHAR(2) | Temporal JOIN, fallback `ZZ` |
+| FIELD_SERVICE_TYPE | STRING | `VOICE`, `SMS` или `DATA`; `NOT NULL` | `TABLE_ROAMING_CDR` | `service_type` | STRING | Без преобразования |
+| FIELD_SESSIONS_CNT | BIGINT | Число финальных уникальных CDR, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `cdr_id` | STRING | `COUNT(*)` после дедупликации |
+| FIELD_USERS_CNT | BIGINT | Число уникальных токенов, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `subscriber_token` | STRING | `COUNT(DISTINCT ...)` |
+| FIELD_TRAFFIC_MB | DECIMAL(20,3) | Трафик MiB, >= 0; `NOT NULL` | `TABLE_ROAMING_CDR` | `uplink_bytes`, `downlink_bytes` | BIGINT | Делитель 1 048 576, half-up |
+| FIELD_CHARGE_RUB | DECIMAL(24,4) | Точная сумма начислений в RUB, >= 0; `NOT NULL` | `TABLE_ROAMING_CDR` | `charge_rub` | DECIMAL(20,4) | Сумма без округления |
+| FIELD_PROC_TS | TIMESTAMP | Время коммита UTC; `NOT NULL` | Spark | `processing_ts` | TIMESTAMP | Одинаково в пределах запуска D |
 
 ### Пример данных
 

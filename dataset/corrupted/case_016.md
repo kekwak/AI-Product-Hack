@@ -42,7 +42,7 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
                                                                           -> counter deltas -> hourly metrics -> HDFS
 ```
 
-### Алгоритм обработки потока
+### Рабочие заметки
 
 Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
 
@@ -106,23 +106,23 @@ normalized_source_value передается в приемник без допо
 
 Для заполнения результата требуется промежуточное поле normalized_source_value.
 
-| Приемники |  |  | Источники |  |  |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** |
-| link_id | string | Идентификатор физического канала; обязательность поля `link_id` не определена | DICT_TRANSPORT_LINK_SCD2 | link_id | string |
-| hour_start_utc | timestamp | Начало часа UTC; `NOT NULL` | Расчет | observed_at_utc | long |
-| region_code | string | Макрорегион; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | region_code | string |
-| capacity_mbps | decimal(12,3) | Пропускная способность, Мбит/с, `>0`; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | capacity_mbps | decimal(12,3) |
-| avg_rx_mbps | decimal(15,3) | Средняя входящая скорость, Мбит/с; `NOT NULL` | Расчет | rx_octets | uint64 |
-| avg_tx_mbps | decimal(15,3) | Средняя исходящая скорость, Мбит/с; `NOT NULL` | Расчет | tx_octets | uint64 |
-| p95_util_pct | decimal(6,3) | P95 максимума RX/TX, проценты; `NOT NULL` | Расчет | counter deltas, capacity_mbps | decimal |
-| max_util_pct | decimal(6,3) | Максимальная утилизация, проценты; `NOT NULL` | Расчет | counter deltas, capacity_mbps | decimal |
-| samples_used | int | Число допустимых интервалов, `>0`; `NOT NULL` | Расчет | observed_at_utc | long |
-| has_sample_gap | boolean | Признак `samples_used < 12`; `NOT NULL` | Расчет | samples_used | int |
-| source_max_observed_at_utc | timestamp | Максимальное время текущей точки UTC; `NOT NULL` | Kafka | observed_at_utc | long |
-| loaded_at_utc | timestamp | Время начала batch UTC; `NOT NULL` | Система | batch_started_at | timestamp |
-| event_date_utc | date | Дата часа UTC; `NOT NULL` | Расчет | hour_start_utc | timestamp |
-| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | hour_start_utc | timestamp |
+| Приемники | | | Источники | | | |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
+| link_id | string | Идентификатор физического канала; обязательность поля `link_id` не определена | DICT_TRANSPORT_LINK_SCD2 | link_id | string | Часть ключа |
+| hour_start_utc | timestamp | Начало часа UTC; `NOT NULL` | Расчет | observed_at_utc | long | `FLOOR_HOUR(observed_at_utc - 1 microsecond)`; часть ключа |
+| region_code | string | Макрорегион; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | region_code | string | Enum регионов MTS |
+| capacity_mbps | decimal(12,3) | Пропускная способность, Мбит/с, `>0`; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | capacity_mbps | decimal(12,3) | Постоянна внутри часа |
+| avg_rx_mbps | decimal(15,3) | Средняя входящая скорость, Мбит/с; `NOT NULL` | Расчет | rx_octets | uint64 | `>=0` |
+| avg_tx_mbps | decimal(15,3) | Средняя исходящая скорость, Мбит/с; `NOT NULL` | Расчет | tx_octets | uint64 | `>=0` |
+| p95_util_pct | decimal(6,3) | P95 максимума RX/TX, проценты; `NOT NULL` | Расчет | counter deltas, capacity_mbps | decimal | `0.000..120.000` |
+| max_util_pct | decimal(6,3) | Максимальная утилизация, проценты; `NOT NULL` | Расчет | counter deltas, capacity_mbps | decimal | `p95..120.000` |
+| samples_used | int | Число допустимых интервалов, `>0`; `NOT NULL` | Расчет | observed_at_utc | long | После исключения reset/gap/outlier |
+| has_sample_gap | boolean | Признак `samples_used < 12`; `NOT NULL` | Расчет | samples_used | int | Детерминированный флаг |
+| source_max_observed_at_utc | timestamp | Максимальное время текущей точки UTC; `NOT NULL` | Kafka | observed_at_utc | long | Больше начала и не позже конца расчетного часа |
+| loaded_at_utc | timestamp | Время начала batch UTC; `NOT NULL` | Система | batch_started_at | timestamp | Processing time |
+| event_date_utc | date | Дата часа UTC; `NOT NULL` | Расчет | hour_start_utc | timestamp | HDFS-партиция |
+| event_hour_utc | smallint | Час UTC `0..23`; `NOT NULL` | Расчет | hour_start_utc | timestamp | HDFS-партиция |
 
 ### Пример данных
 
