@@ -16,20 +16,20 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | [Data Catalog: TABLE_SUBSCRIBER_DEVICE_EVENT](https://datacatalog.corp.mts.ru/tables/DDS_NET/TABLE_SUBSCRIBER_DEVICE_EVENT) | JSON; схема и версия не указаны |
+| `DDS_NET.TABLE_SUBSCRIBER_DEVICE_EVENT`, полный путь `/warehouse/dds/net/subscriber_device_event/` | HDFS/Iceberg, кластер `hadoop-dwh-prod-01` | [Data Catalog: TABLE_SUBSCRIBER_DEVICE_EVENT](https://datacatalog.corp.mts.ru/tables/DDS_NET/TABLE_SUBSCRIBER_DEVICE_EVENT) | Iceberg v2, Parquet `ZSTD`; Hive Metastore schema версии 5.1; Spark Iceberg reader фиксирует snapshot ID на начало расчёта и десериализует logical types согласно schema ID snapshot. |
 
 ### Источники обогащения данных
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| `DWH_REF.DICT_TAC_DEVICE_SCD` | [Data Catalog: DICT_TAC_DEVICE_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_TAC_DEVICE_SCD) | Greenplum `gp-ref-prod-01`, модель 6.0, Spark JDBC repeatable-read snapshot. SCD2 TAC: `vendor_name`, `os_family`, `is_5g_capable`; ключ `(tac, valid_from_utc)`, интервал `[valid_from_utc, valid_to_utc)`. |
+| `DWH_REF.DICT_TAC_DEVICE_SCD` | Ссылка будет добавлена позднее | Greenplum `gp-ref-prod-01`, модель 6.0, Spark JDBC repeatable-read snapshot. SCD2 TAC: `vendor_name`, `os_family`, `is_5g_capable`; ключ `(tac, valid_from_utc)`, интервал `[valid_from_utc, valid_to_utc)`. |
 | `DDS_CRM.TABLE_SUBSCRIBER_PROFILE_SCD` | [Data Catalog: TABLE_SUBSCRIBER_PROFILE_SCD](https://datacatalog.corp.mts.ru/tables/DDS_CRM/TABLE_SUBSCRIBER_PROFILE_SCD) | Iceberg v2/Parquet `ZSTD`, кластер `hadoop-dwh-prod-01`, путь `/warehouse/dds/crm/subscriber_profile_scd/`, schema 8.3; Spark фиксирует snapshot ID. SCD2-профиль token: `home_region_code`, `segment_code`, `is_employee`, `is_test`; интервал `[valid_from_utc, valid_to_utc)`. |
 
 ### Приемники данных
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `CDM_COMM.TABLE_DEVICE_BASE_MONTHLY` | Greenplum, кластер `gp-analytics-prod-02`, БД `dwh`, schema `cdm_comm` | [Data Catalog: TABLE_DEVICE_BASE_MONTHLY](https://datacatalog.corp.mts.ru/tables/CDM_COMM/TABLE_DEVICE_BASE_MONTHLY) | Реляционная модель версии 1.0; загрузка Spark Greenplum Connector 2.1 через GPFDIST во временную таблицу в PostgreSQL binary row format, затем транзакционный `ALTER TABLE EXCHANGE PARTITION`; чтение — PostgreSQL protocol по DDL-модели. |
+| `CDM_COMM.TABLE_DEVICE_BASE_MONTHLY` | Greenplum, кластер `gp-analytics-prod-02`, БД `dwh`, schema `cdm_comm` | Ссылка будет добавлена после релиза | Реляционная модель версии 1.0; загрузка Spark Greenplum Connector 2.1 через GPFDIST во временную таблицу в PostgreSQL binary row format, затем транзакционный `ALTER TABLE EXCHANGE PARTITION`; чтение — PostgreSQL protocol по DDL-модели. |
 
 ### Схема потоков данных
 
@@ -41,7 +41,7 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 #### Шаг 1. Фильтрация данных
 
-Для месяца M выбрать change records по `event_ts` в UTC-интервале `[первый день M 00:00:00, первый день M+1 00:00:00)`. Контракт источника требует полный payload и исходный `event_ts` для `operation IN ('INSERT','UPDATE','DELETE')`. Сначала проверить непустые `event_id`, `source_revision`, `source_file_path`, `source_row_position`, затем дедуплицировать по `event_id`: максимальная `source_revision`, потом максимальные `(source_file_path, source_row_position)`. Winning `DELETE` удаляет событие. При полном равенстве порядка и разном payload публикация блокируется. Для оставшихся winning `INSERT`/`UPDATE` применить фильтр:
+Для месяца M выбрать change records по `event_ts` в UTC-интервале `[первый день M 00:00:00, первый день M+1 00:00:00)`. Контракт источника требует полный payload, исходные `event_ts` и `ingest_ts` для `operation IN ('INSERT','UPDATE','DELETE')`; оба timestamp имеют тип UTC с точностью миллисекунда. Сначала проверить непустые `event_id`, `source_revision`, `source_file_path`, `source_row_position`, `ingest_ts`, затем дедуплицировать по `event_id`: максимальная `source_revision`, потом максимальные `(source_file_path, source_row_position)`. Winning `DELETE` удаляет событие. При полном равенстве порядка и разном payload публикация блокируется. Для оставшихся winning `INSERT`/`UPDATE` применить фильтр:
 
 ```sql
 event_kind IN ('DATA_SESSION', 'VOICE_CALL', 'SMS')
@@ -74,9 +74,9 @@ AND event_ts <= processing_ts + INTERVAL 5 MINUTES
 
 #### Шаг 4. Регламент, исправления и запись
 
-Предварительный расчёт запускается третьего числа M+1 в 03:00 Europe/Moscow по одному зафиксированному Iceberg snapshot. Финальный — шестнадцатого числа в 03:00 Europe/Moscow. Событие с `ingest_ts` ровно до snapshot входит, после snapshot — нет. Источник хранит 400 дней.
+Предварительный расчёт запускается третьего числа M+1 в 03:00 Europe/Moscow по одному зафиксированному Iceberg snapshot. Финальный — шестнадцатого числа в 03:00 Europe/Moscow. В запуск входят только версии с `ingest_ts <= snapshot_committed_at`; равенство границе допустимо. Источник хранит 400 дней.
 
-Поздние события и исправления до финального запуска включаются полной заменой M. Изменение после финализации создаёт `post_final_change_cnt`; автоматический backfill разрешён для последних 12 месяцев и всегда перечитывает месяц целиком по новому snapshot. Более глубокий backfill требует заявки владельца.
+Поздние события и исправления до финального запуска включаются полной заменой M. Изменение после финализации создаёт `post_final_change_cnt`; автоматический backfill разрешён для последних 12 месяцев и всегда перечитывает месяц целиком по новому snapshot. Backfill старше 12 месяцев, но не старше 400 дней, требует заявки владельца; более ранний период недоступен из-за retention источника и не изменяется.
 
 Перед staging процедура `CDM_COMM.ensure_device_base_partition(M)` под advisory lock создаёт отдельную месячную партицию `[M, M+1)`, если её ещё нет; M обязан быть не раньше `2024-01-01` и не позже текущего UTC-месяца. Затем данные записываются в `CDM_COMM.TABLE_DEVICE_BASE_MONTHLY_STG_<run_id>`, проходят проверки, и в одной Greenplum-транзакции выполняется exchange партиции M. При ошибке транзакция откатывается, опубликованная версия остаётся прежней. Retry использует новый staging и полностью заменяет месяц, поэтому идемпотентен. Staging удаляется только после успешного exchange или через 7 дней сервисной очисткой.
 

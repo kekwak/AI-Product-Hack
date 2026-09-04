@@ -6,10 +6,10 @@
     {
       "error_type_id": "D03",
       "source_type": 1,
-      "difficulty": "medium",
-      "evidence_quote": "Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена",
-      "title": "Обязательность нескольких полей не определена",
-      "problem": "Признак NULLABLE/NOT NULL удален сразу у двух полей результата."
+      "difficulty": "low",
+      "evidence_quote": "Дата начала CDR в UTC; обязательность поля `FIELD_BIZ_DATE` не определена",
+      "title": "Не указана обязательность поля",
+      "problem": "Для одного целевого поля удален признак NOT NULL/NULLABLE."
     },
     {
       "error_type_id": "U07",

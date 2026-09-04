@@ -17,6 +17,7 @@
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
 | 15-минутное активное энергопотребление, topic `net.energy.meter-interval.v1`; Kafka key — `meter_id`; поддерживаются `UPSERT` и `DELETE` | Kafka, кластер `kafka-iot-prod-02` | [Data Catalog: net.energy.meter-interval.v1](https://datacatalog.mts.ru/topics/net-energy-meter-interval-v1) | JSON UTF-8; JSON Schema draft 2020-12, `$id=net.energy.meter-interval`, версия `3` по [схеме](https://schema-registry.mts.ru/json/net.energy.meter-interval/3); producer передает `schema_version=3`, consumer выполняет exact validation v3 |
+| Архив тех же change records `raw_energy.METER_INTERVAL_HISTORY`, полный путь `/data/raw/energy/meter_interval_history/`; хранение 7 лет | HDFS/Iceberg, кластер `hdfs-prod-04` | [Data Catalog: METER_INTERVAL_HISTORY](https://datacatalog.mts.ru/tables/raw-energy-meter-interval-history) | Iceberg v2, Parquet ZSTD; схема `energy.meter-interval-history` версии `3`; backfill фиксирует Iceberg snapshot ID и читает те же поля и семантику revision, что Kafka-контракт v3 |
 
 ### Источники обогащения данных
 
@@ -42,22 +43,22 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 ### Алгоритм обработки потока
 
-Во всех расчетах используются только активные записи источников.
+Расчет и уникальность результата определяются на уровне объекта.
 
 Одна UPSERT-запись содержит энергию в Wh за полуинтервал `[interval_start_utc, interval_end_utc)`. Оба timestamps — epoch milliseconds UTC. Локальная бизнес-дата определяется как `DATE(interval_start_utc AT TIME ZONE timezone_name)`. Поддерживаемые зоны: `Europe/Kaliningrad`, `Europe/Moscow`, `Europe/Samara`, `Asia/Yekaterinburg`, `Asia/Omsk`, `Asia/Novosibirsk`, `Asia/Krasnoyarsk`, `Asia/Irkutsk`, `Asia/Vladivostok`. Поддерживаемый диапазон бизнес-дат — `2019-01-01..2030-12-31`; по TZDB 2026a каждые такие сутки в перечисленных зонах имеют 24 часа.
 
 #### Шаг 1. Фильтрация данных
 
 1. При ошибке JSON или версии выполняются retry через 15, 60 и 180 секунд; затем partition блокируется без commit offset, создается `ENERGY_SCHEMA_BLOCKED`.
-2. Для UPSERT обязательны непустые `event_id`, `meter_id`; `revision >= 1`; обе границы интервала; `energy_wh >= 0`; `ingest_time_utc`; `interval_end_utc - interval_start_utc = 900 seconds`; `interval_start_utc < interval_end_utc`; `interval_end_utc <= ingest_time_utc + 5 minutes`; локальная бизнес-дата входит в `2019-01-01..2030-12-31`. Нарушение исключает событие и увеличивает `rejected_energy_intervals_total{reason}`.
+2. Для UPSERT обязательны непустые `event_id`, `meter_id`; `revision >= 1`; обе границы интервала; `energy_wh >= 0`; `ingest_time_utc`; `interval_end_utc - interval_start_utc = 900 seconds`; `interval_start_utc < interval_end_utc`; `interval_end_utc <= ingest_time_utc + 5 minutes`. Нарушение исключает событие и увеличивает `rejected_energy_intervals_total{reason}`.
 3. Для DELETE обязательны `event_id`, `meter_id`, `revision`, обе границы; `energy_wh` игнорируется. Логический ключ интервала — `(meter_id, interval_start_utc)`.
-4. Дубли `event_id` выбираются по максимальному ingest time и SHA-256 payload. Затем по логическому ключу выбирается максимальный `revision`, при равенстве — максимальный ingest time, затем `event_id`. Выбранный DELETE исключает интервал.
+4. Дубли `event_id` выбираются по максимальному ingest time и затем по лексикографически максимальному SHA-256 канонической UTF-8 строки `event_id|meter_id|revision|interval_start_ms|interval_end_ms|energy_wh|operation`: порядок полей фиксирован, timestamps представлены целыми epoch milliseconds, NULL — литералом `NULL`, символ `|` в строковых полях запрещен контрактом. Затем по логическому ключу выбирается максимальный `revision`, при равенстве — максимальный ingest time, затем лексикографически максимальный `event_id`. Выбранный DELETE исключает интервал.
 5. События старше watermark учитываются как late и применяются при replay последних 10 суток. События с `interval_start_utc` вне заявленного Kafka retention для online-процесса не принимаются; для них используется архивный backfill.
 
 #### Шаг 2. Обогащение данных
 
 1. Для каждого интервала выполняется temporal left join к `DICT_SITE_ENERGY_METER_SCD2` по `meter_id` и `interval_start_utc`. Кардинальность `N:0..1`. При отсутствии интервал исключается с `METER_NOT_FOUND`; при множественном совпадении batch останавливается с `METER_DICT_OVERLAP`.
-2. Проходят только `is_active=true`. Начало интервала после перевода в `timezone_name` обязано иметь секунды `00` и минуты `00,15,30,45`; иначе интервал исключается как `NOT_LOCAL_QUARTER_BOUNDARY`.
+2. Проходят только `is_active=true`. После получения `timezone_name` локальная бизнес-дата обязана входить в `2019-01-01..2030-12-31`, а начало интервала после перевода в эту зону — иметь секунды `00` и минуты `00,15,30,45`; иначе интервал исключается как `BUSINESS_DATE_OUT_OF_RANGE` или `NOT_LOCAL_QUARTER_BOUNDARY` соответственно.
 3. Физический предел: `energy_wh <= rated_power_kw * 1000 * 0.25 * 1.20`. Превышение исключается как `ENERGY_ABOVE_120_PERCENT`. `rated_power_kw` обязан быть больше нуля.
 4. На `(site_id,business_date_local)` все активные счетчики должны иметь одинаковые `region_code`, `timezone_name`, `tariff_zone`; конфликт блокирует площадку и публикацию партиции.
 5. По `(tariff_zone,business_date_local)` выполняется left join к `DICT_ELECTRICITY_TARIFF_DAY`, кардинальность `N:0..1`. При отсутствии `tariff_rate_rub_per_kwh=NULL`, `cost_rub=NULL`, `tariff_status='MISSING'`; энергия сохраняется. При нескольких совпадениях batch останавливается с `TARIFF_DUPLICATE`. Найденная строка дает статус `COMPLETE`.
@@ -69,7 +70,7 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 3. `energy_kwh = ROUND(SUM(energy_wh) / 1000, 3)`, при полном отсутствии интервалов — `0.000`. `completeness_pct = ROUND(100.00 * valid_interval_count / expected_interval_count, 2)`. Поскольку active meter count больше нуля, нулевого знаменателя нет. `has_interval_gap = valid_interval_count < expected_interval_count`.
 4. При тарифе `cost_rub = ROUND(energy_kwh * tariff_rate_rub_per_kwh, 2)`; промежуточное умножение выполняется DECIMAL(28,7), округление HALF_UP. При отсутствии тарифа стоимость остается NULL, zero fallback запрещен.
 5. `source_max_interval_end_utc` — максимум конца валидного интервала; при полном отсутствии — NULL. Предварительная версия публикуется через 3 часа после локального конца дня, финальная — через 48 часов. Ежедневно replay полностью перезаписывает последние 10 бизнес-дат.
-6. Партиция пишется в staging и атомарно заменяется после контроля. Retry с тем же `batch_id` выполняет overwrite. При частичном сбое опубликованная партиция остается прежней. DELETE и исправленные revision отражаются при replay. Backfill принимает явные `date_from`, `date_to`, `tariff_dataset_version`; повтор безопасен.
+6. Партиция пишется в staging и атомарно заменяется после контроля. Retry с тем же `batch_id` выполняет overwrite. При частичном сбое опубликованная партиция остается прежней. DELETE и исправленные revision отражаются при replay. Backfill читает архив и принимает явные `date_from`, `date_to`, `raw_snapshot_id`, `meter_snapshot_id`, `tariff_dataset_version`; все три версии сохраняются в metadata запуска, повтор с ними безопасен.
 
 ### Формирование ключа (kafka) / партиции (hdfs)
 
@@ -150,6 +151,8 @@ TBLPROPERTIES (
 ```
 
 ### FAQ
+
+Продуктовые требования заданы на уровне единицы учета; она может включать один или несколько объектов, но правило соответствия между ними не определено.
 
 **В: Почему бизнес-дата не UTC?**  
 О: Тариф и операционный день определены локальной датой площадки. UTC остается единственной шкалой входных событий, а IANA timezone делает преобразование воспроизводимым.

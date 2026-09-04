@@ -102,6 +102,7 @@ class JudgeConfig:
     app_url: str | None
     app_title: str
     base_url: str | None
+    temperature: float | None = 0.0
 
 
 def json_sha256(value: Any) -> str:
@@ -251,20 +252,20 @@ def validate_judge_output(
 class OpenRouterJudge:
     def __init__(self, config: JudgeConfig):
         self.config = config
-        model = ChatOpenRouter(
-            model=config.model,
-            api_key=config.api_key,
-            temperature=0,
-            max_tokens=4096,
-            timeout=config.timeout_seconds * 1000,
-            max_retries=max(1, config.retries),
-            app_url=config.app_url,
-            app_title=config.app_title,
-            base_url=config.base_url,
-            openrouter_provider={"require_parameters": True},
-        )
-        if config.retries == 0:
-            model.client.sdk_configuration.retry_config.strategy = "none"
+        model_options: dict[str, Any] = {
+            "model": config.model,
+            "api_key": config.api_key,
+            "max_tokens": 4096,
+            "timeout": config.timeout_seconds * 1000,
+            "max_retries": 0,
+            "app_url": config.app_url,
+            "app_title": config.app_title,
+            "base_url": config.base_url,
+            "openrouter_provider": {"require_parameters": True},
+        }
+        if config.temperature is not None:
+            model_options["temperature"] = config.temperature
+        model = ChatOpenRouter(**model_options)
         self.model = model
         self.chain = model.with_structured_output(
             JudgeDecision, method="json_schema", strict=True, include_raw=True
@@ -429,9 +430,44 @@ def evaluate_case(
     return result
 
 
-def aggregate_results(
-    case_results: list[dict[str, Any]], model: str, ground_truth_dir: Path, predictions_dir: Path
+def evaluate_case_with_retries(
+    case_id: str,
+    prediction_path: Path,
+    ground_truth_path: Path,
+    judge: OpenRouterJudge,
+    cache_dir: Path,
+    use_cache: bool,
 ) -> dict[str, Any]:
+    attempts = judge.config.retries + 1
+    for attempt in range(attempts):
+        try:
+            return evaluate_case(
+                case_id, prediction_path, ground_truth_path, judge, cache_dir, use_cache
+            )
+        except (EvaluationError, OSError, ValueError) as error:
+            print(
+                f"ERROR: {case_id}: попытка {attempt + 1}/{attempts}: "
+                f"{str(error).splitlines()[0]}",
+                file=sys.stderr,
+                flush=True,
+            )
+            if attempt + 1 == attempts:
+                raise
+            delay = 2**attempt
+            print(f"{case_id}: повтор через {delay}с", file=sys.stderr, flush=True)
+            time.sleep(delay)
+
+    raise AssertionError("unreachable")
+
+
+def aggregate_results(
+    case_results: list[dict[str, Any]],
+    model: str,
+    ground_truth_dir: Path,
+    predictions_dir: Path,
+    failed_cases: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    failed_cases = failed_cases or []
     totals: Counter[str] = Counter()
     usage: Counter[str] = Counter()
     per_type: dict[str, Counter[str]] = {}
@@ -449,17 +485,20 @@ def aggregate_results(
         for item in case["false_negatives"]:
             per_type.setdefault(item["error_type_id"], Counter())["fn"] += 1
 
+    case_count = len(case_results)
     summary = {
         "case_count": len(case_results),
+        "requested_case_count": case_count + len(failed_cases),
+        "failed_case_count": len(failed_cases),
         "total_predictions": totals["tp"] + totals["fp"],
         "total_ground_truth": totals["tp"] + totals["fn"],
         **metrics(totals["tp"], totals["fp"], totals["fn"]),
         "exact_case_count": sum(case["exact_match"] for case in case_results),
-        "exact_case_accuracy": round(sum(case["exact_match"] for case in case_results) / len(case_results), 6),
+        "exact_case_accuracy": round(sum(case["exact_match"] for case in case_results) / case_count, 6) if case_count else 0.0,
         "missing_prediction_files": sum(case["prediction_file_missing"] for case in case_results),
-        "macro_precision": round(sum(case["precision"] for case in case_results) / len(case_results), 6),
-        "macro_recall": round(sum(case["recall"] for case in case_results) / len(case_results), 6),
-        "macro_f1": round(sum(case["f1"] for case in case_results) / len(case_results), 6),
+        "macro_precision": round(sum(case["precision"] for case in case_results) / case_count, 6) if case_count else 0.0,
+        "macro_recall": round(sum(case["recall"] for case in case_results) / case_count, 6) if case_count else 0.0,
+        "macro_f1": round(sum(case["f1"] for case in case_results) / case_count, 6) if case_count else 0.0,
     }
     return {
         "schema_version": "1.1",
@@ -487,6 +526,7 @@ def aggregate_results(
             for error_type, counts in sorted(per_type.items())
         },
         "cases": sorted(case_results, key=lambda item: item["case_id"]),
+        "failed_cases": sorted(failed_cases, key=lambda item: item["case_id"]),
     }
 
 
@@ -510,6 +550,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--ground-truth", type=Path, default=DEFAULT_GROUND_TRUTH)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--model", default=os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL))
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--no-temperature", action="store_true")
     parser.add_argument("--base-url", default=os.getenv("OPENROUTER_BASE_URL"))
     parser.add_argument("--app-url", default=os.getenv("OPENROUTER_HTTP_REFERER"))
     parser.add_argument("--app-title", default=os.getenv("OPENROUTER_APP_TITLE", "AI Product Hack Evaluator"))
@@ -536,6 +578,7 @@ def main(argv: list[str] | None = None) -> int:
             JudgeConfig(
                 api_key=api_key,
                 model=args.model,
+                temperature=None if args.no_temperature else args.temperature,
                 timeout_seconds=args.timeout,
                 retries=args.retries,
                 app_url=args.app_url,
@@ -550,29 +593,41 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
         results = []
+        failed_cases = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
-            futures = [
+            futures = {
                 executor.submit(
-                    evaluate_case,
+                    evaluate_case_with_retries,
                     path.stem,
                     args.predictions / path.name,
                     path,
                     judge,
                     cache_dir,
                     not args.no_cache,
-                )
+                ): path.stem
                 for path in paths
-            ]
+            }
             for future in concurrent.futures.as_completed(futures):
-                result = future.result()
+                case_id = futures[future]
+                try:
+                    result = future.result()
+                except (EvaluationError, OSError, ValueError) as error:
+                    failed_cases.append({"case_id": case_id, "error": str(error).splitlines()[0]})
+                    continue
                 results.append(result)
-                print(f"{result['case_id']}: TP={result['tp']} FP={result['fp']} FN={result['fn']}", file=sys.stderr)
+                print(
+                    f"{result['case_id']}: TP={result['tp']} FP={result['fp']} FN={result['fn']}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
-        report = aggregate_results(results, args.model, args.ground_truth, args.predictions)
+        report = aggregate_results(
+            results, args.model, args.ground_truth, args.predictions, failed_cases
+        )
         atomic_write_json(args.output, report)
         print(json.dumps(report["summary"], ensure_ascii=False, indent=2))
         print(f"Отчет: {args.output}", file=sys.stderr)
-        return 0
+        return bool(failed_cases)
     except (EvaluationError, OSError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2

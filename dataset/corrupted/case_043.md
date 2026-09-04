@@ -1,4 +1,4 @@
-# Служебный документ проекта
+# Потоковые данные/витрины
 
 | **Общие сведения** | Ежемесячная витрина установленной базы устройств: число активных абонентов по домашнему региону, вендору, операционной системе и поддержке 5G. |
 | :--- | :--- |
@@ -8,7 +8,7 @@
 | **Нефункциональные требования** | 9–14 млрд событий в месяц; историческая загрузка с 2024-01-01; хранение агрегатов бессрочно; расчёт в UTC, публикация по расписанию Europe/Moscow; один месяц пересчитывается целиком; RTO 8 часов, одновременная публикация двух версий месяца запрещена. |
 | **Системы-источники** | `NETWORK_EVENT_DDS` — нормализованные события активности с pseudonymous subscriber token и IMEI. |
 | **Data Catalog** | [Продукт Device Base Monthly](https://datacatalog.corp.mts.ru/products/device-base-monthly) |
-| **Исходники проекта** | [GitLab: commercial/device-base-monthly](https://gitlab.corp.mts.ru/bigdata/commercial/device-base-monthly) |
+| **Служебное поле 08** | [GitLab: commercial/device-base-monthly](https://gitlab.corp.mts.ru/bigdata/commercial/device-base-monthly) |
 | **Команда** | Светлана Осина — аналитик; Михаил Рябов — разработчик; Галина Юдина — QA; Андрей Тарасов — Product Owner. |
 | **JIRA** | [DEVBASE-3156 — Ежемесячная база устройств](https://jira.corp.mts.ru/browse/DEVBASE-3156) |
 
@@ -39,8 +39,6 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 ### Алгоритм обработки потока
 
-События после watermark окончательно отбрасываются и не меняют результат.
-
 #### Шаг 1. Фильтрация данных
 
 В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
@@ -58,7 +56,7 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 #### Шаг 3. Трансформация и агрегация
 
-При NULL status записывается значение UNKNOWN.
+Тот же основной показатель рассчитывается как среднее исходных значений; приоритет формул не задан.
 
 Затем для каждого ключа выбирается запись с максимальной revision.
 
@@ -72,9 +70,9 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 #### Шаг 4. Регламент, исправления и запись
 
-Предварительный расчёт запускается третьего числа M+1 в 03:00 Europe/Moscow по одному зафиксированному Iceberg snapshot. Финальный — шестнадцатого числа в 03:00 Europe/Moscow. Событие с `ingest_ts` ровно до snapshot входит, после snapshot — нет. Источник хранит 400 дней.
+Предварительный расчёт запускается третьего числа M+1 в 03:00 Europe/Moscow по одному зафиксированному Iceberg snapshot. Финальный — шестнадцатого числа в 03:00 Europe/Moscow. В запуск входят только версии с `ingest_ts <= snapshot_committed_at`; равенство границе допустимо. Источник хранит 400 дней.
 
-Поздние события и исправления до финального запуска включаются полной заменой M. Изменение после финализации создаёт `post_final_change_cnt`; автоматический backfill разрешён для последних 12 месяцев и всегда перечитывает месяц целиком по новому snapshot. Более глубокий backfill требует заявки владельца.
+Поздние события и исправления до финального запуска включаются полной заменой M. Изменение после финализации создаёт `post_final_change_cnt`; автоматический backfill разрешён для последних 12 месяцев и всегда перечитывает месяц целиком по новому snapshot. Backfill старше 12 месяцев, но не старше 400 дней, требует заявки владельца; более ранний период недоступен из-за retention источника и не изменяется.
 
 Перед staging процедура `CDM_COMM.ensure_device_base_partition(M)` под advisory lock создаёт отдельную месячную партицию `[M, M+1)`, если её ещё нет; M обязан быть не раньше `2024-01-01` и не позже текущего UTC-месяца. Затем данные записываются в `CDM_COMM.TABLE_DEVICE_BASE_MONTHLY_STG_<run_id>`, проходят проверки, и в одной Greenplum-транзакции выполняется exchange партиции M. При ошибке транзакция откатывается, опубликованная версия остаётся прежней. Retry использует новый staging и полностью заменяет месяц, поэтому идемпотентен. Staging удаляется только после успешного exchange или через 7 дней сервисной очисткой.
 
@@ -86,16 +84,14 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 ### Структура данных
 
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
-
-Допустимые значения status: ACTIVE и INACTIVE.
+Основной показатель рассчитывается как сумма исходных значений.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
 | FIELD_MONTH | DATE | Первое число месяца UTC; обязательность поля `FIELD_MONTH` не определена | Параметр DAG | `month_start` | DATE | Всегда day=1 |
 | FIELD_HOME_REGION_CODE | VARCHAR(16) | Домашний регион или `UNKNOWN`; обязательность поля `FIELD_HOME_REGION_CODE` не определена | `TABLE_SUBSCRIBER_PROFILE_SCD` | `home_region_code` | STRING | Temporal JOIN на последнее событие |
-| FIELD_DEVICE_VENDOR | VARCHAR(128) | Вендор либо `UNKNOWN`; обязательность поля `FIELD_DEVICE_VENDOR` не определена | `DICT_TAC_DEVICE_SCD` | `vendor_name` | STRING | `trim`, fallback |
+| FIELD_DEVICE_VENDOR | VARCHAR(128) | Вендор либо `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `vendor_name` | STRING | `trim`, fallback |
 | FIELD_OS_FAMILY | VARCHAR(64) | Семейство ОС либо `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `os_family` | STRING | `trim`, fallback |
 | FIELD_5G_CAPABILITY | VARCHAR(7) | `YES`, `NO`, `UNKNOWN`; `NOT NULL` | `DICT_TAC_DEVICE_SCD` | `is_5g_capable` | BOOLEAN | Явный mapping |
 | FIELD_SUBSCRIBERS_CNT | BIGINT | Число уникальных активных tokens, >0; `NOT NULL` | `TABLE_SUBSCRIBER_DEVICE_EVENT` | `subscriber_token` | STRING | После выбора последнего устройства |
@@ -120,7 +116,7 @@ Iceberg `TABLE_SUBSCRIBER_DEVICE_EVENT` → месячная фильтраци�
 
 ```sql
 CREATE TABLE CDM_COMM.TABLE_DEVICE_BASE_MONTHLY (
-    FIELD_MONTH STRING NOT NULL,
+    FIELD_MONTH_legacy DATE NOT NULL,
     FIELD_HOME_REGION_CODE VARCHAR(16) NOT NULL,
     FIELD_DEVICE_VENDOR VARCHAR(128) NOT NULL,
     FIELD_OS_FAMILY VARCHAR(64) NOT NULL,
@@ -138,7 +134,13 @@ PARTITION BY RANGE (FIELD_MONTH)
 
 ### FAQ
 
-Все поздние события автоматически включаются ближайшим replay без ограничений по возрасту.
+Порог срабатывания, период сравнения и блокировка публикации определяются вручную после проверки.
+
+После загрузки рассчитываются число дублей и расхождение с источником.
+
+Debug-таблица ежедневно копируется в бессрочный backup; правила доступа и удаления отсутствуют.
+
+При ошибке полный исходный payload сохраняется в общей debug-таблице.
 
 **Какое устройство считается устройством месяца?** Устройство из последнего валидного сетевого события абонента в UTC-месяце; tie-break полностью определён в шаге 2.
 
