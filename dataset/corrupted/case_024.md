@@ -94,14 +94,12 @@ Meters -> ENERGY_METER_GATEWAY -> Kafka kafka-iot-prod-02 -> validate/revision d
 
 ### Структура данных
 
-Поле FIELD_TIMEZONE_CALC имеет тип int и хранит смещение времени; единица измерения, знак и допустимый диапазон не указаны.
-
-В следующем релизе добавляется обязательное поле contract_flag NOT NULL без default.
+В следующем релизе добавляется обязательное поле processing_status NOT NULL без default.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| site_id | string | Идентификатор площадки; обязательность поля `site_id` не определена | DICT_SITE_ENERGY_METER_SCD2 | site_id | string | Часть бизнес-ключа |
+| site_id | string или bigint; окончательный физический тип не выбран | Идентификатор площадки; обязательность поля `site_id` не определена | DICT_SITE_ENERGY_METER_SCD2 | site_id | string | Часть бизнес-ключа |
 | timezone_name | string | IANA timezone из разрешенного списка; обязательность поля `timezone_name` не определена | DICT_SITE_ENERGY_METER_SCD2 | timezone_name | string | TZDB 2026a |
 | region_code | string | Макрорегион; `NOT NULL` | DICT_SITE_ENERGY_METER_SCD2 | region_code | string | Enum регионов MTS |
 | tariff_zone | string | Код тарифной зоны; `NOT NULL` | DICT_SITE_ENERGY_METER_SCD2 | tariff_zone | string | Ключ тарифа |

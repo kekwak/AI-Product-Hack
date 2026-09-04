@@ -80,12 +80,10 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 
 ### Структура данных
 
-Поле FIELD_TIMEZONE_CALC имеет тип int и хранит смещение времени; единица измерения, знак и допустимый диапазон не указаны.
-
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| link_id | string | Идентификатор физического канала; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | link_id | string | Часть ключа |
+| link_id | string или bigint; окончательный физический тип не выбран | Идентификатор физического канала; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | link_id | string | Часть ключа |
 | hour_start_utc | timestamp | Начало часа UTC; `NOT NULL` | Расчет | observed_at_utc | long | `FLOOR_HOUR(observed_at_utc - 1 microsecond)`; часть ключа |
 | region_code | string | Макрорегион; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | region_code | string | Enum регионов MTS |
 | capacity_mbps | decimal(12,3) | Пропускная способность, Мбит/с, `>0`; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | capacity_mbps | decimal(12,3) | Постоянна внутри часа |

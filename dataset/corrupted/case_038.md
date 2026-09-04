@@ -103,14 +103,12 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 
 ### Структура данных
 
-Поле FIELD_TIMEZONE_CALC имеет тип int и хранит смещение времени; единица измерения, знак и допустимый диапазон не указаны.
-
 Ниже описан non-null upsert payload. Retract имеет только обязательный Kafka key `FIELD_ALERT_ID` и null value, поэтому nullability полей payload к нему не применяется.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_ALERT_ID | STRING | SHA-256 ID, 64 lowercase hex; обязательность поля `FIELD_ALERT_ID` не определена | Расчёт | `session_id` | STRING | `sha256(concat('qoe-v1', chr(124), session_id))` |
+| FIELD_ALERT_ID | string или bigint; окончательный физический тип не выбран | SHA-256 ID, 64 lowercase hex; обязательность поля `FIELD_ALERT_ID` не определена | Расчёт | `session_id` | STRING | `sha256(concat('qoe-v1', chr(124), session_id))` |
 | FIELD_EVENT_TS | TIMESTAMP_LTZ(3) | Окончание сессии UTC; обязательность поля `FIELD_EVENT_TS` не определена | `TOPIC_DATA_SESSION_END_V3` | `session_end_ts` | BIGINT | Epoch ms |
 | FIELD_EVENT_DATE | DATE | UTC-дата окончания; `NOT NULL` | `TOPIC_DATA_SESSION_END_V3` | `session_end_ts` | BIGINT | Производное от `FIELD_EVENT_TS` |
 | FIELD_SUBSCRIBER_TOKEN | STRING | Необратимый HMAC-SHA256 token, 64 hex; `NOT NULL` | `TOPIC_DATA_SESSION_END_V3` | `subscriber_token` | STRING | Исходный IMSI не доступен job |

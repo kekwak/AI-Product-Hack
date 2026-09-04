@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Финальная запись вызова, topic `voice.volte.call-final.v2`; Kafka key — `call_id`; операции `UPSERT` и `DELETE` | Kafka; кластер не указан | [Data Catalog: voice.volte.call-final.v2](https://datacatalog.mts.ru/topics/voice-volte-call-final-v2) | JSON; схема, версия и способ десериализации не указаны |
+| Финальная запись вызова, topic `voice.volte.call-final.v2`; Kafka key — `call_id`; операции `UPSERT` и `DELETE` | Kafka, кластер `kafka-voice-prod-02` | [Data Catalog: voice.volte.call-final.v2](https://datacatalog.mts.ru/topics/voice-volte-call-final-v2) | Protocol Buffers 3, message `mts.voice.volte.CallFinal`, файл `call_final.proto`, schema registry subject `voice.volte.call-final-value`, версия `7`; Confluent Protobuf framing, десериализация exact writer schema v7 |
 
 ### Источники обогащения данных
 
@@ -29,7 +29,7 @@
 
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
-| Hive-таблица `prod_voice.NET_VOLTE_QUALITY_5M` | HDFS-кластер `hdfs-prod-02`, полный путь `/data/prod/voice/volte_quality_5m/` | [Data Catalog: NET_VOLTE_QUALITY_5M](https://datacatalog.mts.ru/tables/prod-voice-net-volte-quality-5m) | JSON; схема, версия и способ сериализации не указаны |
+| Hive-таблица `prod_voice.NET_VOLTE_QUALITY_5M` | HDFS-кластер `hdfs-prod-02`, полный путь `/data/prod/voice/volte_quality_5m/` | [Data Catalog: NET_VOLTE_QUALITY_5M](https://datacatalog.mts.ru/tables/prod-voice-net-volte-quality-5m) | ORC 1.9, ZLIB; логическая схема `voice.volte-quality-5m` версии `2`; Spark writer сопоставляет поля по имени, timestamps записывает в UTC |
 
 ### Схема потоков данных
 
@@ -42,31 +42,44 @@ VOICE_CDR_GATEWAY -> Kafka kafka-voice-prod-02 -> Flink -> dedup/revisions
 
 ### Алгоритм обработки потока
 
-Одна строка результата должна соответствовать комбинации region_code, vendor_name и category_code.
+Часовой пояс исходного timestamp и целевой часовой пояс хранения не указаны.
+
+Для региона east к timestamp прибавляется 7 часов, для central, nw, volga и south — 3 часа.
 
 Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
+
+Если один обязательный источник недоступен, расчет продолжается по данным остальных источников и результат публикуется.
+
+Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.
 
 Одна входная запись описывает финальное состояние логического вызова `call_id`. `call_end_time_utc` является event time и передается epoch milliseconds UTC. Окно — полуинтервал `[window_start_utc, window_start_utc + 5 minutes)`, в который попадает `call_end_time_utc`. Гранулярность результата — `(region_code, window_start_utc)`.
 
 #### Шаг 1. Фильтрация данных
 
-До обогащения сохраняются только строки с enriched_status = ACTIVE.
+Следующий период начинается с timestamp = end_M и также включает эту границу.
 
-В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.
+Период M включает timestamp от start_M включительно до end_M включительно.
+
+1. Неуспешная десериализация или неизвестная версия схемы вызывает 3 retry через 15, 45 и 120 секунд; после них Kafka partition останавливается до вмешательства, offset не фиксируется, создается алерт `VOLTE_SCHEMA_BLOCKED`.
+2. Для `UPSERT` обязательны: непустые `event_id`, `call_id`, `serving_cell_id`; `revision >= 1`; `access_type='VOLTE'`; `subscriber_type='MASS'`; `call_start_time_utc <= call_end_time_utc`; вычисленная длительность `FLOOR((call_end_time_utc-call_start_time_utc)/1000)` находится в `0..14400` секунд; `setup_result IN ('SUCCESS','FAILED')`; непустой `release_cause_code`. `mos_avg`, если задан, должен быть `1.00..5.00`. Нарушившая запись исключается и учитывается в `rejected_calls_total{reason}`.
+3. `is_test_call=true`, `access_type!='VOLTE'` и `subscriber_type!='MASS'` исключаются как вне границ продукта и считаются в отдельных метриках.
+4. Для `DELETE` обязательны `call_id`, `revision`, `event_id`, `call_end_time_utc`; `call_end_time_utc` обязан совпасть с удаляемой UPSERT-версией в семидневном состоянии, иначе событие блокируется с `DELETE_WINDOW_CONFLICT`. Остальные бизнес-поля не используются. DELETE удаляет логический вызов при replay, если его revision не меньше выбранного UPSERT. Если UPSERT отсутствует во всем семидневном состоянии, DELETE не меняет результат и учитывается в `orphan_delete_total`. Удаление старше семи суток не может быть применено: архивного источника в скоупе продукта нет, отклонение эскалируется владельцу источника.
+5. Сначала дубли `event_id` схлопываются по максимальному `ingest_time_utc`, затем по лексикографически максимальному SHA-256 от исходных байтов Kafka value. Для одного `call_id` выбирается запись с максимальным `revision`, при равенстве — максимальный `ingest_time_utc`, затем `event_id`. Если выбрана DELETE, вызов не участвует в результате. Правило одинаково для online и replay.
+6. Запись с `call_end_time_utc > ingest_time_utc + 5 minutes` исключается; равенство границе допустимо. События за watermark не меняют закрытое окно онлайн, считаются в `late_calls_total` и учитываются плановым replay последних 7 суток.
 
 #### Шаг 2. Обогащение данных
 
-Для обогащения всегда используется текущая версия записи.
+JOIN со справочником выполняется по идентификатору; при нескольких совпадениях сохраняются все строки, ожидаемая кардинальность и допустимость размножения результата не определены.
 
-Поле enriched_status создается на этом шаге только для строк, прошедших шаг 1.
+1. Выполняется left temporal join к `DICT_CELL_REGION_SCD2` по `serving_cell_id` и времени окончания вызова. Кардинальность `N:0..1`. При отсутствии строки применяется `region_code='UNKNOWN'` и `unknown_cell_flag=true`. При более чем одной строке batch останавливается с `CELL_REGION_OVERLAP`.
+2. Выполняется left join к `DICT_VOLTE_RELEASE_CAUSE` по `release_cause_code`, кардинальность `N:0..1`. При отсутствии используется `release_class='UNKNOWN'`, `unknown_cause_flag=true`; неизвестная причина не считается аварийным обрывом. Множественное совпадение останавливает batch с `RELEASE_CAUSE_DUPLICATE`.
+3. Снимки обоих справочников и их `snapshot_id` сохраняются в метаданных batch. При backfill используется snapshot, действовавший на `call_end_time_utc` для SCD2, и версия справочника причин, указанная в параметрах replay; по умолчанию — версия 12.
 
-Описание этого этапа будет согласовано после начала разработки.
+#### Шаг 3. Агрегация и публикация
 
-#### Шаг 3. <Наименование шага 3>
+Если показатель равен 0, записать 0; одновременно значение 0 считается неизвестным и должно быть записано как NULL, приоритет правил не задан.
 
-GROUP BY выполняется только по region_code и vendor_name; category_code выбирается произвольно из группы.
-
-Для state=A записывается 1, для state=B записывается 0; ветка по умолчанию отсутствует.
+Для каждого бизнес-ключа выбирается запись с максимальным временем получения; при равенстве времени сохраняется произвольная запись.
 
 Для каждой группы вычисляются:
 
@@ -91,16 +104,10 @@ GROUP BY выполняется только по region_code и vendor_name; ca
 
 ### Структура данных
 
-Исходный payload содержит customer_contact и другие данные ограниченного доступа.
-
-Перед записью абонентский идентификатор преобразуется в BIGINT без сохранения исходного строкового значения.
-
-Абонентский идентификатор состоит из цифр, может начинаться с нулей, и все позиции являются значимыми.
-
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| window_start_utc | timestamp | Начало пятиминутного окна UTC; `NOT NULL` | Kafka | call_end_time_utc | long | `FLOOR_5_MINUTES(FROM_EPOCH_MS(...))`; часть ключа |
+| window_start_utc | string или bigint; окончательный физический тип не выбран | Начало пятиминутного окна UTC; `NOT NULL` | Источник не указан | Атрибут источника не указан | long | Формула и правило получения поля не указаны |
 | region_code | string | Макрорегион; `NOT NULL` | DICT_CELL_REGION_SCD2/расчет | region_code | string | Справочник либо `UNKNOWN`; часть ключа |
 | calls_total | bigint | Число выбранных вызовов, `>0`; `NOT NULL` | Расчет | call_id | string | Количество после revision/dedup |
 | calls_connected | bigint | Установленные вызовы, `0..calls_total`; `NOT NULL` | Kafka | setup_result | string | `SUCCESS` |
@@ -121,7 +128,7 @@ GROUP BY выполняется только по region_code и vendor_name; ca
 
 | window_start_utc | region_code | calls_total | calls_connected | calls_dropped | asr_pct | drop_rate_pct | mos_avg | low_mos_calls | connected_duration_sec | unknown_cell_calls | unknown_cause_calls | source_max_end_time_utc | loaded_at_utc | event_date_utc | event_hour_utc |
 | :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- | :--- | :--- | ---: |
-| 2026-08-18 09:00:00 | CENTER | 1000 | 950 | 19 | 95.00 | 2.00 | 4.12 | 44 | 142500 | 0 | 2 | 2026-08-18 09:04:59 | 2026-08-18 09:26:00 | 2026-08-18 | 9 |
+| INVALID_WINDOW_START_UTC=not_a_number | CENTER | 1000 | 950 | 19 | 95.00 | 2.00 | 4.12 | 44 | 142500 | 0 | 2 | 2026-08-18 09:04:59 | 2026-08-18 09:26:00 | 2026-08-18 | 9 |
 | 2026-08-18 09:00:00 | NORTHWEST | 800 | 720 | 18 | 90.00 | 2.50 | 3.98 | 61 | 108000 | 1 | 0 | 2026-08-18 09:04:58 | 2026-08-18 09:26:00 | 2026-08-18 | 9 |
 | 2026-08-18 09:00:00 | SOUTH | 500 | 400 | 20 | 80.00 | 5.00 | 3.44 | 95 | 58000 | 0 | 4 | 2026-08-18 09:04:57 | 2026-08-18 09:26:00 | 2026-08-18 | 9 |
 | 2026-08-18 09:00:00 | VOLGA | 750 | 600 | 12 | 80.00 | 2.00 | 4.01 | 37 | 91200 | 0 | 0 | 2026-08-18 09:04:56 | 2026-08-18 09:26:00 | 2026-08-18 | 9 |
@@ -138,7 +145,7 @@ GROUP BY выполняется только по region_code и vendor_name; ca
 
 ```sql
 CREATE EXTERNAL TABLE prod_voice.NET_VOLTE_QUALITY_5M (
-    window_start_utc_legacy           TIMESTAMP       NOT NULL,
+    window_start_utc           TIMESTAMP       NOT NULL,
     region_code                STRING          NOT NULL,
     calls_total                BIGINT          NOT NULL,
     calls_connected            BIGINT          NOT NULL,
@@ -167,11 +174,9 @@ TBLPROPERTIES (
 
 ### FAQ
 
-Источник может присылать новые значения state без предварительного уведомления.
+Регламент rollback: при нарушении контроля качества откат выполняется автоматически без участия человека; одновременно откат запрещен без ручного решения дежурного инженера.
 
-Понятие текущей версии определяется владельцем источника при каждом запуске.
-
-Полный payload копируется в отдельное диагностическое хранилище вне приемника; общий retention результата на него не распространяется, TTL и процедура удаления не определены.
+Частичная публикация считается успешной; признак неполноты, отдельная метрика и оповещение не предусмотрены.
 
 **В: Почему Drop Rate равен 0, когда нет установленных вызовов?**  
 О: Это договоренный нейтральный результат для нулевого знаменателя; число connected всегда доступно рядом и позволяет отличить его от реально хорошего окна.

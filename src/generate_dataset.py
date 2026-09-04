@@ -443,7 +443,7 @@ UNIVERSAL_MUTATIONS = [
     Mutation("U01_UNCLEAR_BUSINESS_PROBLEM", "U01", 3, "medium", "Не определена решаемая бизнес-проблема", "Вместо бизнес-задачи указано только намерение сформировать технический набор данных; ожидаемое решение или изменение процесса не описано.", lambda text: replace_intro_field(text, "Решаемая проблема", "Требуется сформировать новый технический набор данных; решаемая бизнес-проблема и ожидаемое изменение процесса пока не определены.")),
     Mutation("U01_MISSING_USER_SCENARIO", "U01", 3, "medium", "Не определен пользователь нового результата", "В скоуп добавлен отдельный результат для ручного решения, но его пользователь, рабочий сценарий и принимаемое решение не определены.", sequence(intro_edit("Решаемая проблема", "Дополнительно должен формироваться отдельный список объектов для ручного решения."), intro_edit("Заказчики", "Для нового списка пользователь, рабочий сценарий и решение по результату пока не определены."))),
     Mutation("U01_UNDEFINED_SCOPE_BOUNDARIES", "U01", 3, "high", "Не определены границы задачи", "Состав входящих и исключаемых сущностей и периодов оставлен изменяемым между запусками без зафиксированного правила.", lambda text: append_intro_field(text, "Решаемая проблема", "Состав включаемых и исключаемых бизнес-сущностей и периодов определяется отдельно перед каждым запуском и в документе не фиксируется.")),
-    Mutation("U02_UNDEFINED_ACTIVE", "U02", 3, "medium", "Термин «активная запись» имеет два значения", "Состав выборки зависит от термина, который в алгоритме и FAQ определен по двум несовместимым признакам.", sequence(section_edit("Алгоритм обработки потока", "Активной считается запись с is_active = true."), section_edit("FAQ", "Активная запись — любая запись, обновленная за последние 30 дней, независимо от is_active."))),
+    Mutation("U02_UNDEFINED_ACTIVE", "U02", 3, "medium", "Термин «активная запись» имеет два значения", "Состав выборки зависит от термина, который в алгоритме и FAQ определен по двум несовместимым признакам.", sequence(section_edit("Алгоритм обработки потока", "Активной считается запись, имеющая разрешающий статус источника."), section_edit("FAQ", "Активной считается любая запись, обновленная за последние 30 дней, независимо от статуса источника."))),
     Mutation("U02_SAME_ENTITY_DIFFERENT_NAMES", "U02", 3, "medium", "Не определено соответствие бизнес-сущностей", "Алгоритм считает строки по объектам, а требования — по единицам учета, причем одна единица может включать несколько объектов и правило преобразования отсутствует.", sequence(section_edit("Алгоритм обработки потока", "Расчет и уникальность результата определяются на уровне объекта."), section_edit("FAQ", "Продуктовые требования заданы на уровне единицы учета; она может включать один или несколько объектов, но правило соответствия между ними не определено."))),
     Mutation("U02_SAME_NAME_DIFFERENT_ENTITIES", "U02", 3, "high", "Одно название обозначает разные сущности", "Термин «владелец» одновременно обозначает владельца исходной записи и оператора процесса, поэтому ссылки на него неоднозначны.", sequence(section_edit("Алгоритм обработки потока", "В этом разделе владельцем называется владелец исходной записи."), section_edit("FAQ", "В FAQ и описании использования владельцем называется оператор, отвечающий за запуск процесса."))),
     Mutation("U02_UNDEFINED_BUSINESS_MEANING", "U02", 3, "medium", "Не определен бизнес-смысл показателя", "Документ требует рассчитывать «уровень результата», но не объясняет, что этот показатель означает и как интерпретировать его значения.", sequence(intro_edit("Продуктовые метрики", "Ключевой показатель решения — уровень результата."), section_edit("FAQ", "Бизнес-смысл показателя «уровень результата» и интерпретация его значений пока не определены."))),
@@ -465,10 +465,10 @@ UNIVERSAL_MUTATIONS = [
     Mutation("U06_CYCLIC_DEPENDENCY", "U06", 3, "high", "Шаги имеют циклическую зависимость", "Фильтрация требует enriched_status из следующего шага, а обогащение выполняется только для строк, уже прошедших эту фильтрацию.", sequence(section_edit("Шаг 1. Фильтрация данных", "До обогащения сохраняются только строки с enriched_status = ACTIVE.", prefix=True), section_edit("Шаг 2. Обогащение данных", "Поле enriched_status создается на этом шаге только для строк, прошедших шаг 1.", prefix=True))),
     Mutation("U07_OPEN_TIME_BOUNDARY", "U07", 3, "high", "Не определено скользящее окно отбора", "Фильтр «7 дней назад / 2 часа вперед» не задает момент фиксации текущего времени и включение границ, поэтому состав выборки зависит от реализации.", lambda text: insert_after_heading(text, "Шаг 1. Фильтрация данных", "Учитываются события не ранее 7 дней назад и не позже 2 часов вперед от текущего времени на стороне обработки; момент фиксации текущего времени и включение границ не определены.", prefix=True)),
     Mutation("U08_JOIN_CARDINALITY_GAP", "U08", 3, "high", "Не определена кардинальность JOIN", "Для соединения со справочником не указано ожидаемое число совпадений на одну входную запись и допустимость размножения результата.", lambda text: insert_after_heading(text, "Шаг 2. Обогащение данных", "JOIN со справочником выполняется по идентификатору; при нескольких совпадениях сохраняются все строки, ожидаемая кардинальность и допустимость размножения результата не определены.", prefix=True)),
-    Mutation("U09_NONDETERMINISTIC_LAST", "U09", 3, "high", "Недетерминирован выбор последней записи", "Для выбора последнего значения задан только timestamp без дополнительного порядка при равенстве времени, поэтому повторный расчет может выбрать другую запись.", lambda text: insert_after_heading(text, "Шаг 3.", "Для каждого абонента выбирается последнее значение по event_timestamp; если timestamps равны, сохраняется любая из записей.", prefix=True)),
+    Mutation("U09_NONDETERMINISTIC_LAST", "U09", 3, "high", "Недетерминирован выбор последней записи", "Для выбора записи по бизнес-ключу задано только время получения без дополнительного порядка при равенстве, поэтому повторный расчет может выбрать другую запись.", lambda text: insert_after_heading(text, "Шаг 3.", "Для каждого бизнес-ключа выбирается запись с максимальным временем получения; при равенстве времени сохраняется произвольная запись.", prefix=True)),
     Mutation("U10_CONFLICTING_ZERO_RULES", "U10", 3, "high", "Для нулевого значения заданы два результата", "Одно и то же нулевое значение одновременно удовлетворяет двум правилам с разными выходами, а приоритет ветвей не определен.", lambda text: insert_after_heading(text, "Шаг 3.", "Если показатель равен 0, записать 0; одновременно значение 0 считается неизвестным и должно быть записано как NULL, приоритет правил не задан.", prefix=True)),
     Mutation("U11_TIMEZONE_AMBIGUITY", "U11", 3, "high", "Не определена временная зона преобразования", "Региональные сдвиги перечислены без исходного и целевого часового пояса, поэтому одинаковый timestamp может быть преобразован по-разному.", sequence(section_edit("Алгоритм обработки потока", "Для региона east к timestamp прибавляется 7 часов, для central, nw, volga и south — 3 часа."), section_edit("Алгоритм обработки потока", "Часовой пояс исходного timestamp и целевой часовой пояс хранения не указаны."))),
-    Mutation("U12_UNSPECIFIED_UNITS", "U12", 3, "medium", "Не определен формат смещения времени", "Числовое поле смещения времени не имеет единицы измерения и допустимого диапазона, поэтому часы и минуты нельзя различить.", lambda text: insert_after_heading(text, "Структура данных", "Поле FIELD_TIMEZONE_CALC имеет тип int и хранит смещение времени; единица измерения, знак и допустимый диапазон не указаны.")),
+    Mutation("U12_AMBIGUOUS_PHYSICAL_TYPE", "U12", 3, "medium", "Не выбран физический тип поля", "Для первого поля результата допускаются два несовместимых физических типа, поэтому правила хранения и проверки значения не определены.", lambda text: mutate_table_cell(text, "Структура данных", 1, "string или bigint; окончательный физический тип не выбран")),
     Mutation("U13_ARBITRARY_BAD_DATA", "U13", 3, "high", "Не определена обработка поврежденной записи", "Для неразбираемых числовых и временных значений не выбрано единое действие и не описано влияние ошибки на публикацию результата.", lambda text: insert_after_heading(text, "Шаг 1. Фильтрация данных", "Запись с неразбираемым числом или timestamp можно сохранить либо отбросить; правило выбора, quarantine, логирование и влияние на публикацию не определены.", prefix=True)),
     Mutation("U14_NON_IDEMPOTENT_RETRY", "U14", 3, "high", "Не определена семантика повторного запуска", "Повтор может выполнять append или overwrite и поэтому менять число строк.", lambda text: insert_after_heading(text, "Формирование ключа (kafka) / партиции (hdfs)", "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.")),
     Mutation("U15_UNVERSIONED_SCHEMA_CHANGE", "U15", 3, "high", "Допущено несовместимое изменение схемы", "Тип поля разрешено менять без новой версии контракта.", lambda text: insert_after_heading(text, "FAQ", "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.")),
@@ -506,7 +506,7 @@ UNIVERSAL_MUTATIONS = [
     Mutation("U13_PARTIAL_BATCH_PUBLISHED", "U13", 3, "high", "Частичный пакет публикуется как полный результат", "При недоступности одного обязательного источника расчет продолжается по оставшимся данным без флага, метрики и оповещения, поэтому потребитель не видит неполноту результата.", sequence(section_edit("Алгоритм обработки потока", "Если один обязательный источник недоступен, расчет продолжается по данным остальных источников и результат публикуется."), section_edit("FAQ", "Частичная публикация считается успешной; признак неполноты, отдельная метрика и оповещение не предусмотрены."))),
     Mutation("U14_APPEND_RETRY_DUPLICATES", "U14", 3, "high", "Retry повторно добавляет опубликованные строки", "Первый запуск пишет append, а повтор не проверяет идентификатор загрузки и снова добавляет тот же набор.", sequence(section_edit("Формирование ключа (kafka) / партиции (hdfs)", "Каждый запуск записывает результат в режиме append."), section_edit("FAQ", "Retry повторяет запись целиком; batch_id в приемнике не хранится и дубли не удаляются."))),
     Mutation("U14_DELETE_AND_CORRECTION_IGNORED", "U14", 3, "high", "Повторная обработка не применяет исправления", "Replay добавляет новые ревизии, но не удаляет старые строки и игнорирует tombstone, поэтому состояние зависит от истории запусков.", sequence(section_edit("Алгоритм обработки потока", "Replay добавляет исправленные события рядом с ранее опубликованными."), section_edit("FAQ", "DELETE и tombstone подтверждаются, но соответствующие строки приемника не изменяются."))),
-    Mutation("U15_REQUIRED_FIELD_WITHOUT_MIGRATION", "U15", 3, "high", "Добавлено обязательное поле без миграции", "Новая версия требует NOT NULL-поле, но не задает default, backfill истории и порядок обновления потребителей.", sequence(section_edit("Структура данных", "В следующем релизе добавляется обязательное поле contract_flag NOT NULL без default."), section_edit("FAQ", "Старые партиции и потребители остаются без изменений; план миграции не предусмотрен."))),
+    Mutation("U15_REQUIRED_FIELD_WITHOUT_MIGRATION", "U15", 3, "high", "Добавлено обязательное поле без миграции", "Новая версия требует NOT NULL-поле, но не задает default, backfill истории и порядок обновления потребителей.", sequence(section_edit("Структура данных", "В следующем релизе добавляется обязательное поле processing_status NOT NULL без default."), section_edit("FAQ", "Старые партиции и потребители остаются без изменений; план миграции не предусмотрен."))),
     Mutation("U15_RENAME_CHANGES_MEANING", "U15", 3, "high", "Поле переименовывается вместе со смыслом без версии", "Существующее поле получает новое имя и другую семантику в той же версии схемы, а старые данные не преобразуются.", sequence(section_edit("Структура данных", "Поле total_count переименовывается в successful_count и начинает учитывать только успешные записи."), section_edit("FAQ", "Версия контракта при этом не меняется, исторические значения сохраняют прежний смысл."))),
     Mutation("U16_WATERMARK_EXCEEDS_SLA", "U16", 3, "high", "SLA меньше необходимого ожидания данных", "Результат требуется публиковать раньше закрытия watermark, хотя до watermark он еще может измениться.", sequence(intro_edit("Продуктовые метрики", "Финальный результат публикуется не позднее чем через 2 минуты."), intro_edit("Нефункциональные требования", "Watermark закрывает расчет только через 30 минут после периода."))),
     Mutation("U16_REPLAY_LONGER_THAN_RETENTION", "U16", 3, "high", "Горизонт replay превышает retention", "Документ обещает автоматический пересчет периода, для которого исходные данные уже гарантированно удалены.", sequence(intro_edit("Нефункциональные требования", "Retention авторитетного сырья составляет 7 суток."), section_edit("FAQ", "Автоматический replay гарантирован для любых периодов за последние 90 суток."))),
@@ -524,6 +524,48 @@ UNIVERSAL_MUTATIONS = [
 ]
 
 
+OTHER_MUTATIONS = [
+    Mutation("O01_INCIDENT_OWNER_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "За первичный разбор одного инцидента одновременно назначены две команды, причем каждая освобождена от участия по соседнему правилу.", lambda text: insert_after_heading(text, "FAQ", "Эксплуатационный регламент: первичный разбор инцидента выполняет NOC, команда данных не подключается; одновременно первичный разбор возложен на команду данных, а NOC только получает итог.")),
+    Mutation("O02_PUBLICATION_APPROVAL_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Неясно, допускается ли автоматическая публикация: два обязательных правила требуют противоположного порядка согласования.", lambda text: insert_after_heading(text, "FAQ", "Регламент публикации: успешный расчет публикуется автоматически без согласования; одновременно каждая публикация должна ждать ручного подтверждения владельца продукта.")),
+    Mutation("O03_INCIDENT_SEVERITY_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Одинаковая задержка данных получает разные уровни инцидента, поэтому невозможно определить обязательную процедуру реагирования.", lambda text: insert_after_heading(text, "FAQ", "Классификация инцидента: задержка более 30 минут считается SEV-1; одновременно задержка до двух часов считается информационным событием и не открывает инцидент.")),
+    Mutation("O04_SUPPORT_CALENDAR_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Срок поддержки должен считаться по двум различным производственным календарям без правила выбора.", lambda text: insert_after_heading(text, "FAQ", "Регламент поддержки: рабочие дни определяются производственным календарем РФ; одновременно сроки считаются по локальному календарю региона заказчика, который может от него отличаться.")),
+    Mutation("O05_REFERENCE_CORRECTION_AUTHORITY", "O", 4, "high", "Найдена не типизированная ошибка", "Два правила противоположно определяют право команды продукта исправлять ошибочное значение справочника.", lambda text: insert_after_heading(text, "FAQ", "Регламент исправлений: команда продукта самостоятельно корректирует ошибочные значения справочника; одновременно любые изменения справочника разрешены только его владельцу, а локальная коррекция запрещена.")),
+    Mutation("O06_ESCALATION_CHANNEL_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Для обязательной эскалации назначены два взаимоисключающих канала, каждый из которых объявлен единственным допустимым.", lambda text: insert_after_heading(text, "FAQ", "Регламент эскалации: инцидент регистрируется только в JIRA и сообщения в другие каналы не считаются уведомлением; одновременно единственным официальным уведомлением признается письмо, а задача JIRA создается необязательно.")),
+    Mutation("O07_ROLLBACK_AUTHORITY_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Не определено, кто принимает обязательное решение об откате: автоматический механизм или дежурный инженер.", lambda text: insert_after_heading(text, "FAQ", "Регламент rollback: при нарушении контроля качества откат выполняется автоматически без участия человека; одновременно откат запрещен без ручного решения дежурного инженера.")),
+    Mutation("O08_INCIDENT_CLOSURE_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Одни и те же полномочия по закрытию инцидента одновременно исключительным образом назначены разным ролям.", lambda text: insert_after_heading(text, "FAQ", "Регламент закрытия: инцидент закрывает только владелец продукта после проверки показателей; одновременно закрытие выполняет только дежурный NOC, согласование владельца продукта не требуется.")),
+    Mutation("O09_ACCEPTANCE_AUTHORITY_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Документ не позволяет определить, чье решение является достаточным для приемки результата.", lambda text: insert_after_heading(text, "FAQ", "Регламент приемки: итог утверждает QA без дополнительного согласования; одновременно приемка действительна только после решения бизнес-заказчика, а заключение QA носит справочный характер.")),
+    Mutation("O10_RECOVERY_DEADLINE_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Для одного производственного сбоя установлены два несовместимых обязательных срока восстановления без приоритета.", lambda text: insert_after_heading(text, "FAQ", "Регламент восстановления: производственный сбой должен быть устранен за 30 минут; одновременно допустимый срок восстановления — до конца следующего рабочего дня без промежуточного ограничения.")),
+]
+
+
+COVERAGE_SEPARATED_UNIVERSAL_TYPES = {"U06", "U07", "U08", "U09", "U12", "U13", "U17"}
+COVERAGE_ROTATING_UNIVERSAL_TYPES = [
+    "U01", "U02", "U03", "U04", "U05", "U10",
+    "U11", "U14", "U15", "U16", "U18", "U19",
+]
+COVERAGE_PREFERRED_MUTATION_IDS = {
+    "U01": "U01_SCOPE_OUTPUT_GAP",
+    "U02": "U02_UNDEFINED_ACTIVE",
+    "U03": "U03_CONFLICTING_SOURCES",
+    "U04": "U04_GRAIN_CONTRADICTION",
+    "U05": "U05_OUTPUT_WITHOUT_LINEAGE",
+    "U06": "U06_ARBITRARY_OPERATION_ORDER",
+    "U07": "U07_OVERLAPPING_PERIODS",
+    "U08": "U08_JOIN_CARDINALITY_GAP",
+    "U09": "U09_NONDETERMINISTIC_LAST",
+    "U10": "U10_CONFLICTING_ZERO_RULES",
+    "U11": "U11_TIMEZONE_AMBIGUITY",
+    "U12": "U12_AMBIGUOUS_PHYSICAL_TYPE",
+    "U13": "U13_PARTIAL_BATCH_PUBLISHED",
+    "U14": "U14_PARTIAL_FAILURE_RECOVERY_UNDEFINED",
+    "U15": "U15_REQUIRED_FIELD_WITHOUT_MIGRATION",
+    "U16": "U16_WATERMARK_EXCEEDS_SLA",
+    "U17": "U17_EXAMPLE_OUTSIDE_CONTRACT",
+    "U18": "U18_NO_PASS_FAIL_THRESHOLDS",
+    "U19": "U19_SENSITIVE_DEBUG_AND_BACKUP",
+}
+
+
 def write_error_catalog() -> None:
     catalog = [
         {
@@ -534,7 +576,7 @@ def write_error_catalog() -> None:
             "title": item.title,
             "problem": item.description,
         }
-        for item in DOMAIN_MUTATIONS + TEMPLATE_MUTATIONS + UNIVERSAL_MUTATIONS
+        for item in DOMAIN_MUTATIONS + TEMPLATE_MUTATIONS + UNIVERSAL_MUTATIONS + OTHER_MUTATIONS
     ]
     (ROOT / "error_catalog.json").write_text(
         json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -603,6 +645,44 @@ def choose_mutations(
     return selected
 
 
+def choose_coverage_mutations(
+    case_index: int,
+    clean_text: str,
+) -> list[Mutation]:
+    """Build cases 1..10 with five document-level observations per D/T/U type."""
+    groups: dict[str, list[Mutation]] = {}
+    for pool in (DOMAIN_MUTATIONS, TEMPLATE_MUTATIONS, UNIVERSAL_MUTATIONS):
+        groups.update(applicable_by_type(pool, clean_text))
+
+    required_types: list[str] = []
+    if case_index <= 5:
+        required_types.extend(f"D{number:02d}" for number in range(1, 9))
+        required_types.append("T01")
+    else:
+        required_types.extend(sorted(COVERAGE_SEPARATED_UNIVERSAL_TYPES))
+
+    for offset, error_type_id in enumerate(COVERAGE_ROTATING_UNIVERSAL_TYPES):
+        selected_cases = {((offset + step) % 10) + 1 for step in range(5)}
+        if case_index in selected_cases:
+            required_types.append(error_type_id)
+
+    selected: list[Mutation] = []
+    for type_position, error_type_id in enumerate(required_types):
+        variants = groups.get(error_type_id, [])
+        if not variants:
+            raise RuntimeError(f"case {case_index}: no applicable mutation for {error_type_id}")
+        preferred_id = COVERAGE_PREFERRED_MUTATION_IDS.get(error_type_id)
+        preferred = [item for item in variants if item.mutation_id == preferred_id]
+        if preferred_id and not preferred:
+            raise RuntimeError(
+                f"case {case_index}: preferred mutation {preferred_id} is not applicable"
+            )
+        selected.append(preferred[0] if preferred else variants[(case_index + type_position) % len(variants)])
+
+    selected.append(OTHER_MUTATIONS[case_index - 1])
+    return selected
+
+
 def main() -> None:
     clean_files = sorted(CLEAN_DIR.glob("clean_*.md"))
     if len(clean_files) != 10:
@@ -616,12 +696,21 @@ def main() -> None:
     for case_index in range(1, 51):
         clean_path = clean_files[(case_index - 1) // 5]
         clean_text = clean_path.read_text(encoding="utf-8")
-        error_count = ERROR_COUNTS[case_index - 1]
         rng = random.Random(SEED * 100 + case_index)
-        selected = choose_mutations(error_count, case_index, rng, clean_text, mutation_usage)
+        if case_index <= 10:
+            legacy_selected = choose_mutations(
+                ERROR_COUNTS[case_index - 1], case_index, rng, clean_text, mutation_usage
+            )
+            mutation_usage.update(item.mutation_id for item in legacy_selected)
+            selected = choose_coverage_mutations(case_index, clean_text)
+            error_count = len(selected)
+        else:
+            error_count = ERROR_COUNTS[case_index - 1]
+            selected = choose_mutations(error_count, case_index, rng, clean_text, mutation_usage)
         if len(selected) != error_count:
             raise RuntimeError(f"selection mismatch for case {case_index}")
-        mutation_usage.update(item.mutation_id for item in selected)
+        if case_index > 10:
+            mutation_usage.update(item.mutation_id for item in selected)
 
         text = clean_text
         findings = []
@@ -629,7 +718,7 @@ def main() -> None:
         def mutation_phase(item: Mutation) -> int:
             if item.error_type_id in {"D04", "D05"}:
                 return 1
-            return {1: 2, 3: 3, 2: 4}[item.source_type]
+            return {1: 2, 3: 3, 2: 4, 4: 5}[item.source_type]
 
         ordered = sorted(selected, key=mutation_phase)
         for item in ordered:
@@ -675,7 +764,8 @@ def main() -> None:
     manifest = {
         "seed": SEED,
         "error_count_distribution": {
-            str(count): ERROR_COUNTS.count(count) for count in sorted(set(ERROR_COUNTS))
+            str(count): sum(1 for case in manifest_cases if case["error_count"] == count)
+            for count in sorted({case["error_count"] for case in manifest_cases})
         },
         "cases": manifest_cases,
     }

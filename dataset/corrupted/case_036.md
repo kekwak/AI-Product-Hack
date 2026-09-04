@@ -104,7 +104,7 @@ Flink использует checkpoint 30 секунд, Kafka source offsets и K
 
 Поле status допускает только значения ACTIVE и INACTIVE.
 
-В следующем релизе добавляется обязательное поле contract_flag NOT NULL без default.
+В следующем релизе добавляется обязательное поле processing_status NOT NULL без default.
 
 Ниже описан non-null upsert payload. Retract имеет только обязательный Kafka key `FIELD_ALERT_ID` и null value, поэтому nullability полей payload к нему не применяется.
 
