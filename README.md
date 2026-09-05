@@ -7,6 +7,7 @@
 1. `dataset-generate` создает чистые и поврежденные документы с ground truth.
 2. `infer-documents` проверяет Markdown-документы моделью через OpenRouter и сохраняет найденные ошибки.
 3. `evaluate-predictions` сопоставляет предсказания с ground truth и считает `TP`, `FP`, `FN`, precision, recall и F1.
+4. `optimize-prompt` улучшает инструктивную часть промпта с помощью GEPA.
 
 ## Быстрый старт
 
@@ -50,6 +51,7 @@ uv run evaluate-predictions \
 │   ├── generate_dataset.py     # генератор датасета
 │   ├── run_inference.py        # LangGraph-инференсер
 │   ├── evaluate_predictions.py # LLM-судья и метрики
+│   ├── optimize_prompt.py       # GEPA-оптимизация промпта
 │   └── paths.py                # пути проекта
 ├── tests/                      # тесты датасета, инференса и судьи
 ├── artifacts/                  # локальные предсказания и отчеты
@@ -67,6 +69,29 @@ uv run evaluate-predictions \
 - `U01–U19` — логика, полнота, согласованность и проверяемость.
 
 Полный inference-промпт вместе с шаблоном и описанием всех ошибок явно записан в `FULL_PROMPT` файла `src/run_inference.py`. Во время запуска критерии из других файлов не подгружаются.
+
+## Оптимизация промпта
+
+GEPA изменяет только инструкции модели. Встроенные определения D01–D08, T01 и U01–U19 остаются неизменными. Одна итерация равна одной предложенной мутации промпта.
+
+```bash
+uv run optimize-prompt \
+  --iterations 10 \
+  --concurrency 4 \
+  --output artifacts/gepa/luna_run_01
+```
+
+Используется `openai/gpt-5.6-luna:nitro` без параметра temperature для инференса, LLM-судьи и рефлексии. Датасет делится по исходным clean-документам: 01–06 для train, 07–08 для validation, 09–10 для test. Целевая метрика — среднее F1 по документам. Лучшие инструкции сохраняются в `best_prompt.md`, история validation и итоговые test-метрики — в `metrics.json`.
+
+Запустить обычный инференс с найденным промптом:
+
+```bash
+uv run infer-documents \
+  --model openai/gpt-5.6-luna:nitro \
+  --no-temperature \
+  --prompt-file artifacts/gepa/luna_run_01/best_prompt.md \
+  --output artifacts/predictions/luna_gepa
+```
 
 ## Инференс
 
