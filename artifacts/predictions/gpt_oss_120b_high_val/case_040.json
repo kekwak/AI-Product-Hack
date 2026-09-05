@@ -1,0 +1,50 @@
+[
+  {
+    "error_type_id": "D02",
+    "evidence_quote": "Data Catalog: ссылка отсутствует",
+    "title": "Missing Data Catalog link for source topic",
+    "problem": "The source `TOPIC_DATA_SESSION_END_V3` does not provide a direct link to its entry in the Data Catalog, violating the requirement for a catalog reference for each source."
+  },
+  {
+    "error_type_id": "D06",
+    "evidence_quote": "Kafka; конкретный кластер не зафиксирован",
+    "title": "Kafka cluster not specified for source topic",
+    "problem": "The source `TOPIC_DATA_SESSION_END_V3` description does not specify the exact Kafka cluster name, which is required for each streaming source."
+  },
+  {
+    "error_type_id": "T01",
+    "evidence_quote": "| **Служебное поле 07** | [Продукт QoE Degradation Alert](https://datacatalog.corp.mts.ru/products/qoe-degradation-alert) |",
+    "title": "Missing Data Catalog entry in Общие сведения table",
+    "problem": "The required 'Data Catalog' row is absent from the 'Общие сведения' section; instead a different row 'Служебное поле 07' is present, violating the template's mandatory elements."
+  },
+  {
+    "error_type_id": "U05",
+    "evidence_quote": "Источник не указан",
+    "title": "No source defined for FIELD_ALERT_ID (and other derived fields)",
+    "problem": "The structure table does not specify the source for `FIELD_ALERT_ID` (and other derived fields like `FIELD_QOE_CLASS` and `FIELD_REASON_CODES`), and the classification step is left undefined, leading to ambiguous field mapping."
+  },
+  {
+    "error_type_id": "U07",
+    "evidence_quote": "session_end_ts <= processing_time + 2 minutes\nProcessing time используется только для SLA и `FIELD_PROC_TS`.",
+    "title": "Filter uses undefined processing_time variable",
+    "problem": "The filter condition references `processing_time`, which is described as only used for SLA, creating ambiguity about its value and violating clear filter definition."
+  },
+  {
+    "error_type_id": "U08",
+    "evidence_quote": "JOIN выполняется только по полю normalized_join_key.\nЛогика будет определена командой разработки.",
+    "title": "Join logic and normalized_join_key not defined",
+    "problem": "The enrichment step mentions a join on `normalized_join_key` but does not define the key or the join logic, leading to unclear enrichment behavior."
+  },
+  {
+    "error_type_id": "U10",
+    "evidence_quote": "Если показатель равен 0, записать 0; одновременно значение 0 считается неизвестным и должно быть записано как NULL, приоритет правил не задан.",
+    "title": "Conflicting rule for zero-valued metrics",
+    "problem": "The classification step states both that a zero metric should be recorded as 0 and that zero should be treated as unknown and recorded as NULL, without priority, causing ambiguous behavior."
+  },
+  {
+    "error_type_id": "U12",
+    "evidence_quote": "FIELD_AVG_THROUGHPUT_KBPS BIGINT NOT NULL\nЕсли показатель равен 0, записать 0; одновременно значение 0 считается неизвестным и должно быть записано как NULL",
+    "title": "NOT NULL field may be assigned NULL due to zero handling rule",
+    "problem": "Fields defined as NOT NULL (e.g., `FIELD_AVG_THROUGHPUT_KBPS`) could be set to NULL according to the zero-value rule, violating the declared data contract."
+  }
+]
