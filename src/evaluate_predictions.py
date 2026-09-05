@@ -18,12 +18,13 @@ from typing import Any, Iterable
 
 from langchain_openrouter import ChatOpenRouter
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+import wandb
 
 from paths import ARTIFACTS_DIR, DATASET_DIR
 
 DEFAULT_GROUND_TRUTH = DATASET_DIR / "corrupted"
 DEFAULT_OUTPUT = ARTIFACTS_DIR / "evaluation" / "latest.json"
-DEFAULT_MODEL = "minimax/minimax-m3"
+DEFAULT_MODEL = "openai/gpt-5.6-luna:nitro"
 PREDICTION_FIELDS = ("error_type_id", "evidence_quote", "title", "problem")
 PROMPT_VERSION = "matching-v5"
 SYSTEM_PROMPT = """Ты — строгий судья качества поиска ошибок в технических заданиях.
@@ -344,6 +345,7 @@ def metrics(tp: int, fp: int, fn: int) -> dict[str, float | int]:
     precision = tp / (tp + fp) if tp + fp else 1.0
     recall = tp / (tp + fn) if tp + fn else 1.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    f2 = 5 * precision * recall / (4 * precision + recall) if precision + recall else 0.0
     return {
         "tp": tp,
         "fp": fp,
@@ -351,6 +353,7 @@ def metrics(tp: int, fp: int, fn: int) -> dict[str, float | int]:
         "precision": round(precision, 6),
         "recall": round(recall, 6),
         "f1": round(f1, 6),
+        "f2": round(f2, 6),
     }
 
 
@@ -443,7 +446,9 @@ def evaluate_case(
     if use_cache and cache_path.exists():
         cached = load_json(cache_path)
         if isinstance(cached, dict) and cached.get("fingerprint") == fingerprint:
-            return cached["result"]
+            result = cached["result"]
+            result.update(metrics(result["tp"], result["fp"], result["fn"]))
+            return result
 
     if judge_predictions and judge_ground_truth:
         candidate_matches, audit = judge.judge(judge_predictions, judge_ground_truth)
@@ -526,9 +531,10 @@ def aggregate_results(
         "macro_precision": round(sum(case["precision"] for case in case_results) / case_count, 6) if case_count else 0.0,
         "macro_recall": round(sum(case["recall"] for case in case_results) / case_count, 6) if case_count else 0.0,
         "macro_f1": round(sum(case["f1"] for case in case_results) / case_count, 6) if case_count else 0.0,
+        "macro_f2": round(sum(case["f2"] for case in case_results) / case_count, 6) if case_count else 0.0,
     }
     return {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "created_at_utc": dt.datetime.now(dt.UTC).isoformat(),
         "judge": {
             "provider": "OpenRouter via LangChain",
@@ -558,7 +564,7 @@ def aggregate_results(
 
 
 def select_ground_truth_files(directory: Path, requested: Iterable[str] | None, limit: int | None) -> list[Path]:
-    paths = sorted(directory.glob("case_*.json"))
+    paths = sorted(directory.glob("*.json"))
     if requested:
         names = set(requested)
         paths = [path for path in paths if path.stem in names]
@@ -567,7 +573,7 @@ def select_ground_truth_files(directory: Path, requested: Iterable[str] | None, 
     if limit is not None:
         paths = paths[:limit]
     if not paths:
-        raise EvaluationError(f"В {directory} не найдены case_*.json")
+        raise EvaluationError(f"В {directory} не найдены ground-truth JSON")
     return paths
 
 
@@ -589,6 +595,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--case", action="append", dest="cases")
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--wandb-project")
+    parser.add_argument("--wandb-entity")
+    parser.add_argument("--wandb-group")
+    parser.add_argument("--wandb-run-name")
     return parser.parse_args(argv)
 
 
@@ -652,6 +662,42 @@ def main(argv: list[str] | None = None) -> int:
             results, args.model, args.ground_truth, args.predictions, failed_cases
         )
         atomic_write_json(args.output, report)
+        if args.wandb_project:
+            wandb_dir = ARTIFACTS_DIR / "wandb"
+            wandb_dir.mkdir(parents=True, exist_ok=True)
+            os.environ.setdefault("WANDB_DATA_DIR", str(wandb_dir))
+            try:
+                with wandb.init(
+                    project=args.wandb_project,
+                    dir=str(wandb_dir),
+                    entity=args.wandb_entity,
+                    group=args.wandb_group,
+                    name=args.wandb_run_name,
+                    job_type="evaluation",
+                    config={
+                        "judge_model": args.model,
+                        "ground_truth": str(args.ground_truth),
+                        "predictions": str(args.predictions),
+                        "workers": args.workers,
+                        "retries": args.retries,
+                        "temperature": None if args.no_temperature else args.temperature,
+                    },
+                ) as tracking:
+                    tracking.log({f"eval/{key}": value for key, value in report["summary"].items()})
+                    tracking.log({
+                        "eval/by_error_type": wandb.Table(
+                            columns=["error_type_id", "tp", "fp", "fn", "precision", "recall", "f1", "f2"],
+                            data=[
+                                [error_type, *(values[key] for key in ("tp", "fp", "fn", "precision", "recall", "f1", "f2"))]
+                                for error_type, values in report["by_error_type"].items()
+                            ],
+                        )
+                    })
+                    artifact = wandb.Artifact(f"{tracking.id}-evaluation", type="evaluation")
+                    artifact.add_file(str(args.output), name=args.output.name)
+                    tracking.log_artifact(artifact)
+            except Exception as error:
+                print(f"WARNING: W&B недоступен: {error}", file=sys.stderr)
         print(json.dumps(report["summary"], ensure_ascii=False, indent=2))
         print(f"Отчет: {args.output}", file=sys.stderr)
         return bool(failed_cases)

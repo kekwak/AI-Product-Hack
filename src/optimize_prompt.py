@@ -24,6 +24,7 @@ from evaluate_predictions import (
     OpenRouterJudge,
     annotate_rows,
     build_case_result,
+    metrics,
     restore_document_indices,
 )
 from paths import ARTIFACTS_DIR, DATASET_DIR
@@ -33,21 +34,52 @@ MODEL = "openai/gpt-5.6-luna:nitro"
 JUDGE_MODEL = "openai/gpt-5.6-luna:nitro"
 
 
+def micro_f2(counts: list[dict[str, int]]) -> float:
+    total = {key: sum(row[key] for row in counts) for key in ("tp", "fp", "fn")}
+    return float(metrics(**total)["f2"])
+
+
+class MicroF2Adapter(LangChainAdapter):
+    def evaluate(self, batch, candidate, capture_traces=False):
+        result = super().evaluate(batch, candidate, capture_traces)
+        counts = [output["state"]["counts"] for output in result.outputs]
+        result.scores = [micro_f2(counts)] * len(result.scores)
+        return result
+
+
 class IterationProgress:
     def __init__(self, total: int):
         self.bar = tqdm(total=total, desc="GEPA", unit="mutation")
         self.best_score: float | None = None
+        self.minibatch_sizes: dict[int, int] = {}
+
+    def on_minibatch_sampled(self, event: dict[str, Any]) -> None:
+        self.minibatch_sizes[event["iteration"]] = len(event["minibatch_ids"])
 
     def on_valset_evaluated(self, event: dict[str, Any]) -> None:
         score = float(event["average_score"])
         if event["iteration"] == 0:
             self.best_score = score
-            tqdm.write(f"Baseline validation macro F1: {score:.4f}")
-        elif event["is_best_program"] and (self.best_score is None or score > self.best_score):
-            self.best_score = score
-            tqdm.write(f"Iteration {event['iteration']}: new best validation macro F1: {score:.4f}")
+            tqdm.write(f"Baseline validation micro F2: {score:.4f}")
+        else:
+            is_new_best = event["is_best_program"] and (
+                self.best_score is None or score > self.best_score
+            )
+            if is_new_best:
+                self.best_score = score
+            suffix = " (new best)" if is_new_best else ""
+            tqdm.write(
+                f"Iteration {event['iteration']}: validation micro F2: {score:.4f}{suffix}"
+            )
         if self.best_score is not None:
             self.bar.set_postfix(best=f"{self.best_score:.4f}")
+
+    def on_candidate_rejected(self, event: dict[str, Any]) -> None:
+        size = self.minibatch_sizes.get(event["iteration"], 1)
+        score = float(event["new_score"]) / size
+        tqdm.write(
+            f"Iteration {event['iteration']}: minibatch micro F2: {score:.4f} (rejected)"
+        )
 
     def on_iteration_end(self, event: dict[str, Any]) -> None:
         self.bar.update()
@@ -61,31 +93,29 @@ class QuietLogger:
         pass
 
 
-def load_split(clean_range: range, case_range: range) -> list[dict[str, Any]]:
+def load_split(name: str) -> list[dict[str, Any]]:
     examples = []
-    for number in clean_range:
-        path = DATASET_DIR / "clean" / f"clean_{number:02d}.md"
-        examples.append({"input": path.read_text(encoding="utf-8"), "errors": [], "id": path.stem})
-    for number in case_range:
-        path = DATASET_DIR / "corrupted" / f"case_{number:03d}.md"
+    for path in sorted((DATASET_DIR / name).glob("*.md")):
         metadata = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
         examples.append({"input": path.read_text(encoding="utf-8"), "errors": metadata["errors"], "id": path.stem})
     return examples
 
 
-def model_options(model: str) -> dict[str, Any]:
+def model_options(model: str, reasoning_effort: str) -> dict[str, Any]:
     return {
         "model": model,
         "api_key": os.environ["OPENROUTER_API_KEY"],
         "max_tokens": 32768,
         "max_retries": 0,
-        "reasoning": {"effort": "high", "exclude": True},
+        "reasoning": {"effort": reasoning_effort, "exclude": True},
         "openrouter_provider": {"require_parameters": True},
     }
 
 
-def make_adapter(model: str, concurrency: int, retries: int) -> tuple[LangChainAdapter, ChatOpenRouter]:
-    chat = ChatOpenRouter(**model_options(model))
+def make_adapter(
+    model: str, reasoning_effort: str, concurrency: int, retries: int
+) -> tuple[LangChainAdapter, ChatOpenRouter]:
+    chat = ChatOpenRouter(**model_options(model, reasoning_effort))
     task = chat.with_structured_output(Findings, method="json_schema", strict=True, include_raw=True)
     judge = OpenRouterJudge(JudgeConfig(
         api_key=os.environ["OPENROUTER_API_KEY"], model=JUDGE_MODEL, temperature=None,
@@ -109,6 +139,7 @@ def make_adapter(model: str, concurrency: int, retries: int) -> tuple[LangChainA
 
     def evaluate(example: dict[str, Any], state: dict[str, Any]) -> tuple[float, str]:
         if error := state.get("error"):
+            state["counts"] = {"tp": 0, "fp": 0, "fn": len(example["errors"])}
             return 0.0, f"Inference failed: {error}"
         predictions = annotate_rows(state["predictions"], example["input"])
         ground_truth = annotate_rows(example["errors"], example["input"])
@@ -124,12 +155,14 @@ def make_adapter(model: str, concurrency: int, retries: int) -> tuple[LangChainA
                         raise
                     time.sleep(2**attempt)
         result = build_case_result(example["id"], predictions, ground_truth, matches, audit, False)
+        state["counts"] = {key: result[key] for key in ("tp", "fp", "fn")}
         feedback = {
             "f1": result["f1"],
+            "f2": result["f2"],
             "false_positives": result["false_positives"],
             "false_negatives": result["false_negatives"],
         }
-        return float(result["f1"]), json.dumps(feedback, ensure_ascii=False)
+        return float(result["f2"]), json.dumps(feedback, ensure_ascii=False)
 
     def reflection_record(
         example: dict[str, Any], state: dict[str, Any], score: float, feedback: str
@@ -140,7 +173,7 @@ def make_adapter(model: str, concurrency: int, retries: int) -> tuple[LangChainA
             "Feedback": feedback,
         }
 
-    return LangChainAdapter(
+    return MicroF2Adapter(
         rollout,
         evaluate,
         num_threads=concurrency,
@@ -159,6 +192,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--concurrency", type=int, default=4)
     parser.add_argument("--retries", type=int, default=2)
     parser.add_argument("--model", default=MODEL)
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("minimal", "low", "medium", "high", "xhigh", "max"),
+        default="high",
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -172,12 +210,17 @@ def main() -> int:
 
     output = args.output or ARTIFACTS_DIR / "gepa" / datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     output.mkdir(parents=True, exist_ok=True)
-    train = load_split(range(1, 7), range(1, 31))
-    validation = load_split(range(7, 9), range(31, 41))
-    test = load_split(range(9, 11), range(41, 51))
-    adapter, reflection_chat = make_adapter(args.model, args.concurrency, args.retries)
+    train = load_split("train")
+    validation = load_split("val")
+    test = load_split("test")
+    adapter, reflection_chat = make_adapter(
+        args.model, args.reasoning_effort, args.concurrency, args.retries
+    )
     seed = {"instructions": BASE_INSTRUCTIONS}
-    print(f"Models: inference/reflection={args.model}, judge={JUDGE_MODEL}")
+    print(
+        f"Models: inference/reflection={args.model} ({args.reasoning_effort}), "
+        f"judge={JUDGE_MODEL}"
+    )
 
     result = optimize(
         seed_candidate=seed,
@@ -193,7 +236,7 @@ def main() -> int:
         run_dir=str(output / "state"),
         display_progress_bar=False,
         callbacks=[IterationProgress(args.iterations)],
-        cache_evaluation=True,
+        cache_evaluation=False,
         seed=42,
     )
 
@@ -201,12 +244,14 @@ def main() -> int:
     (output / "best_prompt.md").write_text(best["instructions"].strip() + "\n", encoding="utf-8")
     report = {
         "model": args.model,
+        "reasoning_effort": args.reasoning_effort,
         "judge_model": JUDGE_MODEL,
         "iterations": args.iterations,
         "split": {"train": len(train), "validation": len(validation), "test": len(test)},
         "validation_history": result.val_aggregate_scores,
-        "baseline_test_macro_f1": score(adapter, test, seed),
-        "optimized_test_macro_f1": score(adapter, test, best),
+        "optimization_metric": "micro_f2",
+        "baseline_test_micro_f2": score(adapter, test, seed),
+        "optimized_test_micro_f2": score(adapter, test, best),
     }
     (output / "metrics.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -217,4 +262,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

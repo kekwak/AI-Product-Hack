@@ -15,10 +15,11 @@ from langchain_openrouter import ChatOpenRouter
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict
 from tqdm import tqdm
+import wandb
 
 from paths import ARTIFACTS_DIR, DATASET_DIR
 
-MODEL = "minimax/minimax-m3"
+MODEL = "openai/gpt-5.6-luna:nitro"
 FULL_PROMPT = r"""Ты проводишь независимое pre-review ТЗ на поток или витрину данных глазами Data Analyst, Data Engineer и QA.
 
 Цель — max recall значимых, доказуемых ошибок без выдуманных замечаний. Ниже без сокращений вставлены шаблон и два нормативных файла с полным описанием D01–D08, T01 и U01–U19. Проверь каждый их пункт; пересказ или замена критериев не допускаются. После этого выполни отдельный проход по значимым противоречиям вне их области и помечай их единым ID `O`.
@@ -344,15 +345,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-file", type=Path, help="GEPA-оптимизированная часть инструкций")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--no-temperature", action="store_true")
-    parser.add_argument("--max-tokens", type=int, default=32768)
+    parser.add_argument("--max-tokens", type=int, default=65536)
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("minimal", "low", "medium", "high", "xhigh", "max"),
+        default="high",
+    )
     parser.add_argument("--no-reasoning", action="store_true")
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--retries", type=int, default=2)
+    parser.add_argument("--wandb-project")
+    parser.add_argument("--wandb-entity")
+    parser.add_argument("--wandb-group")
+    parser.add_argument("--wandb-run-name")
     return parser.parse_args()
 
 
 async def run(args: argparse.Namespace) -> int:
-    documents = sorted(args.input.glob("case_*.md"))
+    documents = sorted(args.input.glob("*.md"))
     if args.cases:
         documents = [path for path in documents if path.stem in set(args.cases)]
     documents = documents[: args.limit] if args.limit else documents
@@ -368,7 +378,9 @@ async def run(args: argparse.Namespace) -> int:
         "openrouter_provider": {"require_parameters": True},
     }
     chat_options["reasoning"] = (
-        {"enabled": False} if args.no_reasoning else {"effort": "high", "exclude": True}
+        {"enabled": False}
+        if args.no_reasoning
+        else {"effort": args.reasoning_effort, "exclude": True}
     )
     if not args.no_temperature:
         chat_options["temperature"] = args.temperature
@@ -380,6 +392,35 @@ async def run(args: argparse.Namespace) -> int:
     graph = build_graph(llm, build_prompt(instructions))
     args.output.mkdir(parents=True, exist_ok=True)
     semaphore = asyncio.Semaphore(args.concurrency)
+    wandb_dir = ARTIFACTS_DIR / "wandb"
+    if args.wandb_project:
+        wandb_dir.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("WANDB_DATA_DIR", str(wandb_dir))
+    tracking = None
+    if args.wandb_project:
+        try:
+            tracking = wandb.init(
+                project=args.wandb_project,
+                dir=str(wandb_dir),
+                entity=args.wandb_entity,
+                group=args.wandb_group,
+                name=args.wandb_run_name,
+                job_type="inference",
+                config={
+                    "model": args.model,
+                    "input": str(args.input),
+                    "output": str(args.output),
+                    "document_count": len(documents),
+                    "concurrency": args.concurrency,
+                    "retries": args.retries,
+                    "temperature": None if args.no_temperature else args.temperature,
+                    "max_tokens": args.max_tokens,
+                    "reasoning_effort": "none" if args.no_reasoning else args.reasoning_effort,
+                    "prompt_file": str(args.prompt_file) if args.prompt_file else None,
+                },
+            )
+        except Exception as error:
+            print(f"WARNING: W&B недоступен: {error}", file=sys.stderr)
 
     with tqdm(total=len(documents), desc="Inference", unit="doc") as progress:
         async def infer_document(path: Path) -> str | None:
@@ -414,6 +455,32 @@ async def run(args: argparse.Namespace) -> int:
         ) if error]
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
+    if tracking:
+        try:
+            outputs = [args.output / f"{path.stem}.json" for path in documents]
+            prediction_count = sum(
+                len(json.loads(path.read_text(encoding="utf-8")))
+                for path in outputs if path.exists()
+            )
+            tracking.log({
+                "inference/documents": len(documents),
+                "inference/succeeded": len(documents) - len(errors),
+                "inference/failed": len(errors),
+                "inference/predictions": prediction_count,
+            })
+            existing_outputs = [path for path in outputs if path.exists()]
+            if existing_outputs:
+                artifact = wandb.Artifact(f"{tracking.id}-predictions", type="predictions")
+                for path in existing_outputs:
+                    artifact.add_file(str(path), name=path.name)
+                tracking.log_artifact(artifact)
+        except Exception as error:
+            print(f"WARNING: не удалось отправить данные в W&B: {error}", file=sys.stderr)
+        finally:
+            try:
+                tracking.finish(exit_code=int(bool(errors)))
+            except Exception as error:
+                print(f"WARNING: не удалось завершить W&B run: {error}", file=sys.stderr)
     return bool(errors)
 
 
@@ -422,4 +489,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

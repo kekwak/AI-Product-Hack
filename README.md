@@ -45,6 +45,9 @@ uv run evaluate-predictions \
 ├── dataset/
 │   ├── clean/                  # 10 чистых документов
 │   ├── corrupted/              # 50 пар: case_XXX.md + ground truth JSON
+│   ├── train/                  # symlink-ссылки: 6 clean + 30 cases
+│   ├── val/                    # symlink-ссылки: 2 clean + 10 cases
+│   ├── test/                   # symlink-ссылки: 2 clean + 10 cases
 │   ├── error_catalog.json      # каталог вариантов ошибок
 │   └── manifest.json           # распределение ошибок по кейсам
 ├── src/
@@ -81,7 +84,7 @@ uv run optimize-prompt \
   --output artifacts/gepa/luna_run_01
 ```
 
-Используется `openai/gpt-5.6-luna:nitro` без параметра temperature для инференса, LLM-судьи и рефлексии. Датасет делится по исходным clean-документам: 01–06 для train, 07–08 для validation, 09–10 для test. Целевая метрика — среднее F1 по документам. Лучшие инструкции сохраняются в `best_prompt.md`, история validation и итоговые test-метрики — в `metrics.json`.
+Используется `openai/gpt-5.6-luna:nitro` без параметра temperature для инференса, LLM-судьи и рефлексии. Датасет делится по исходным clean-документам: 01–06 для train, 07–08 для validation, 09–10 для test. Целевая метрика — macro F2: recall имеет в четыре раза больший вес, чем precision. F1 также сохраняется в отчете. Лучшие инструкции сохраняются в `best_prompt.md`, история validation и итоговые test-метрики — в `metrics.json`.
 
 Запустить обычный инференс с найденным промптом:
 
@@ -124,13 +127,15 @@ uv run infer-documents \
 
 Параметры:
 
-- `--input` — каталог входных `case_*.md`;
+- `--input` — каталог входных `.md`-документов;
 - `--output` — каталог для JSON-предсказаний;
 - `--limit N` — взять первые `N` документов;
 - `--case case_XXX` — выбрать конкретный кейс, флаг можно повторять;
 - `--concurrency N` — число параллельных запросов, по умолчанию `8`;
 - `--temperature N` — температура модели, по умолчанию `0.0`;
 - `--no-temperature` — совсем не отправлять параметр `temperature` модели;
+- `--reasoning-effort` — бюджет reasoning, по умолчанию `high`;
+- `--no-reasoning` — отключить reasoning и оставить весь output-бюджет финальному JSON;
 - `--retries N` — число повторов после первой попытки; по умолчанию `2`, то есть не более 3 попыток всего;
 - `--model MODEL` — модель OpenRouter.
 
@@ -196,6 +201,34 @@ export OPENROUTER_MODEL='minimax/minimax-m3'
 ```
 
 Итоговый отчет содержит общие и покейсовые метрики, результаты по классам ошибок, найденные пары, `FP`, `FN`, токены и стоимость вызовов. Сетевой сбой одного кейса не останавливает остальные: после исчерпания повторов он попадает в `failed_cases`, а частичный отчет сохраняется.
+
+## Weights & Biases
+
+W&B включается только флагом `--wandb-project`. Перед первым запуском выполните `wandb login` или задайте `WANDB_API_KEY`.
+
+Инференс и оценку одного эксперимента связывайте одинаковым `--wandb-group`:
+
+```bash
+uv run infer-documents \
+  --input dataset/val \
+  --model google/gemma-4-31b-it:nitro \
+  --output artifacts/predictions/gemma_4_31b_nitro_val \
+  --wandb-project ai-product-hack \
+  --wandb-group gemma-4-val \
+  --wandb-run-name gemma-4-val-inference
+
+uv run evaluate-predictions \
+  --ground-truth dataset/val \
+  --predictions artifacts/predictions/gemma_4_31b_nitro_val \
+  --model openai/gpt-5.6-luna:nitro \
+  --no-temperature \
+  --output artifacts/evaluation/gemma_4_31b_nitro_val.json \
+  --wandb-project ai-product-hack \
+  --wandb-group gemma-4-val \
+  --wandb-run-name gemma-4-val-evaluation
+```
+
+Inference-run логирует конфигурацию, число обработанных документов и artifact с предсказаниями. Evaluation-run логирует micro/macro-метрики, таблицу по типам ошибок и artifact с полным JSON-отчетом.
 
 ## Генерация датасета
 
