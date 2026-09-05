@@ -1,32 +1,30 @@
 {
   "seed": 20260903,
   "error_count_distribution": {
-    "0": 1,
     "1": 2,
     "2": 2,
     "3": 2,
-    "4": 2,
-    "5": 2,
+    "4": 1,
+    "5": 1,
     "6": 2,
     "7": 2,
-    "8": 2,
+    "8": 1,
     "9": 2,
     "10": 2,
-    "11": 2,
+    "11": 1,
     "12": 2,
-    "13": 2,
+    "13": 6,
     "14": 2,
     "15": 2,
     "16": 2,
-    "17": 2,
+    "17": 6,
     "18": 2,
-    "19": 2,
+    "19": 1,
     "20": 2,
     "21": 2,
     "22": 2,
-    "23": 2,
-    "24": 2,
-    "25": 1
+    "23": 1,
+    "24": 2
   },
   "cases": [
     {
@@ -37,47 +35,47 @@
     {
       "document_id": "case_002",
       "source_clean_document": "clean_01.md",
-      "error_count": 23
+      "error_count": 17
     },
     {
       "document_id": "case_003",
       "source_clean_document": "clean_01.md",
-      "error_count": 5
+      "error_count": 17
     },
     {
       "document_id": "case_004",
       "source_clean_document": "clean_01.md",
-      "error_count": 8
+      "error_count": 17
     },
     {
       "document_id": "case_005",
       "source_clean_document": "clean_01.md",
-      "error_count": 11
+      "error_count": 17
     },
     {
       "document_id": "case_006",
       "source_clean_document": "clean_02.md",
-      "error_count": 4
+      "error_count": 14
     },
     {
       "document_id": "case_007",
       "source_clean_document": "clean_02.md",
-      "error_count": 14
+      "error_count": 13
     },
     {
       "document_id": "case_008",
       "source_clean_document": "clean_02.md",
-      "error_count": 19
+      "error_count": 13
     },
     {
       "document_id": "case_009",
       "source_clean_document": "clean_02.md",
-      "error_count": 0
+      "error_count": 13
     },
     {
       "document_id": "case_010",
       "source_clean_document": "clean_02.md",
-      "error_count": 25
+      "error_count": 13
     },
     {
       "document_id": "case_011",

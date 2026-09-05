@@ -22,7 +22,7 @@
 
 | Описание источника | Ссылка | Описание |
 | :--- | :--- | :--- |
-| Неуказанный справочник | Ссылка на справочник отсутствует | Используется для обогащения; поля и версия не перечислены |
+| `DWH_REF.DICT_SMS_ROUTE_SCD` | [Data Catalog: DICT_SMS_ROUTE_SCD](https://datacatalog.corp.mts.ru/tables/DWH_REF/DICT_SMS_ROUTE_SCD) | PostgreSQL `ref-messaging-prod-01`, модель 2.0; Flink JDBC temporal lookup, версия snapshot закреплена checkpoint. Поля `route_id`, `region_code`, `traffic_channel`; SCD2-интервал UTC `[valid_from_ts, valid_to_ts)`, enum channel: `P2P`, `A2P`, `SERVICE`. |
 
 ### Приемники данных
 
@@ -32,47 +32,29 @@
 
 ### Схема потоков данных
 
+Обязательный порядок: фильтрация → обогащение → агрегация.
+
 `SMS_STATUS_HUB` → `kafka-messaging-prod-02.TOPIC_SMS_FINAL_STATUS_V2` → Flink `sms-delivery-hourly-v2` → валидация/дедупликация → temporal JOIN маршрута → часовая агрегация → Iceberg `TABLE_SMS_DELIVERY_HOURLY`.
 
 Бизнес-ключ: `(FIELD_BIZ_DATE, FIELD_HOUR_UTC, FIELD_REGION_CODE, FIELD_DIRECTION, FIELD_TRAFFIC_CHANNEL)`. Одна строка содержит все финальные исходы своей группы; один принятый `message_id` учитывается один раз.
 
 ### Алгоритм обработки потока
 
-Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.
+Одна бизнес-строка результата соответствует объекту за календарный день.
+
+Реализация сначала обогащает все записи, затем применяет входные фильтры.
 
 #### Шаг 1. Фильтрация данных
 
-Некорректную запись разрешается либо исключить, либо сохранить без изменений.
+Запись с неразбираемым числом или timestamp можно сохранить либо отбросить; правило выбора, quarantine, логирование и влияние на публикацию не определены.
 
-Дополнительно учитываются события только за последние 7 дней.
+Учитываются события не ранее 7 дней назад и не позже 2 часов вперед от текущего времени на стороне обработки; момент фиксации текущего времени и включение границ не определены.
 
-Replay использует отдельные выгрузочные фильтры, которые будут согласованы позднее.
+Online-расчет и replay используют разные наборы фильтров из кода приложения; конкретные условия, границы и исключения в документации не перечислены.
 
-Онлайн применяет стандартные фильтры качества, перечень которых хранится в коде.
+#### Шаг 2. Обогащение данных
 
-Event time — `final_status_ts`, epoch milliseconds UTC. Сначала принять декодированные change records с `operation IN ('UPSERT','DELETE')`, непустыми `message_id`, `final_status_ts`, `status_revision >= 1` и Kafka key, равным payload `message_id`. Дедуплицировать по `message_id`: выбрать максимальный `status_revision`, затем максимальные `(kafka_partition, kafka_offset)`. Winning `DELETE` удаляет сообщение из агрегата исходного часа. Одинаковый revision и порядок при различном payload блокируют commit checkpoint.
-
-Для winning `UPSERT` применить все условия:
-
-```sql
-message_id RLIKE '^[A-Za-z0-9-]{20,80}$'
-AND operation = 'UPSERT'
-AND status IN ('DELIVERED', 'FAILED', 'EXPIRED')
-AND direction IN ('MO', 'MT')
-AND route_id IS NOT NULL
-AND is_test = false
-AND submit_ts <= final_status_ts
-AND final_status_ts >= TIMESTAMP '2025-01-01 00:00:00 UTC'
-AND final_status_ts <= processing_ts + INTERVAL 2 MINUTES
-```
-
-NULL не проходит соответствующее условие. Ошибки schema/JSON, enum, времени и обязательных полей исключаются и учитываются раздельно; payload, адреса и текст не журналируются. Поля MSISDN и message body отсутствуют в контракте источника. Пустой поток штатен; недоступность Kafka или Schema Registry приостанавливает job без commit offsets.
-
-#### Этап B. Подготовка
-
-При нескольких совпадениях со справочником в результат передаются все найденные варианты.
-
-После основного JOIN выполняется проверка по дополнительному корпоративному справочнику; его имя и версия не зафиксированы.
+JOIN со справочником выполняется по идентификатору; при нескольких совпадениях сохраняются все строки, ожидаемая кардинальность и допустимость размножения результата не определены.
 
 Temporal `LEFT JOIN` по `event.route_id = ref.route_id` и `final_status_ts` в `[valid_from_ts, valid_to_ts)`. Ожидаемая кардинальность many-to-zero-or-one. При нескольких совпадениях checkpoint не коммитится и поднимается ошибка справочника.
 
@@ -80,11 +62,11 @@ Temporal `LEFT JOIN` по `event.route_id = ref.route_id` и `final_status_ts` �
 
 #### Шаг 3. Агрегация и расчёт показателей
 
-После расчета агрегатов дубли удаляются по идентификатору исходного события.
+Затем для каждого бизнес-ключа требуется выбрать строку с максимальной revision.
 
-Сначала все входные строки агрегируются без дедупликации.
+Сначала выполняется DISTINCT по бизнес-полям без revision, поле revision после этого недоступно.
 
-Если несколько последних записей имеют одинаковое время, сохраняется любая из них.
+При одновременном наличии primary_value и fallback_value выбирается любое из них; приоритет не задан.
 
 1. `FIELD_BIZ_DATE` и `FIELD_HOUR_UTC` вычислить из `final_status_ts` в UTC; часовой интервал полуоткрытый `[H, H+1)`.
 2. Сгруппировать по бизнес-ключу.
@@ -95,13 +77,15 @@ Temporal `LEFT JOIN` по `event.route_id = ref.route_id` и `final_status_ts` �
 
 #### Шаг 4. Поздние данные, запись и replay
 
-Watermark — максимальный `final_status_ts` минус 30 минут. Событие ровно на watermark принимается. До закрытия watermark каждый checkpoint записывает полный aggregate snapshot всех групп затронутой часовой партиции, а не только изменённые строки; в H+31 минут выполняется финализирующая атомарная замена и устанавливается `FIELD_IS_FINAL=true`.
+Watermark — максимальный `final_status_ts` минус 30 минут; idle Kafka partitions исключаются из его минимума после 5 минут без сообщений. Событие ровно на watermark принимается; после его прохождения действует allowed lateness 1 минута, и час не финализируется раньше H+31. До финализации каждый checkpoint записывает полный aggregate snapshot всех групп затронутой часовой партиции, а не только изменённые строки. Независимый processing-time timer в H+31 минут закрывает час даже при пустом или остановившемся потоке: выполняется атомарная замена и устанавливается `FIELD_IS_FINAL=true`.
 
 Более позднее событие учитывается в `too_late_cnt` и ставит час в очередь replay. Replay доступен за Kafka retention 14 дней: читает полный сохранённый диапазон offsets часа, применяет ту же дедупликацию и атомарно заменяет час. Для периода старше retention авторитетного сырья в скоупе продукта нет: партиция не меняется, отклонение эскалируется владельцу источника. Если correction переносит `final_status_ts` в другой час, replay атомарно пересчитывает обе затронутые партиции; winning `DELETE` пересчитывает исходный час.
 
 Iceberg commit атомарен: частичные файлы не видны читателям. При падении до commit Flink восстанавливает offsets и state из checkpoint; при падении после commit Iceberg commit ID не применяется повторно. Замена целой партиции и детерминированная агрегация делают retry идемпотентным. Исправление revision и tombstone требуют replay часа исходного финального статуса.
 
-### Формирование ключа (kafka) / партиции (hdfs)
+### Параметры выполнения
+
+Ключ дополнительно включает run_id и processing_timestamp, которые меняются при каждом повторном расчете.
 
 - Входной Kafka key: `message_id` UTF-8. Kafka-приёмник отсутствует.
 - HDFS/Iceberg partitions: `days(FIELD_BIZ_DATE)` и identity `FIELD_HOUR_UTC`; полный путь `/warehouse/cdm/messaging/sms_delivery_hourly/`.
@@ -109,13 +93,13 @@ Iceberg commit атомарен: частичные файлы не видны �
 
 ### Структура данных
 
-Если одноименное поле найдено в нескольких источниках, выбирается любое доступное значение.
+Поле resolved_value заполняется из primary_value или fallback_value; оба значения могут присутствовать и различаться.
 
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| FIELD_BIZ_DATE | DATE | UTC-дата final status; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT | Epoch ms → date |
-| FIELD_HOUR_UTC | TINYINT | UTC-час 0–23; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT | Epoch ms → hour |
+| FIELD_BIZ_DATE | DATE | UTC-дата final status; обязательность поля `FIELD_BIZ_DATE` не определена | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT | Epoch ms → date |
+| FIELD_HOUR_UTC | TINYINT | UTC-час 0–23; обязательность поля `FIELD_HOUR_UTC` не определена | `TOPIC_SMS_FINAL_STATUS_V2` | `final_status_ts` | BIGINT | Epoch ms → hour |
 | FIELD_REGION_CODE | STRING | Регион либо `UNKNOWN`; `NOT NULL` | `DICT_SMS_ROUTE_SCD` | `region_code` | STRING | Temporal JOIN/fallback |
 | FIELD_DIRECTION | STRING | `MO` или `MT`; `NOT NULL` | `TOPIC_SMS_FINAL_STATUS_V2` | `direction` | STRING | Валидированный enum |
 | FIELD_TRAFFIC_CHANNEL | STRING | `P2P`, `A2P`, `SERVICE` или `UNKNOWN`; `NOT NULL` | `DICT_SMS_ROUTE_SCD` | `traffic_channel` | STRING | Temporal JOIN/fallback |

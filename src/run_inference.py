@@ -15,13 +15,14 @@ from langchain_openrouter import ChatOpenRouter
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict
 from tqdm import tqdm
+import wandb
 
 from paths import ARTIFACTS_DIR, DATASET_DIR
 
-MODEL = "minimax/minimax-m3"
+MODEL = "openai/gpt-5.6-luna:nitro"
 FULL_PROMPT = r"""Ты проводишь независимое pre-review ТЗ на поток или витрину данных глазами Data Analyst, Data Engineer и QA.
 
-Цель — max recall значимых ошибок. Ниже без сокращений вставлены шаблон и два нормативных файла с полным описанием D01–D08, T01 и U01–U19. Проверь каждый их пункт; пересказ или замена критериев не допускаются.
+Цель — max recall значимых, доказуемых ошибок без выдуманных замечаний. Ниже без сокращений вставлены шаблон и два нормативных файла с полным описанием D01–D08, T01 и U01–U19. Проверь каждый их пункт; пересказ или замена критериев не допускаются. После этого выполни отдельный проход по значимым противоречиям вне их области и помечай их единым ID `O`.
 
 Обязательный внутренний проход внутри единственного вызова:
 1. Мысленно восстанови назначение, гранулярность, источники, приемники и полный алгоритм.
@@ -29,22 +30,36 @@ FULL_PROMPT = r"""Ты проводишь независимое pre-review ТЗ
    D01, D02, D03, D04, D05, D06, D07, D08,
    T01,
    U01, U02, U03, U04, U05, U06, U07, U08, U09, U10, U11, U12, U13, U14, U15, U16, U17, U18, U19.
-3. Обязательно обработай каждый ID без пропусков. Для каждого: прочитай его полное определение ниже, проверь все относящиеся к нему места документа и мысленно поставь PASS либо FAIL с конкретным доказательством.
+3. Обязательно обработай каждый ID без пропусков. Для каждого прочитай его полное определение, проверь все относящиеся места документа и внутренне поставь PASS либо FAIL. Этот внутренний чек-лист никогда не выводи.
 4. Для T01 отдельно сверь каждый обязательный раздел, поле, шаг, таблицу, колонку, 10 строк примера, DDL, FAQ и историю изменений с приложенным шаблоном. Все нарушения T01 объедини в одно замечание.
 5. Для каждого U-критерия примени обычный случай, границу, отсутствие, множественность, повтор/порядок и изменение/сбой, если состояние применимо.
 6. Сверь между собой текст, таблицы, схему, алгоритм, DDL, примеры и FAQ. Отдельно ищи локальные фразы, противоречащие другим частям документа.
-7. Не завершай анализ, пока всем 28 ID не присвоен внутренний PASS или FAIL. В ответ перенеси каждую позицию с FAIL и ни одной с PASS.
+7. Не завершай внутренний анализ, пока всем 28 ID не присвоен PASS или FAIL. Затем выполни отдельный open-world проход `O`: ищи только конкретные значимые противоречия, которые не покрывает ни один D/T/U-критерий. В финальный `errors` перенеси только доказанные ошибки. Количество проверок никак не определяет количество элементов ответа.
 8. Создавай замечание только по правилам «Когда создавать замечание». Объедини проявления одной корневой причины; разные причины не склеивай. Не придирайся к стилю и не выдумывай контекст.
-9. Пустой список допустим только когда все 28 позиций получили PASS.
+9. Перед ответом выполни финальную фильтрацию кандидатов. Удали замечание, если оно:
+   - подтверждает, что текст корректен, согласован или уже содержит требуемое правило;
+   - основано только на желании получить больше технических подробностей, хотя документ уже позволяет однозначно реализовать и проверить поведение;
+   - требует элемент, которого нет в буквальном определении соответствующего критерия;
+   - строится на гипотетической сущности, поле, источнике или формате, которых нет в документе;
+   - не содержит конкретного негативного последствия именно для описанного результата.
+10. Отсутствие дополнительной реализации, инфраструктурной настройки, SQL `CHECK`, полного текста внешней схемы или повторного описания уже заданного правила само по себе не является ошибкой, если критерий этого буквально не требует.
+11. Не создавай замечание ради заполнения ID. Нормальный ответ может содержать 0, 1 или несколько ошибок. Если все 28 критериев получили PASS и ошибок `O` нет, обязательный ответ — `{"errors": []}`.
 
 Требования к ответу:
 - evidence_quote — дословный фрагмент проверяемого документа, достаточный для поиска проблемного места; не пересказывай его;
 - title — короткое название конкретной ошибки по контексту документа;
 - problem — кратко объясни неоднозначность/противоречие и возможное последствие; не предлагай автоисправление;
-- если ошибок нет, верни пустой errors;
+- error_type_id — ровно один ID из D01–D08, T01, U01–U19 или `O`; составные и собственные ID запрещены;
+- каждый элемент `errors` обязан утверждать конкретный дефект; элементы с выводом `OK`, `PASS`, «корректно», «согласовано» или «ошибки нет» запрещены;
+- если ошибок нет, верни ровно `{"errors": []}`;
 - не раскрывай рассуждения и не добавляй текст вне структурированного ответа.
 
-Ниже приведены нормативные первоисточники. Следуй им буквально; не добавляй собственные классы ошибок.
+Пример финального ответа для полностью корректного документа:
+`{"errors": []}`
+
+Важно: требование проверить все 28 ID относится только к внутреннему анализу. Оно не означает, что нужно вернуть 28 элементов.
+
+Ниже приведены нормативные первоисточники. Следуй им буквально. Допустимы только D01–D08, T01, U01–U19 и единый fallback-класс `O`.
 
 # ПЕРВОИСТОЧНИК: Шаблоны документации.md
 
@@ -135,6 +150,17 @@ DDL схема таблицы
 | **D06** | Не указан Kafka-кластер | Для каждого потокового источника и приемника указано точное имя Kafka-кластера. |
 | **D07** | Неполное описание файлового хранилища | Для каждого файлового приемника указан полный путь в HDFS и формат хранения. |
 | **D08** | Не перечислены справочники | Указаны все справочники и нормативно-справочные данные, используемые при формировании витрины; при их отсутствии это написано явно. |
+
+## Приоритет доменных ошибок и границы с универсальными
+
+Если одна причина одновременно похожа на ошибку D и U, используется класс D; второй раз та же причина как U не размечается. D фиксирует отсутствие обязательной для данного вида документа информации, а U — логический дефект уже приведенного содержательного правила.
+
+- `D01` имеет приоритет для неполного контракта сериализации потока; `U12` применяется к контракту отдельного поля, а `U13` — к поведению обработки при фактической ошибке чтения.
+- `D03` имеет приоритет, когда не указана только обязательность поля; `U12` применяется к другим характеристикам поля или к противоречию между ними.
+- `D04` имеет приоритет, когда точные условия типовых фильтров отсутствуют или заменены ссылкой на код; `U07` применяется, когда фильтр описан содержательно, но его границы, NULL-семантика или момент применения неоднозначны.
+- `D05` имеет приоритет, когда обязательный этап присутствует лишь формально, пуст, содержит `TBD` или не отмечен как неприменимый; `U06`, `U08` и `U09` применяются только к содержательно описанному этапу с логическим пробелом.
+- `D08` имеет приоритет, когда справочник не перечислен или не идентифицирован; `U08` применяется к указанному справочнику, если не определены ключ, тип JOIN, кардинальность, актуальность или fallback.
+- `T01` применяется к отсутствующему структурному элементу. Если раздел или шаг существует, но не заполнен и не помечен как неприменимый, используется `D05`, а не `T01`.
 ```
 
 ## Тип 2 — ошибки соответствия шаблону
@@ -187,6 +213,24 @@ DDL схема таблицы
 | **U17. Согласованность частей документа** | Текст, таблицы, схема, DDL, формулы, примеры, FAQ | Одинаковы ли названия, типы, поля, источники, периоды и правила во всех представлениях. Соответствует ли DDL описанной структуре. Проходят ли примеры через заявленный алгоритм и дают ли ожидаемый результат. Не опровергает ли частный комментарий общее правило. |
 | **U18. Проверяемость и контроль результата** | Ожидаемый результат, примеры, критерии приемки, проверки качества | Можно ли построить объективный pass/fail тест без догадок. Есть ли проверяемые инварианты: уникальность, полнота, допустимые значения, контрольные количества или суммы. Можно ли обнаружить потерю, размножение, устаревание или неверный расчет данных. Понятно ли, как сверить результат с источником. |
 | **U19. Доступ и чувствительные данные** | Поля с ограничениями, правила публикации и хранения | Если зона применима: кто может читать результат, какие поля нужно маскировать или исключать, не попадают ли чувствительные значения в примеры, логи и технические таблицы, согласован ли срок хранения с назначением данных. |
+
+## Разграничение с доменными и шаблонными ошибками
+
+Одна корневая причина размечается один раз. Если она удовлетворяет определению D, используется D; универсальный класс для той же причины не добавляется.
+
+- `U07` не используется вместо `D04`: U07 требует, чтобы фильтр был содержательно задан, но имел неоднозначную границу, NULL-семантику или порядок применения.
+- `U06`, `U08` и `U09` не используются вместо `D05`: они требуют содержательного описания шага. Пустой шаг, `TBD` или фраза «определит разработчик» размечаются как D05.
+- `U08` не используется вместо `D08`: для U08 справочник или соединяемый набор уже должен быть однозначно идентифицирован; дефект относится к механике JOIN, актуальности, кардинальности или fallback.
+- `U12` не используется вместо `D03`, если отсутствует только признак `NULLABLE`/`NOT NULL`, и не используется вместо `D01` для неполной сериализации потока.
+- `U13` описывает реакцию на конкретный невалидный вход или сбой, а не отсутствие формата/схемы сериализации как части контракта.
+- `U17` не добавляется к простому отсутствию сведений. Он применяется, когда две присутствующие части документа прямо несовместимы.
+- `T01` означает отсутствие обязательного структурного элемента; присутствующий, но незаполненный обязательный этап относится к D05.
+
+## O. Значимая ошибка вне заданных классов
+
+`O` — единый fallback-ID для значимой и доказуемой ошибки, которая не подходит ни под один из D01–D08, T01 и U01–U19. Перед выбором `O` нужно убедиться, что нет более точного D/T/U-ID. Одна корневая причина не дублируется как `O` и D/T/U.
+
+`O` не используется для простого отсутствия деталей, стилистического замечания или гипотетического риска. Фиксируется только конкретное противоречие или дефект с проверяемым негативным последствием. Отдельно проверяются взаимоисключающие операционные и регламентные правила: владение инцидентом, согласование публикации, классификация и закрытие инцидента, календарь поддержки, полномочия на исправление справочника и rollback, канал эскалации, полномочия приемки и сроки восстановления.
 
 ## Универсальный проход по каждому правилу
 
@@ -245,6 +289,12 @@ DDL схема таблицы
 ```
 """
 
+BASE_INSTRUCTIONS = """Ищи максимум доказуемых ошибок. Перед ответом удаляй ложные замечания, которые уже закрыты текстом документа."""
+
+
+def build_prompt(instructions: str = BASE_INSTRUCTIONS) -> str:
+    return f"{FULL_PROMPT}\n\n{instructions.strip()}"
+
 
 class Finding(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -266,12 +316,14 @@ class State(TypedDict):
     findings: list[dict[str, str]]
 
 
-def build_graph(model):
+def build_graph(model, prompt: str = FULL_PROMPT):
     async def infer(state: State) -> State:
         response = await model.ainvoke(
-            [("system", FULL_PROMPT), ("human", f"# ПРОВЕРЯЕМЫЙ ДОКУМЕНТ\n\n```\n{state['document']}\n```")]
+            [("system", prompt), ("human", f"# ПРОВЕРЯЕМЫЙ ДОКУМЕНТ\n\n```\n{state['document']}\n```")]
         )
-        result = response["parsed"]
+        result = response.get("parsed")
+        if not isinstance(result, Findings):
+            raise ValueError(response.get("parsing_error") or "модель вернула пустой ответ")
         return {"findings": [item.model_dump() for item in result.errors]}
 
     return (
@@ -290,13 +342,27 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case", action="append", dest="cases")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--model", default=os.getenv("INFERENCE_MODEL", MODEL))
+    parser.add_argument("--prompt-file", type=Path, help="GEPA-оптимизированная часть инструкций")
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--no-temperature", action="store_true")
+    parser.add_argument("--max-tokens", type=int, default=65536)
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=("minimal", "low", "medium", "high", "xhigh", "max"),
+        default="high",
+    )
+    parser.add_argument("--no-reasoning", action="store_true")
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--retries", type=int, default=2)
+    parser.add_argument("--wandb-project")
+    parser.add_argument("--wandb-entity")
+    parser.add_argument("--wandb-group")
+    parser.add_argument("--wandb-run-name")
     return parser.parse_args()
 
 
 async def run(args: argparse.Namespace) -> int:
-    documents = sorted(args.input.glob("case_*.md"))
+    documents = sorted(args.input.glob("*.md"))
     if args.cases:
         documents = [path for path in documents if path.stem in set(args.cases)]
     documents = documents[: args.limit] if args.limit else documents
@@ -304,20 +370,57 @@ async def run(args: argparse.Namespace) -> int:
         print("ERROR: документы не найдены", file=sys.stderr)
         return 2
 
-    chat = ChatOpenRouter(
-        model=args.model,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        temperature=0,
-        max_tokens=8192,
-        max_retries=1,
-        reasoning={"effort": "high", "exclude": True},
-        openrouter_provider={"require_parameters": True},
+    chat_options: dict[str, Any] = {
+        "model": args.model,
+        "api_key": os.getenv("OPENROUTER_API_KEY"),
+        "max_tokens": args.max_tokens,
+        "max_retries": 0,
+        "openrouter_provider": {"require_parameters": True},
+    }
+    chat_options["reasoning"] = (
+        {"enabled": False}
+        if args.no_reasoning
+        else {"effort": args.reasoning_effort, "exclude": True}
     )
+    if not args.no_temperature:
+        chat_options["temperature"] = args.temperature
+
+    chat = ChatOpenRouter(**chat_options)
 
     llm = chat.with_structured_output(Findings, method="json_schema", strict=True, include_raw=True)
-    graph = build_graph(llm)
+    instructions = args.prompt_file.read_text(encoding="utf-8") if args.prompt_file else BASE_INSTRUCTIONS
+    graph = build_graph(llm, build_prompt(instructions))
     args.output.mkdir(parents=True, exist_ok=True)
     semaphore = asyncio.Semaphore(args.concurrency)
+    wandb_dir = ARTIFACTS_DIR / "wandb"
+    if args.wandb_project:
+        wandb_dir.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("WANDB_DATA_DIR", str(wandb_dir))
+    tracking = None
+    if args.wandb_project:
+        try:
+            tracking = wandb.init(
+                project=args.wandb_project,
+                dir=str(wandb_dir),
+                entity=args.wandb_entity,
+                group=args.wandb_group,
+                name=args.wandb_run_name,
+                job_type="inference",
+                config={
+                    "model": args.model,
+                    "input": str(args.input),
+                    "output": str(args.output),
+                    "document_count": len(documents),
+                    "concurrency": args.concurrency,
+                    "retries": args.retries,
+                    "temperature": None if args.no_temperature else args.temperature,
+                    "max_tokens": args.max_tokens,
+                    "reasoning_effort": "none" if args.no_reasoning else args.reasoning_effort,
+                    "prompt_file": str(args.prompt_file) if args.prompt_file else None,
+                },
+            )
+        except Exception as error:
+            print(f"WARNING: W&B недоступен: {error}", file=sys.stderr)
 
     with tqdm(total=len(documents), desc="Inference", unit="doc") as progress:
         async def infer_document(path: Path) -> str | None:
@@ -334,8 +437,15 @@ async def run(args: argparse.Namespace) -> int:
                         )
                         return None
                     except Exception as error:
+                        tqdm.write(
+                            f"ERROR: {path.stem}: попытка {attempt + 1}/{args.retries + 1}: "
+                            f"{str(error).splitlines()[0]}"
+                        )
                         if attempt == args.retries:
                             return f"{path.stem}: {str(error).splitlines()[0]}"
+                        tqdm.write(
+                            f"{path.stem}: повтор через {2**attempt}с"
+                        )
                         await asyncio.sleep(2**attempt)
             finally:
                 progress.update()
@@ -345,6 +455,32 @@ async def run(args: argparse.Namespace) -> int:
         ) if error]
     for error in errors:
         print(f"ERROR: {error}", file=sys.stderr)
+    if tracking:
+        try:
+            outputs = [args.output / f"{path.stem}.json" for path in documents]
+            prediction_count = sum(
+                len(json.loads(path.read_text(encoding="utf-8")))
+                for path in outputs if path.exists()
+            )
+            tracking.log({
+                "inference/documents": len(documents),
+                "inference/succeeded": len(documents) - len(errors),
+                "inference/failed": len(errors),
+                "inference/predictions": prediction_count,
+            })
+            existing_outputs = [path for path in outputs if path.exists()]
+            if existing_outputs:
+                artifact = wandb.Artifact(f"{tracking.id}-predictions", type="predictions")
+                for path in existing_outputs:
+                    artifact.add_file(str(path), name=path.name)
+                tracking.log_artifact(artifact)
+        except Exception as error:
+            print(f"WARNING: не удалось отправить данные в W&B: {error}", file=sys.stderr)
+        finally:
+            try:
+                tracking.finish(exit_code=int(bool(errors)))
+            except Exception as error:
+                print(f"WARNING: не удалось завершить W&B run: {error}", file=sys.stderr)
     return bool(errors)
 
 
@@ -353,4 +489,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

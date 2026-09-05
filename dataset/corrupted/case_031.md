@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | Apache Iceberg v2, Parquet `ZSTD`; схема Hive Metastore `RAW_BILLING.TABLE_ROAMING_CDR` версии 3.2; десериализация Spark Iceberg reader по snapshot ID. Для расчёта фиксируется один snapshot на запуск. |
+| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/`; raw-строки и snapshot history хранятся 5 лет | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | Apache Iceberg v2, Parquet `ZSTD`; схема Hive Metastore `RAW_BILLING.TABLE_ROAMING_CDR` версии 3.2; десериализация Spark Iceberg reader по snapshot ID. Для расчёта фиксируется один snapshot на запуск. |
 
 ### Источники обогащения данных
 
@@ -40,7 +40,7 @@
 
 #### Шаг 1. Фильтрация данных
 
-Дополнительно учитываются события только за последние 7 дней.
+Учитываются события не ранее 7 дней назад и не позже 2 часов вперед от текущего времени на стороне обработки; момент фиксации текущего времени и включение границ не определены.
 
 Расчёт дня D читает change records источника по `session_start_ts` в полуоткрытом UTC-интервале `[D 00:00:00, D+1 00:00:00)`. Контракт источника требует полный business payload, исходный `session_start_ts`, непустые `cdr_id`, `source_update_ts`, `source_file_name`, `source_row_number` и `operation IN ('INSERT','UPDATE','DELETE')` для любой операции, включая `DELETE`.
 
@@ -86,7 +86,7 @@ AND charge_rub >= 0
 
 - Предварительный запуск D выполняется D+1 в 05:00 UTC по snapshot, созданному не раньше D+1 04:50 UTC. Финальный запуск — D+8 в 05:00 UTC.
 - CDR, появившиеся до финального cutoff D+8 05:00 UTC, включаются при следующей полной замене D. Запись ровно на cutoff входит, если её `source_update_ts <= D+8 05:00:00.000 UTC`.
-- Более поздняя вставка, исправление или tombstone создаёт контроль `post_final_change_cnt` и задачу полного пересчёта D. Автоматический backfill разрешён за последние 90 дней; более старые даты — по заявке финансового контролёра.
+- Более поздняя вставка, исправление или tombstone создаёт контроль `post_final_change_cnt` и задачу полного пересчёта D. Автоматический backfill разрешён за последние 90 дней; период от 91 дня до 5 лет пересчитывается по заявке финансового контролёра и явному snapshot ID. Более старый период недоступен из-за raw-retention и эскалируется владельцу источника без изменения результата.
 - Запись — атомарный Iceberg `overwritePartitions` только для D. До commit проверяются уникальность ключа, неотрицательность метрик и сверка с контрольными суммами источника. При сбое snapshot не публикуется. Retry с тем же snapshot ID детерминирован; retry с новым snapshot пересчитывает D целиком.
 
 ### Формирование ключа (kafka) / партиции (hdfs)
@@ -101,7 +101,7 @@ AND charge_rub >= 0
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
 | FIELD_BIZ_DATE | DATE | Дата начала CDR в UTC; обязательность поля `FIELD_BIZ_DATE` не определена | `TABLE_ROAMING_CDR` | `session_start_ts` | TIMESTAMP | UTC date |
-| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; обязательность поля `FIELD_HOME_REGION_CODE` не определена | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
+| FIELD_HOME_REGION_CODE | STRING | Домашний регион, 2–8 символов; `NOT NULL` | `TABLE_ROAMING_CDR` | `home_region_code` | STRING | Валидируется regex |
 | FIELD_VISITED_COUNTRY_CODE | CHAR(2) | ISO alpha-2 или `ZZ`; `NOT NULL` | `DICT_MCC_COUNTRY_SCD` | `country_code` | CHAR(2) | Temporal JOIN, fallback `ZZ` |
 | FIELD_SERVICE_TYPE | STRING | `VOICE`, `SMS` или `DATA`; `NOT NULL` | `TABLE_ROAMING_CDR` | `service_type` | STRING | Без преобразования |
 | FIELD_SESSIONS_CNT | BIGINT | Число финальных уникальных CDR, >= 1; `NOT NULL` | `TABLE_ROAMING_CDR` | `cdr_id` | STRING | `COUNT(*)` после дедупликации |

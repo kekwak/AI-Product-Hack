@@ -16,7 +16,7 @@
 
 | Описание источника | Тип источника | Ссылка на источник | Сериализация |
 | :--- | :--- | :--- | :--- |
-| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/` | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | Apache Iceberg v2, Parquet `ZSTD`; схема Hive Metastore `RAW_BILLING.TABLE_ROAMING_CDR` версии 3.2; десериализация Spark Iceberg reader по snapshot ID. Для расчёта фиксируется один snapshot на запуск. |
+| `RAW_BILLING.TABLE_ROAMING_CDR`, полный путь `/warehouse/raw/billing/roaming_cdr/`; raw-строки и snapshot history хранятся 5 лет | HDFS/Iceberg, кластер `hadoop-billing-prod-02` | [Data Catalog: TABLE_ROAMING_CDR](https://datacatalog.corp.mts.ru/tables/RAW_BILLING/TABLE_ROAMING_CDR) | Apache Iceberg v2, Parquet `ZSTD`; схема Hive Metastore `RAW_BILLING.TABLE_ROAMING_CDR` версии 3.2; десериализация Spark Iceberg reader по snapshot ID. Для расчёта фиксируется один snapshot на запуск. |
 
 ### Источники обогащения данных
 
@@ -84,7 +84,7 @@ AND charge_rub >= 0
 
 - Предварительный запуск D выполняется D+1 в 05:00 UTC по snapshot, созданному не раньше D+1 04:50 UTC. Финальный запуск — D+8 в 05:00 UTC.
 - CDR, появившиеся до финального cutoff D+8 05:00 UTC, включаются при следующей полной замене D. Запись ровно на cutoff входит, если её `source_update_ts <= D+8 05:00:00.000 UTC`.
-- Более поздняя вставка, исправление или tombstone создаёт контроль `post_final_change_cnt` и задачу полного пересчёта D. Автоматический backfill разрешён за последние 90 дней; более старые даты — по заявке финансового контролёра.
+- Более поздняя вставка, исправление или tombstone создаёт контроль `post_final_change_cnt` и задачу полного пересчёта D. Автоматический backfill разрешён за последние 90 дней; период от 91 дня до 5 лет пересчитывается по заявке финансового контролёра и явному snapshot ID. Более старый период недоступен из-за raw-retention и эскалируется владельцу источника без изменения результата.
 - Запись — атомарный Iceberg `overwritePartitions` только для D. До commit проверяются уникальность ключа, неотрицательность метрик и сверка с контрольными суммами источника. При сбое snapshot не публикуется. Retry с тем же snapshot ID детерминирован; retry с новым snapshot пересчитывает D целиком.
 
 ### Формирование ключа (kafka) / партиции (hdfs)

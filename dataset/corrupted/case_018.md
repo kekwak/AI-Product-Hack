@@ -26,8 +26,6 @@
 
 ### Приемники данных
 
-Одна строка приемника является суточным агрегатом объекта.
-
 | Описание данных | Кластер | Ссылка на Каталог | Сериализация |
 | :--- | :--- | :--- | :--- |
 | Hive-таблица `prod_transport.NET_TRANSPORT_LINK_HOUR` | HDFS-кластер `hdfs-prod-03`, полный путь `/data/prod/transport/link_hour/` | [Data Catalog: NET_TRANSPORT_LINK_HOUR](https://datacatalog.mts.ru/tables/prod-transport-net-transport-link-hour) | Parquet 2.9, Snappy; логическая схема `transport.link-hour` версии `1`; Spark writer по именам полей, decimals записываются как fixed-length byte array, timestamps — `TIMESTAMP_MICROS` UTC |
@@ -44,15 +42,13 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 
 ### Алгоритм обработки потока
 
-Каждое прошедшее фильтр событие записывается отдельной строкой без агрегации.
-
 `observed_at_utc` — event time в epoch milliseconds UTC. Исходные `rx_octets` и `tx_octets` — накопительные unsigned 64-bit счетчики по интерфейсу. Гранулярность результата — `(link_id, hour_start_utc)`, час является полуинтервалом `[hour_start_utc, hour_start_utc + 1 hour)`.
 
 #### Шаг 1. Фильтрация данных
 
 1. При ошибке Avro или неизвестном schema ID consumer выполняет retry через 10, 30 и 60 секунд, затем останавливает Kafka partition без commit offset и создает алерт `TRANSPORT_SCHEMA_BLOCKED`.
 2. Обязательны непустые `event_id`, `device_id`, `interface_name`, `observed_at_utc`, `ingest_time_utc`; оба счетчика лежат в `0..18446744073709551615`; `oper_status IN ('UP','DOWN','UNKNOWN')`; `observed_at_utc <= ingest_time_utc + 5 minutes`. Невалидная запись исключается и учитывается в `rejected_interface_samples_total{reason}`.
-3. Дубли `event_id` выбираются по максимальному `ingest_time_utc`, затем SHA-256 payload. Дубли `(device_id, interface_name, observed_at_utc)` выбираются по максимальному `ingest_time_utc`, затем `event_id`.
+3. Дубли `event_id` выбираются по максимальному `ingest_time_utc`, затем по лексикографически максимальному SHA-256 от исходных байтов Kafka value. Дубли `(device_id, interface_name, observed_at_utc)` выбираются по максимальному `ingest_time_utc`, затем `event_id`.
 4. Поздние после watermark записи не меняют опубликованный час онлайн, считаются в `late_interface_samples_total` и включаются в hourly replay последних 96 часов.
 
 #### Шаг 2. Обогащение данных
@@ -66,16 +62,16 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 
 #### Шаг 3. Расчет дельт и агрегация
 
-При NULL status записывается значение UNKNOWN.
-
 1. Валидные дедуплицированные source-точки сортируются по `(device_id, interface_name, observed_at_utc, event_id)`. Для текущей точки с `is_active=true` и `endpoint_role='PRIMARY'` берется непосредственно предыдущая source-точка того же интерфейса, включая точку из предыдущего часа. Предыдущая точка нужна только как значение счетчика и не обязана иметь роль PRIMARY; это исключает искусственный разрыв при смене роли на границе часа.
 2. Интервал допустим, если `240 <= interval_sec <= 420`. Иначе дельта не строится и увеличивается `invalid_intervals_total{reason='INTERVAL_GAP'}`.
 3. Для каждого счетчика: если `current >= previous`, `delta=current-previous`. Если `current < previous`, `previous > 18446702073709551615` и `current < 42000000000000`, фиксируется одно переполнение и `delta=(18446744073709551616-previous)+current`. Порог 42 000 000 000 000 байт равен максимуму за 420 секунд при физическом пределе 800 Гбит/с. Любое другое уменьшение — сброс устройства; интервал исключается с `COUNTER_RESET`. Несколько переполнений за 420 секунд физически невозможны.
 4. `rx_mbps = 8 * rx_delta / interval_sec / 1000000`, аналогично `tx_mbps`. `interval_util_pct = 100 * GREATEST(rx_mbps,tx_mbps) / capacity_mbps`. Отрицательные значения невозможны. Интервал с любой скоростью выше `capacity_mbps * 1.20` исключается как телеметрическая ошибка `RATE_ABOVE_120_PERCENT`.
 5. Интервал относится к часу момента `current_observed_at_utc - 1 microsecond`, поэтому измерение ровно в `13:00:00` завершает интервал часа `12:00`. По `(link_id,hour_start_utc)` считаются `samples_used`, `avg_rx_mbps = 8 * SUM(rx_delta) / SUM(interval_sec) / 1000000`, аналогичный `avg_tx_mbps`, а также `max_util_pct` и `p95_util_pct`. P95 — nearest-rank: сортировка по возрастанию и элемент с индексом `CEIL(0.95 * samples_used)`, начиная с 1. Десятичные результаты округляются HALF_UP до 3 знаков. `has_sample_gap = samples_used < 12`.
-6. Пустая группа не создается. После watermark час пишется во staging и атомарно заменяет партицию. Каждый час пересчитываются последние 96 часов; retry с тем же `batch_id` делает overwrite. Частичный staging не публикуется. Upstream не передает удаления; исправленная точка с тем же ключом выбирается по более позднему ingest при replay. Backfill более 96 часов читает архив raw и требует явного периода.
+6. Пустая группа не создается. После watermark час пишется во staging и атомарно заменяет партицию. Каждый час пересчитываются только партиции последних 96 часов, затронутые late-событиями или исправлениями; раз в сутки выполняется контрольный полный replay 96 часов. Retry с тем же `batch_id` делает overwrite. Частичный staging не публикуется. Upstream не передает удаления; исправленная точка с тем же ключом выбирается по более позднему ingest при replay. Старше 96 часов авторитетного сырья в скоупе продукта нет: backfill не выполняется, запрос эскалируется владельцу источника.
 
 ### Формирование ключа (kafka) / партиции (hdfs)
+
+В результате допускается несколько строк с одинаковым бизнес-ключом; отличающий атрибут и правило уникальности не заданы.
 
 - Kafka key: `device_id|interface_name` в UTF-8; символ `|` в компонентах запрещен источником.
 - Бизнес-ключ: `(link_id, hour_start_utc)`.
@@ -84,12 +80,10 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 
 ### Структура данных
 
-Допустимые значения status: ACTIVE и INACTIVE.
-
 | Приемники | | | Источники | | | |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Атрибут** | **Тип данных** | **Описание атрибута** | **Источник** | **Атрибут** | **Тип данных** | **Комментарий** |
-| link_id | string | Идентификатор физического канала; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | link_id | string | Часть ключа |
+| link_id | string или bigint; окончательный физический тип не выбран | Идентификатор физического канала; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | link_id | string | Часть ключа |
 | hour_start_utc | timestamp | Начало часа UTC; `NOT NULL` | Расчет | observed_at_utc | long | `FLOOR_HOUR(observed_at_utc - 1 microsecond)`; часть ключа |
 | region_code | string | Макрорегион; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | region_code | string | Enum регионов MTS |
 | capacity_mbps | decimal(12,3) | Пропускная способность, Мбит/с, `>0`; `NOT NULL` | DICT_TRANSPORT_LINK_SCD2 | capacity_mbps | decimal(12,3) | Постоянна внутри часа |
@@ -116,7 +110,7 @@ Routers -> IPMPLS_TELEMETRY_COLLECTOR -> Kafka kafka-transport-prod-01
 | LINK-NSK-0018 | 2026-08-20 12:00:00 | SIBERIA | 25000.000 | 5100.000 | 4900.000 | 29.750 | 31.200 | 10 | true | 2026-08-20 12:54:59 | 2026-08-20 13:16:00 | 2026-08-20 | 12 |
 | LINK-VVO-0004 | 2026-08-20 12:00:00 | FAR_EAST | 10000.000 | 0.000 | 0.000 | 0.000 | 0.000 | 12 | false | 2026-08-20 12:59:54 | 2026-08-20 13:16:00 | 2026-08-20 | 12 |
 | LINK-MSK-0001 | 2026-08-20 13:00:00 | CENTER | 10000.000 | 7250.750 | 6800.500 | 95.100 | 101.000 | 12 | false | 2026-08-20 13:59:58 | 2026-08-20 14:16:00 | 2026-08-20 | 13 |
-| LINK-OMK-0012 | 2026-08-20 13:00:00 | SIBERIA | 1000.000 | 115.250 | 90.000 | 18.000 | 21.500 | 1 | true | 2026-08-20 13:05:00 | 2026-08-20 14:16:00 | 2026-08-20 | 13 |
+| LINK-OMK-0012 | 2026-08-20 13:00:00 | SIBERIA | 1000.000 | 115.250 | 90.000 | 21.500 | 21.500 | 1 | true | 2026-08-20 13:05:00 | 2026-08-20 14:16:00 | 2026-08-20 | 13 |
 | LINK-RND-0024 | 2026-08-20 13:00:00 | SOUTH | 40000.000 | 33000.000 | 27000.000 | 99.900 | 110.500 | 12 | false | 2026-08-20 13:59:59 | 2026-08-20 14:16:00 | 2026-08-20 | 13 |
 
 Нулевая нагрузка допустима при неизменных валидных счетчиках. Значение выше 100% допустимо до 120% и отражает кратковременный burst относительно номинальной емкости.
@@ -173,7 +167,7 @@ TBLPROPERTIES (
 
 ### Изменение схемы и доступ
 
-Добавить nullable-поле можно в minor-версии. Изменение определения delta, percentile, бизнес-ключа или единицы требует новой major-версии и backfill всей сравниваемой истории. Данные не содержат абонентских или пользовательских идентификаторов. Доступ имеют `TRANSPORT_CAPACITY_READ`, `NOC_READ` и сервис планирования емкости.
+Добавить nullable-поле можно в minor-версии. Изменение определения delta, percentile, бизнес-ключа или единицы требует новой major-версии и backfill доступной 96-часовой raw-истории; более ранняя история остаётся в прежней major-версии либо загружается из отдельно согласованного источника, не входящего в этот продукт. Данные не содержат абонентских или пользовательских идентификаторов. Доступ имеют `TRANSPORT_CAPACITY_READ`, `NOC_READ` и сервис планирования емкости.
 
 ### История изменений
 
