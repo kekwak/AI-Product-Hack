@@ -44,7 +44,16 @@ def upload(request):
     model = available.slug
     review = Review.objects.create(document_name=Path(uploaded.name).name[:255], model=model)
     try:
-        findings = run_review(document, model)
+        findings = run_review(
+            document,
+            model,
+            max_tokens=available.max_tokens,
+            reasoning_effort=available.reasoning_effort,
+            no_reasoning=available.no_reasoning,
+            temperature=available.temperature,
+            no_temperature=available.no_temperature,
+            provider=available.provider,
+        )
     except ReviewError as exc:
         review.error = str(exc)
         review.save(update_fields=["error"])
@@ -54,21 +63,32 @@ def upload(request):
     ReviewFinding.objects.bulk_create([
         ReviewFinding(
             review=review,
-            error_type_id=str(item.get("error_type_id", "OTHER")),
+            error_type_id=str(item.get("error_type_id", "O")),
             result=item,
         )
         for item in findings
     ])
+    display_findings = [
+        {
+            **item,
+            "family": (
+                item.get("error_type_id", "")[:1]
+                if item.get("error_type_id", "")[:1] in {"D", "T", "U"}
+                else "OTHER"
+            ),
+        }
+        for item in findings
+    ]
     finding_highlights = [
         {"index": index, "family": item["family"], "terms": highlight_terms(item["evidence_quote"])}
-        for index, item in enumerate(findings)
+        for index, item in enumerate(display_findings)
     ]
-    family_counts = {family: sum(item["family"] == family for item in findings) for family in enabled}
+    family_counts = {family: sum(item["family"] == family for item in display_findings) for family in enabled}
     criteria_count = sum({"D": 8, "T": 1, "U": 19, "OTHER": 1}[family] for family in enabled)
     return render(request, "reviewapp/report.html", {
         "document_name": review.document_name, "model": model,
-        "predictions": findings, "highlighted_document": highlighted_source(document, findings),
-        "rendered_document": rendered_markdown(document, findings),
+        "predictions": display_findings, "highlighted_document": highlighted_source(document, display_findings),
+        "rendered_document": rendered_markdown(document, display_findings),
         "finding_highlights": finding_highlights,
         "family_counts": family_counts,
         "criteria_count": criteria_count,

@@ -4,8 +4,14 @@ from .models import OpenRouterModel, Review
 
 @admin.register(OpenRouterModel)
 class OpenRouterModelAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "enabled", "sort_order")
-    list_editable = ("enabled", "sort_order")
+    list_display = (
+        "name", "slug", "provider", "max_tokens", "reasoning_effort", "no_reasoning",
+        "temperature", "no_temperature", "enabled", "sort_order",
+    )
+    list_editable = (
+        "provider", "max_tokens", "reasoning_effort", "no_reasoning", "temperature",
+        "no_temperature", "enabled", "sort_order",
+    )
     list_filter = ("enabled",)
     search_fields = ("name", "slug")
 

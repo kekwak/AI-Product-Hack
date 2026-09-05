@@ -2,8 +2,27 @@ from django.db import models
 
 
 class OpenRouterModel(models.Model):
+    class ReasoningEffort(models.TextChoices):
+        MINIMAL = "minimal", "Minimal"
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+        XHIGH = "xhigh", "XHigh"
+        MAX = "max", "Max"
+
     name = models.CharField("название", max_length=120)
     slug = models.CharField("идентификатор OpenRouter", max_length=160, unique=True)
+    provider = models.CharField("провайдер OpenRouter", max_length=120, blank=True)
+    max_tokens = models.PositiveIntegerField("максимум токенов ответа", default=65536)
+    reasoning_effort = models.CharField(
+        "reasoning effort",
+        max_length=10,
+        choices=ReasoningEffort.choices,
+        default=ReasoningEffort.HIGH,
+    )
+    no_reasoning = models.BooleanField("отключить reasoning (--no-reasoning)", default=False)
+    temperature = models.FloatField("temperature", default=0.0)
+    no_temperature = models.BooleanField("не передавать temperature (--no-temperature)", default=False)
     enabled = models.BooleanField("доступна пользователям", default=True)
     sort_order = models.PositiveSmallIntegerField("порядок", default=0)
 

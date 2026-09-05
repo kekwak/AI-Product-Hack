@@ -1,18 +1,16 @@
 from io import BytesIO
-from unittest.mock import Mock, patch
+from unittest.mock import call, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from .models import OpenRouterModel, Review, ReviewFinding
 from .rendering import highlight_terms, highlighted_source, rendered_markdown
-from run_inference import Findings
+from run_inference import BASE_INSTRUCTIONS, Finding, Findings, build_prompt
 
 from .reviewer import (
     ReviewError,
     _invoke_schema,
-    _recover_parsed_response,
-    _resolve_evidence_quote,
     run_review,
 )
 
@@ -46,6 +44,14 @@ class UploadTests(TestCase):
         self.assertContains(response, 'data-family="U"')
         self.assertNotContains(response, 'name="filters"')
         self.assertEqual(run_review.call_args.args, ("# ТЗ\nфрагмент", "minimax/minimax-m3"))
+        self.assertEqual(run_review.call_args.kwargs, {
+            "max_tokens": 65536,
+            "reasoning_effort": "high",
+            "no_reasoning": False,
+            "temperature": 0.0,
+            "no_temperature": False,
+            "provider": "",
+        })
         self.assertEqual(Review.objects.get().findings[0]["error_type_id"], "D01")
         saved_finding = ReviewFinding.objects.get()
         self.assertEqual(saved_finding.error_type_id, "D01")
@@ -66,6 +72,34 @@ class UploadTests(TestCase):
         response = self.client.get("/")
         self.assertContains(response, "minimax/minimax-m3")
         self.assertNotContains(response, "disabled/model")
+
+    @patch("reviewapp.views.run_review", return_value=[])
+    def test_passes_admin_model_settings_to_inference(self, run_review):
+        OpenRouterModel.objects.create(
+            name="Configured",
+            slug="configured/model",
+            provider="deepinfra",
+            max_tokens=32768,
+            reasoning_effort="xhigh",
+            no_reasoning=False,
+            temperature=0.7,
+            no_temperature=True,
+        )
+
+        response = self.client.post("/", {
+            "document": SimpleUploadedFile("spec.md", b"# spec"),
+            "model": "configured/model",
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(run_review.call_args.kwargs, {
+            "max_tokens": 32768,
+            "reasoning_effort": "xhigh",
+            "no_reasoning": False,
+            "temperature": 0.7,
+            "no_temperature": True,
+            "provider": "deepinfra",
+        })
 
     @patch("reviewapp.views.run_review", side_effect=ReviewError("Ошибка провайдера"))
     def test_error_page_allows_uploading_another_file(self, run_review):
@@ -133,48 +167,99 @@ class MarkdownRenderingTests(TestCase):
 
 class ReviewerResilienceTests(TestCase):
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"})
-    @patch("reviewapp.reviewer.httpx.post")
-    def test_reports_when_model_has_no_compatible_endpoint(self, post):
-        no_endpoint = Mock(status_code=404, is_error=True, reason_phrase="Not Found")
-        no_endpoint.json.return_value = {
-            "error": {"message": "No endpoints found that can handle the requested parameters"}
-        }
-        post.return_value = no_endpoint
+    @patch("reviewapp.reviewer.ChatOpenRouter")
+    def test_uses_benchmark_model_options_without_optional_parameters(self, chat_class):
+        structured = chat_class.return_value.with_structured_output.return_value
+        structured.invoke.return_value = {"parsed": Findings(errors=[])}
+        messages = [("system", "prompt"), ("human", "document")]
 
-        with self.assertRaisesRegex(ReviewError, "Выберите другую модель"):
-            _invoke_schema("test/model", Findings, [{"role": "user", "content": "x"}])
+        parsed = _invoke_schema(
+            "test/model",
+            Findings,
+            messages,
+            max_tokens=32768,
+            reasoning_effort="xhigh",
+            no_temperature=True,
+        )
 
-        self.assertEqual(post.call_count, 1)
-        payload = post.call_args.kwargs["json"]
-        self.assertNotIn("max_tokens", payload)
-        self.assertNotIn("reasoning", payload)
-        self.assertNotIn("provider", payload)
+        self.assertEqual(parsed.errors, [])
+        chat_class.assert_called_once_with(
+            model="test/model",
+            api_key="test-key",
+            max_tokens=32768,
+            max_retries=0,
+            reasoning={"effort": "xhigh", "exclude": True},
+        )
+        chat_class.return_value.with_structured_output.assert_called_once_with(
+            Findings, method="json_schema", strict=True, include_raw=True,
+        )
+        structured.invoke.assert_called_once_with(messages)
+
+    @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"})
+    @patch("reviewapp.reviewer.ChatOpenRouter")
+    def test_sends_temperature_and_provider_only_when_configured(self, chat_class):
+        structured = chat_class.return_value.with_structured_output.return_value
+        structured.invoke.return_value = {"parsed": Findings(errors=[])}
+
+        _invoke_schema(
+            "test/model",
+            Findings,
+            [],
+            no_reasoning=True,
+            temperature=0.25,
+            provider="deepinfra",
+        )
+
+        chat_class.assert_called_once_with(
+            model="test/model",
+            api_key="test-key",
+            max_tokens=65536,
+            max_retries=0,
+            reasoning={"enabled": False},
+            temperature=0.25,
+            openrouter_provider={
+                "only": ["deepinfra"],
+                "allow_fallbacks": False,
+                "require_parameters": True,
+            },
+        )
+
+    @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"})
+    @patch("reviewapp.reviewer.time.sleep")
+    @patch("reviewapp.reviewer._invoke_schema")
+    def test_retries_like_batch_inference(self, invoke_schema, sleep):
+        invoke_schema.side_effect = RuntimeError("provider failed")
+
+        with self.assertRaisesRegex(ReviewError, "provider failed"):
+            run_review("document", "test/model")
+
+        self.assertEqual(invoke_schema.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"})
     @patch("reviewapp.reviewer._invoke_schema")
-    def test_provider_error_does_not_poison_next_request(self, invoke_schema):
-        invoke_schema.side_effect = RuntimeError("provider failed")
-        for _ in range(2):
-            with self.assertRaisesRegex(ReviewError, "provider failed"):
-                run_review("document", "test/model")
+    def test_uses_exact_prompt_and_does_not_filter_model_findings(self, invoke_schema):
+        findings = Findings(errors=[
+            Finding(
+                error_type_id="O",
+                evidence_quote="цитата, которой нет в исходном документе",
+                title="Первая",
+                problem="Описание",
+            ),
+            Finding(
+                error_type_id="O",
+                evidence_quote="цитата, которой нет в исходном документе",
+                title="Дубликат",
+                problem="Другое описание",
+            ),
+        ])
+        invoke_schema.return_value = findings
 
-    def test_recovers_json_from_markdown_fence(self):
-        class Raw:
-            content = 'Ответ:\n```json\n{"errors": []}\n```'
+        result = run_review("исходный документ", "test/model", retries=0)
 
-        parsed = _recover_parsed_response({"raw": Raw()})
-        self.assertIsNotNone(parsed)
-        self.assertEqual(parsed.errors, [])
-
-    def test_empty_schema_response_does_not_crash(self):
-        self.assertIsNone(_recover_parsed_response({"raw": None}))
-
-    def test_resolves_unique_quote_with_changed_whitespace(self):
-        document = "Строка с двумя  пробелами\nи переносом."
-        self.assertEqual(
-            _resolve_evidence_quote(document, "Строка с двумя пробелами и переносом."),
-            document,
-        )
-
-    def test_does_not_resolve_ambiguous_quote(self):
-        self.assertIsNone(_resolve_evidence_quote("поле id и поле id", "поле id"))
+        self.assertEqual(result, [item.model_dump() for item in findings.errors])
+        messages = invoke_schema.call_args.args[2]
+        self.assertEqual(messages, [
+            ("system", build_prompt(BASE_INSTRUCTIONS)),
+            ("human", "# ПРОВЕРЯЕМЫЙ ДОКУМЕНТ\n\n```\nисходный документ\n```"),
+        ])
