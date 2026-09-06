@@ -45,7 +45,7 @@ def upload(request):
 
     uploaded = request.FILES.get("document")
     if not uploaded:
-        return render(request, "reviewapp/upload.html", _upload_context("Выберите Markdown-файл."))
+        return render(request, "reviewapp/upload.html", _upload_context("Для проверки добавьте файлы."))
     if Path(uploaded.name).suffix.lower() not in ALLOWED_SUFFIXES:
         return render(request, "reviewapp/upload.html", _upload_context("Поддерживаются только файлы .md и .markdown."))
     if uploaded.size > MAX_DOCUMENT_BYTES:
