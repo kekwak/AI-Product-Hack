@@ -21,6 +21,8 @@ dependencies = [
 dataset-generate = "generate_dataset:main"
 evaluate-predictions = "evaluate_predictions:main"
 infer-documents = "run_inference:main"
+validate-ensemble = "validate_ensemble:main"
+aggregate-ensemble = "aggregate_ensemble:main"
 optimize-prompt = "optimize_prompt:main"
 
 [build-system]
@@ -29,4 +31,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["paths", "generate_dataset", "evaluate_predictions", "run_inference", "optimize_prompt"]
+py-modules = ["paths", "generate_dataset", "evaluate_predictions", "run_inference", "validate_ensemble", "aggregate_ensemble", "optimize_prompt"]
