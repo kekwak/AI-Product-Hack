@@ -7,7 +7,7 @@ from django.views.decorators.http import require_http_methods
 from run_inference import MODEL
 
 from .models import OpenRouterModel, Review, ReviewFinding
-from .rendering import highlight_terms, highlighted_source, rendered_markdown
+from .rendering import highlight_groups, highlight_terms, highlighted_source, rendered_markdown
 from .reviewer import ReviewError, run_review
 
 MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
@@ -102,7 +102,12 @@ def upload(request):
         for item in findings
     ]
     finding_highlights = [
-        {"index": index, "family": item["family"], "terms": highlight_terms(item["evidence_quote"])}
+        {
+            "index": index,
+            "family": item["family"],
+            "terms": highlight_terms(item["evidence_quote"]),
+            "groups": highlight_groups(item["evidence_quote"]),
+        }
         for index, item in enumerate(display_findings)
     ]
     family_counts = {family: sum(item["family"] == family for item in display_findings) for family in enabled}

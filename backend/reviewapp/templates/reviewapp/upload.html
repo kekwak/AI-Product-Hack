@@ -1,8 +1,11 @@
+{% load static %}
 <!doctype html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="{% static 'reviewapp/favicon.svg' %}?v=2">
+    <link rel="shortcut icon" href="{% static 'reviewapp/favicon.svg' %}?v=2">
     <title>AI-инструмент для анализа документации</title>
     <style>
         :root {
@@ -419,7 +422,7 @@
             class="file-name" id="file-name"></span></span></label><input type="file" id="document" name="document"
                                                                           accept=".md,.markdown,text/markdown" required>
         <div class="file-warning{% if error == 'Выберите Markdown-файл.' %} visible{% endif %}" id="file-warning"
-             role="alert">Для проверки добавьте файлы
+             role="alert">Для проверки добавьте файл
         </div>
         <label class="title" id="mode-label">Режим проверки</label>
         <div class="mode-select" id="mode-select"><input type="hidden" id="model" name="model" required>

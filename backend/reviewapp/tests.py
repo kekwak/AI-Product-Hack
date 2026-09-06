@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
 from .models import OpenRouterModel, Review, ReviewFinding
-from .rendering import highlight_terms, highlighted_source, rendered_markdown
+from .rendering import highlight_groups, highlight_terms, highlighted_source, rendered_markdown
 from run_inference import BASE_INSTRUCTIONS, Finding, Findings, build_prompt
 from .views import CHECK_ERROR_MESSAGES, _finding_sort_key
 
@@ -63,6 +63,8 @@ class UploadTests(TestCase):
         self.assertNotContains(response, 'name="filters"')
         self.assertNotContains(response, "{{ predictions|length }}")
         self.assertNotContains(response, "{{ count }}")
+        self.assertContains(response, 'class="review-checkbox"')
+        self.assertContains(response, "Проверено")
         self.assertEqual(run_review.call_args.args, ("# ТЗ\nфрагмент", "minimax/minimax-m3"))
         self.assertEqual(run_review.call_args.kwargs, {
             "max_tokens": 65536,
@@ -164,6 +166,22 @@ class MarkdownRenderingTests(TestCase):
     def test_highlight_terms_include_link_label_and_source_url(self):
         terms = highlight_terms("| [DC: DDS](http://datacatalog.corp/dds) |")
         self.assertEqual(terms, ["DC: DDS", "http://datacatalog.corp/dds"])
+
+    def test_highlight_terms_split_adjacent_sentences_for_overlapping_findings(self):
+        terms = highlight_terms("Обработка выполняется в DDS/CDM. На этапе RAW — не применимо.")
+        self.assertEqual(terms, [
+            "Обработка выполняется в DDS/CDM.",
+            "На этапе RAW — не применимо.",
+        ])
+
+    def test_highlight_groups_keep_table_cells_in_the_same_row(self):
+        groups = highlight_groups(
+            "| FIELD_DATE_EVENT | date | Kafka |\n| FIELD_TIME_START | long | Kafka |"
+        )
+        self.assertEqual(groups, [
+            ["FIELD_DATE_EVENT", "date", "Kafka"],
+            ["FIELD_TIME_START", "long", "Kafka"],
+        ])
 
     def test_renders_list_without_blank_line_before_it(self):
         document = "Продуктовые метрики\n- Задержка: < 1 мин\n- Пропускная способность: 100 000\n\nЗаказчики\n- BigData"

@@ -1,8 +1,11 @@
+{% load static %}
 <!doctype html>
 <html lang="ru">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="{% static 'reviewapp/favicon.svg' %}?v=2">
+    <link rel="shortcut icon" href="{% static 'reviewapp/favicon.svg' %}?v=2">
     <title>Отчет — {{ document_name }}</title>
     <style>
         @media (min-width: 901px) {
@@ -954,6 +957,30 @@
             border-color: #c9c9cf
         }
 
+        .finding-card.reviewed {
+            background: #fafafa;
+            opacity: .72
+        }
+
+        .review-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: fit-content;
+            margin-top: 13px;
+            color: #3f3f46;
+            font-weight: 700;
+            cursor: pointer
+        }
+
+        .review-check input {
+            width: 17px;
+            height: 17px;
+            margin: 0;
+            accent-color: var(--red);
+            cursor: pointer
+        }
+
         .badge {
             display: inline-block;
             padding: 2px 7px;
@@ -1013,7 +1040,19 @@
             color: #fff
         }
 
-        mark.filtered-out {
+        .rendered tr.evidence-row-active > th,
+        .rendered tr.evidence-row-active > td {
+            background: var(--red) !important;
+            color: #fff
+        }
+
+        .rendered tr.evidence-row-active a,
+        .rendered tr.evidence-row-active code {
+            color: inherit;
+            background: transparent
+        }
+
+        mark.filtered-out, mark.reviewed-out {
             background: transparent;
             color: inherit;
             padding: 0
@@ -1097,6 +1136,7 @@
             <div class="problem"><b>Рекомендация:</b> {{ item.recommendation }}</div>
             {% endif %}
             <blockquote>{{ item.evidence_quote }}</blockquote>
+            <label class="review-check"><input class="review-checkbox" type="checkbox">Проверено</label>
         </article>
         {% empty %}
         <div class="card">Значимых проблем не найдено.</div>
@@ -1109,36 +1149,86 @@
         renderBtn = document.getElementById('render-btn'), sourceBtn = document.getElementById('source-btn'),
         panelToggle = document.getElementById('panel-toggle');
 
-    function markTerm(container, term, index, family, state) {
-        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-        let node;
-        while (node = walker.nextNode()) {
-            if (node.parentElement.closest('mark')) continue;
-            if (state.after && !(state.after.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
-            const pattern = term.trim().split(/\s+/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
-            const match = node.nodeValue.match(new RegExp(pattern, 'u'));
-            if (!match) continue;
-            const start = match.index;
-            const before = node.splitText(start);
-            before.splitText(match[0].length);
-            const mark = document.createElement('mark');
-            mark.dataset.index = index;
-            mark.dataset.family = family;
-            before.replaceWith(mark);
-            mark.appendChild(before);
-            state.after = mark;
-            return true
-        }
-        return false
+    function termPattern(term) {
+        const trimmed = term.trim(), escaped = trimmed.split(/\s+/)
+            .map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+        const tokenChar = '[\\p{L}\\p{N}_/]';
+        const leftBoundary = /^[\p{L}\p{N}_/]/u.test(trimmed) ? '(?<!' + tokenChar + ')' : '';
+        const rightBoundary = /[\p{L}\p{N}_/]$/u.test(trimmed) ? '(?!' + tokenChar + ')' : '';
+        return new RegExp(leftBoundary + escaped + rightBoundary, 'gu')
     }
 
-    JSON.parse(document.getElementById('finding-highlights').textContent).forEach(item => {
-        const renderedState = {after: null}, sourceState = {after: null};
-        item.terms.forEach(term => {
-            markTerm(rendered, term, item.index, item.family, renderedState);
-            markTerm(source, term, item.index, item.family, sourceState)
+    function highlightContainer(container, findings) {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        let current;
+        while (current = walker.nextNode()) nodes.push(current);
+        const ranges = [];
+
+        function candidatesFor(term) {
+            const candidates = [];
+            nodes.forEach((node, nodeIndex) => {
+                for (const match of node.nodeValue.matchAll(termPattern(term))) {
+                    let scope = node.parentElement.closest('tr, p, li, pre, h1, h2, h3, h4, blockquote');
+                    if (container === source) {
+                        scope = 'line-' + node.nodeValue.slice(0, match.index).split('\n').length
+                    } else if (!scope) {
+                        scope = node.parentElement
+                    }
+                    candidates.push({node, nodeIndex, start: match.index, end: match.index + match[0].length, scope})
+                }
+            });
+            return candidates
+        }
+
+        findings.forEach(finding => {
+            (finding.groups || finding.terms.map(term => [term])).forEach(group => {
+                const candidateLists = group.map(candidatesFor);
+                const scopes = [...new Set(candidateLists.flat().map(candidate => candidate.scope))];
+                const bestScope = scopes.sort((left, right) => {
+                    const rightScore = candidateLists.filter(list => list.some(item => item.scope === right)).length;
+                    const leftScore = candidateLists.filter(list => list.some(item => item.scope === left)).length;
+                    return rightScore - leftScore
+                })[0];
+                candidateLists.forEach(candidates => {
+                    const selected = candidates.find(candidate => candidate.scope === bestScope) || candidates[0];
+                    if (selected) ranges.push({...selected, index: String(finding.index), family: finding.family})
+                })
+            })
+        });
+
+        nodes.forEach(node => {
+            const nodeRanges = ranges.filter(range => range.node === node);
+            if (!nodeRanges.length) return;
+            const boundaries = [...new Set([0, node.nodeValue.length, ...nodeRanges.flatMap(range => [range.start, range.end])])]
+                .sort((a, b) => a - b);
+            const fragment = document.createDocumentFragment();
+            for (let position = 0; position < boundaries.length - 1; position++) {
+                const start = boundaries[position], end = boundaries[position + 1];
+                if (start === end) continue;
+                const value = node.nodeValue.slice(start, end);
+                const owners = nodeRanges.filter(range => range.start <= start && range.end >= end);
+                if (!owners.length) {
+                    fragment.appendChild(document.createTextNode(value));
+                    continue
+                }
+                const indexes = [...new Set(owners.map(owner => owner.index))];
+                const families = [...new Set(owners.map(owner => owner.family))];
+                const mark = document.createElement('mark');
+                mark.dataset.index = indexes[0];
+                mark.dataset.indexes = indexes.join(' ');
+                mark.dataset.family = families[0];
+                mark.dataset.families = families.join(' ');
+                mark.textContent = value;
+                fragment.appendChild(mark)
+            }
+            node.replaceWith(fragment)
         })
-    });
+    }
+
+    const findingHighlights = JSON.parse(document.getElementById('finding-highlights').textContent);
+    highlightContainer(rendered, findingHighlights);
+    highlightContainer(source, findingHighlights);
 
     function setMode(mode) {
         const isRendered = mode === 'rendered';
@@ -1159,12 +1249,33 @@
     });
     document.querySelectorAll('.finding-card').forEach(card => card.addEventListener('click', () => {
         document.querySelectorAll('mark').forEach(mark => mark.classList.remove('active'));
+        document.querySelectorAll('.evidence-row-active').forEach(row => row.classList.remove('evidence-row-active'));
         const container = rendered.hidden ? source : rendered,
-            mark = container.querySelector('mark[data-index="' + card.dataset.index + '"]:not(.filtered-out)');
+            selector = 'mark[data-indexes~="' + card.dataset.index + '"]:not(.filtered-out):not(.reviewed-out)',
+            mark = container.querySelector(selector);
         if (mark) {
-            container.querySelectorAll('mark[data-index="' + card.dataset.index + '"]:not(.filtered-out)').forEach(item => item.classList.add('active'));
+            container.querySelectorAll(selector).forEach(item => {
+                item.classList.add('active');
+                item.closest('tr')?.classList.add('evidence-row-active')
+            });
             mark.scrollIntoView({behavior: 'smooth', block: 'center'})
         }
+    }));
+    function applyReviewedMarks() {
+        document.querySelectorAll('mark[data-indexes]').forEach(mark => {
+            const indexes = mark.dataset.indexes.split(/\s+/).filter(Boolean);
+            const hasReviewed = indexes.some(index =>
+                document.querySelector('.finding-card[data-index="' + index + '"] .review-checkbox')?.checked
+            );
+            mark.classList.toggle('reviewed-out', hasReviewed);
+            if (hasReviewed) mark.classList.remove('active')
+        })
+    }
+    document.querySelectorAll('.review-checkbox').forEach(checkbox => checkbox.addEventListener('click', event => {
+        event.stopPropagation();
+        checkbox.closest('.finding-card').classList.toggle('reviewed', checkbox.checked);
+        document.querySelectorAll('.evidence-row-active').forEach(row => row.classList.remove('evidence-row-active'));
+        applyReviewedMarks()
     }));
     function applyFamilyFilters() {
         const enabled = new Set([...document.querySelectorAll('.family-filter.active')].map(item => item.dataset.family));
@@ -1174,7 +1285,8 @@
             if (!card.hidden) count++
         });
         document.querySelectorAll('mark[data-family]').forEach(mark => {
-            const filtered = !enabled.has(mark.dataset.family);
+            const families = (mark.dataset.families || mark.dataset.family).split(/\s+/);
+            const filtered = !families.some(family => enabled.has(family));
             mark.classList.toggle('filtered-out', filtered);
             if (filtered) mark.classList.remove('active')
         });

@@ -59,7 +59,15 @@ def highlight_terms(evidence: str) -> list[str]:
                     continue
                 link = re.fullmatch(r"\[([^]]+)]\(([^)]+)\)", segment)
                 matchable_parts = [link.group(1), link.group(2)] if link else [segment]
+                searchable_parts: list[str] = []
                 for part in matchable_parts:
+                    if is_table_row:
+                        searchable_parts.append(part)
+                    else:
+                        searchable_parts.extend(
+                            sentence for sentence in re.split(r"(?<!\d\.)(?<=[.!?])\s+", part) if sentence.strip()
+                        )
+                for part in searchable_parts:
                     normalized = " ".join(part.replace("`", "").strip("*~ ").split())
                     # Standalone numbers and ellipsis placeholders have no useful
                     # context. Matching them globally highlights unrelated values
@@ -73,6 +81,11 @@ def highlight_terms(evidence: str) -> list[str]:
                         # the same number of occurrences as in the evidence quote.
                         terms.append(normalized)
     return terms
+
+
+def highlight_groups(evidence: str) -> list[list[str]]:
+    """Keep terms from one source line together for contextual matching."""
+    return [terms for line in evidence.splitlines() if (terms := highlight_terms(line))]
 
 
 def _normalize_loose_markdown(document: str) -> str:
