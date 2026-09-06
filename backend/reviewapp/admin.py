@@ -18,10 +18,10 @@ class OpenRouterModelAdmin(admin.ModelAdmin):
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    list_display = ("document_name", "model", "created_at", "finding_count", "has_error")
-    list_filter = ("model", "created_at")
+    list_display = ("document_name", "status", "model", "created_at", "finding_count", "has_error")
+    list_filter = ("status", "model", "created_at")
     search_fields = ("document_name", "error")
-    readonly_fields = ("created_at", "document_name", "model", "findings", "error")
+    readonly_fields = ("created_at", "document_name", "status", "model", "findings", "error")
 
     @admin.display(description="Замечаний")
     def finding_count(self, obj):

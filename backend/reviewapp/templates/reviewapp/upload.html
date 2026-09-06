@@ -410,18 +410,18 @@
     <div class="brand">МТС</div>
     <h1>AI-инструмент для анализа документации</h1>
     <p class="lead">Загрузите Markdown-документ — агент проверит его и подготовит понятный отчет</p>
-    {% if error and error != "Выберите Markdown-файл." %}
+    {% if error and error != "Для проверки добавьте файлы." %}
     <div class="error">{{ error }}<br><a href="{% url 'reviewapp:upload' %}"
                                          style="display:inline-flex;margin-top:12px;padding:9px 13px;border:1px solid currentColor;border-radius:9px;color:inherit;font-weight:750;text-decoration:none;background:#fff">Загрузить другой файл</a></div>
     {% endif %}
-    <form method="post" enctype="multipart/form-data" id="form" novalidate>{% csrf_token %}<label class="title"
+    <form method="post" action="{% url 'reviewapp:reports_api' %}" enctype="multipart/form-data" id="form" novalidate>{% csrf_token %}<label class="title"
                                                                                                   for="document">Документ
         ТЗ</label><label class="dropzone" id="dropzone" for="document"><span><span class="drop-icon">⇧</span><span
             class="drop-main">Перетащите Markdown-файл сюда</span><span class="drop-sub">или нажмите, чтобы выбрать .md /markdown и до 2 МБ</span><span
             class="file-name" id="file-name"></span></span></label><input type="file" id="document" name="document"
                                                                           accept=".md,.markdown,text/markdown" required>
-        <div class="file-warning{% if error == 'Выберите Markdown-файл.' %} visible{% endif %}" id="file-warning"
-             role="alert">Для проверки добавьте файл
+        <div class="file-warning{% if error == 'Для проверки добавьте файлы.' %} visible{% endif %}" id="file-warning"
+             role="alert">Для проверки добавьте файлы
         </div>
         <label class="title" id="mode-label">Режим проверки</label>
         <div class="mode-select" id="mode-select"><input type="hidden" id="model" name="model" required>
@@ -527,6 +527,29 @@
     });
     const initial = document.querySelector('.mode-option.selected') || document.querySelector('.mode-option[data-value]');
     if (initial) chooseMode(initial);
+
+    async function waitForReport(apiUrl) {
+        while (true) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                cache: 'no-store',
+                headers: {'Accept': 'application/json'}
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || 'Не удалось получить статус проверки.')
+            }
+            if (payload.status === 'completed') return payload;
+            if (payload.status === 'failed') {
+                throw new Error(payload.message || 'Упс, проверка завершилась с ошибкой. Попробуйте ещё раз.')
+            }
+            if (payload.status !== 'pending' && payload.status !== 'running') {
+                throw new Error('Сервер вернул неизвестный статус проверки.')
+            }
+        }
+    }
+
     form.addEventListener('submit', async function (event) {
         event.preventDefault();
         const button = document.getElementById('submit'), progress = document.getElementById('progress'),
@@ -589,16 +612,21 @@
                 body: new FormData(form),
                 headers: {'X-Requested-With': 'fetch'}
             });
-            const html = await response.text();
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || 'Упс, что-то пошло не так. Попробуйте ещё раз.')
+            }
+            if (!payload.report_url) {
+                throw new Error('Сервер не вернул ссылку на отчёт.')
+            }
+            const completedReport = await waitForReport(payload.api_url);
             clearInterval(timer);
-            document.open();
-            document.write(html);
-            document.close()
+            window.location.assign(completedReport.report_url)
         } catch (error) {
             clearInterval(timer);
             progress.classList.remove('visible');
             button.disabled = false;
-            alert('Соединение прервано. Повторите проверку.')
+            alert(error.message || 'Соединение прервано. Повторите проверку.')
         }
     });
 </script>

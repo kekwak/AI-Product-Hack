@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 
 
@@ -36,9 +38,20 @@ class OpenRouterModel(models.Model):
 
 
 class Review(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Ожидает"
+        RUNNING = "running", "Выполняется"
+        COMPLETED = "completed", "Готов"
+        FAILED = "failed", "Ошибка"
+
+    public_id = models.UUIDField("публичный ID", default=uuid.uuid4, unique=True, editable=False)
     created_at = models.DateTimeField("дата", auto_now_add=True)
     document_name = models.CharField("файл", max_length=255)
+    document = models.TextField("исходный документ", blank=True)
     model = models.CharField("модель", max_length=160)
+    status = models.CharField(
+        "статус", max_length=16, choices=Status.choices, default=Status.COMPLETED, db_index=True
+    )
     findings = models.JSONField("результат", default=list)
     error = models.TextField("ошибка", blank=True)
 

@@ -1,4 +1,5 @@
 from io import BytesIO
+import uuid
 from unittest.mock import call, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -7,7 +8,7 @@ from django.test import TestCase
 from .models import OpenRouterModel, Review, ReviewFinding
 from .rendering import highlight_groups, highlight_terms, highlighted_source, rendered_markdown
 from run_inference import BASE_INSTRUCTIONS, Finding, Findings, build_prompt
-from .views import CHECK_ERROR_MESSAGES, _finding_sort_key
+from .views import CHECK_ERROR_MESSAGES, _execute_review, _finding_sort_key
 
 from .reviewer import (
     ReviewError,
@@ -35,6 +36,7 @@ class UploadTests(TestCase):
     def test_get_renders_form(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'action="/api/reports/"')
 
     def test_rejects_non_markdown(self):
         response = self.client.post("/", {"document": SimpleUploadedFile("x.txt", b"hello")})
@@ -65,6 +67,8 @@ class UploadTests(TestCase):
         self.assertNotContains(response, "{{ count }}")
         self.assertContains(response, 'class="review-checkbox"')
         self.assertContains(response, "Проверено")
+        self.assertContains(response, 'class="btn new-review-btn"')
+        self.assertContains(response, "Новая проверка")
         self.assertEqual(run_review.call_args.args, ("# ТЗ\nфрагмент", "minimax/minimax-m3"))
         self.assertEqual(run_review.call_args.kwargs, {
             "max_tokens": 65536,
@@ -137,6 +141,91 @@ class UploadTests(TestCase):
         self.assertContains(response, 'href="/"')
         self.assertEqual(Review.objects.get().error, "Ошибка провайдера")
         choice.assert_called_once_with(CHECK_ERROR_MESSAGES)
+
+    @patch("reviewapp.views.run_review")
+    def test_completed_review_has_permanent_page(self, run_review):
+        run_review.return_value = [{
+            "error_type_id": "D01",
+            "title": "Ошибка",
+            "problem": "Описание",
+            "evidence_quote": "фрагмент",
+        }]
+
+        response = self.client.post("/", {
+            "document": SimpleUploadedFile("spec.md", "# ТЗ\nфрагмент".encode()),
+            "model": "minimax/minimax-m3",
+        })
+
+        review = Review.objects.get()
+        report_path = f"/reports/{review.public_id}/"
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["X-Report-URL"], report_path)
+        self.assertEqual(review.document, "# ТЗ\nфрагмент")
+        saved_response = self.client.get(report_path)
+        self.assertEqual(saved_response.status_code, 200)
+        self.assertContains(saved_response, "D01")
+        self.assertContains(saved_response, "фрагмент")
+
+    @patch("reviewapp.views._submit_review_job")
+    @patch("reviewapp.views.run_review")
+    def test_api_creates_and_returns_report_by_uuid(self, run_review, submit_review_job):
+        run_review.return_value = [{
+            "error_type_id": "U02",
+            "title": "Замечание",
+            "problem": "Описание",
+            "evidence_quote": "исходник",
+        }]
+
+        create_response = self.client.post("/api/reports/", {
+            "document": SimpleUploadedFile("api.md", "# API\nисходник".encode()),
+            "model": "minimax/minimax-m3",
+        })
+
+        self.assertEqual(create_response.status_code, 202)
+        created = create_response.json()
+        self.assertEqual(created["status"], "pending")
+        self.assertEqual(created["findings_count"], 0)
+        self.assertTrue(created["report_url"].endswith(f"/reports/{created['id']}/"))
+        review = Review.objects.get(public_id=created["id"])
+        submit_review_job.assert_called_once_with(review.pk)
+
+        pending_page = self.client.get(f"/reports/{created['id']}/")
+        self.assertContains(pending_page, "Проверяем документ")
+        _execute_review(review, OpenRouterModel.objects.get(slug="minimax/minimax-m3"))
+        detail_response = self.client.get(f"/api/reports/{created['id']}/")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(detail_response.json()["status"], "completed")
+        self.assertEqual(detail_response.json()["findings"], run_review.return_value)
+
+    @patch("reviewapp.views._submit_review_job")
+    @patch("reviewapp.views.run_review", side_effect=ReviewError("Секрет провайдера"))
+    def test_api_saves_llm_error_without_exposing_it(self, run_review, submit_review_job):
+        response = self.client.post("/api/reports/", {
+            "document": SimpleUploadedFile("api.md", b"# API"),
+            "model": "minimax/minimax-m3",
+        })
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["status"], "pending")
+        review = Review.objects.get()
+        _execute_review(review, OpenRouterModel.objects.get(slug="minimax/minimax-m3"))
+        result_response = self.client.get(f"/api/reports/{review.public_id}/")
+        self.assertEqual(result_response.json()["status"], "failed")
+        self.assertNotContains(result_response, "Секрет провайдера")
+        review.refresh_from_db()
+        self.assertEqual(review.error, "Секрет провайдера")
+
+    def test_api_rejects_missing_document(self):
+        response = self.client.post("/api/reports/", {})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "Для проверки добавьте файлы.")
+
+    def test_api_returns_json_404_for_unknown_report(self):
+        response = self.client.get(f"/api/reports/{uuid.uuid4()}/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json(), {"error": "Отчёт не найден."})
 
 
 class MarkdownRenderingTests(TestCase):
