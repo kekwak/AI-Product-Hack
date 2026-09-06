@@ -151,11 +151,19 @@ class MarkdownRenderingTests(TestCase):
 
     def test_highlight_terms_preserve_repeated_cells(self):
         terms = highlight_terms("| Greenplum | - |\n| Greenplum | - |")
-        self.assertEqual(terms, ["Greenplum", "Greenplum"])
+        self.assertEqual(terms, ["Greenplum", "-", "Greenplum", "-"])
 
     def test_highlight_terms_split_inline_code_from_text(self):
         terms = highlight_terms("Шаг 1. Фильтрация: `FIELD_LAT IS NOT NULL`.")
         self.assertEqual(terms, ["Шаг 1. Фильтрация:", "FIELD_LAT IS NOT NULL"])
+
+    def test_highlight_terms_ignore_contextless_numbers_and_placeholders(self):
+        terms = highlight_terms("| TABLE | 100 | ... | - |\nЗадержка: < 1 мин")
+        self.assertEqual(terms, ["TABLE", "-", "Задержка: < 1 мин"])
+
+    def test_highlight_terms_include_link_label_and_source_url(self):
+        terms = highlight_terms("| [DC: DDS](http://datacatalog.corp/dds) |")
+        self.assertEqual(terms, ["DC: DDS", "http://datacatalog.corp/dds"])
 
     def test_renders_list_without_blank_line_before_it(self):
         document = "Продуктовые метрики\n- Задержка: < 1 мин\n- Пропускная способность: 100 000\n\nЗаказчики\n- BigData"
@@ -191,17 +199,22 @@ class MarkdownRenderingTests(TestCase):
         self.assertEqual(table_result.count("<table>"), 1)
         self.assertEqual(table_result.count("<tr>"), 2)
 
-    def test_source_marks_include_family(self):
+    def test_source_is_pristine_before_shared_client_highlighting(self):
         result = highlighted_source("ошибка здесь", [{
             "error_type_id": "D01", "family": "D", "evidence_quote": "ошибка"
         }])
-        self.assertIn('data-family="D"', result)
+        self.assertEqual(result, "ошибка здесь")
+        self.assertNotIn("<mark", result)
 
-    def test_source_marks_support_other_family(self):
+    def test_source_escapes_html_before_shared_client_highlighting(self):
         result = highlighted_source("иная ошибка", [{
             "error_type_id": "OTHER", "family": "OTHER", "evidence_quote": "иная ошибка"
         }])
-        self.assertIn('data-family="OTHER"', result)
+        self.assertEqual(result, "иная ошибка")
+
+        escaped = highlighted_source("<script>alert(1)</script>", [])
+        self.assertNotIn("<script>", escaped)
+        self.assertIn("&lt;script&gt;", escaped)
 
 
 class ReviewerResilienceTests(TestCase):

@@ -7,13 +7,12 @@
     <style>
         @media (min-width: 901px) {
             html body main {
-                grid-template-columns:minmax(0, 1fr) !important
+                grid-template-columns:minmax(0, 1fr) 420px !important
             }
 
             html body aside {
-                position: fixed !important;
+                position: sticky !important;
                 top: 68px;
-                right: 0;
                 width: 420px;
                 z-index: 4
             }
@@ -21,7 +20,8 @@
             html body .document {
                 width: 100%;
                 padding-left: 30px;
-                padding-right: 30px
+                padding-right: 30px;
+                overflow-x: hidden
             }
         }
 
@@ -353,7 +353,8 @@
             border-radius: 50%;
             font-size: 11px;
             font-weight: 800;
-            line-height: 1
+            line-height: 1;
+            transform: translateY(-2px)
         }
 
         .mobile-criterion-help {
@@ -665,7 +666,9 @@
 
         .source {
             white-space: pre-wrap;
-            font: 13px/1.65 ui-monospace, monospace
+            overflow-wrap: anywhere;
+            word-break: normal;
+            font: 14px/1.65 Arial, sans-serif
         }
 
         .rendered {
@@ -1106,11 +1109,12 @@
         renderBtn = document.getElementById('render-btn'), sourceBtn = document.getElementById('source-btn'),
         panelToggle = document.getElementById('panel-toggle');
 
-    function markTerm(container, term, index, family) {
+    function markTerm(container, term, index, family, state) {
         const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
         let node;
         while (node = walker.nextNode()) {
             if (node.parentElement.closest('mark')) continue;
+            if (state.after && !(state.after.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
             const pattern = term.trim().split(/\s+/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
             const match = node.nodeValue.match(new RegExp(pattern, 'u'));
             if (!match) continue;
@@ -1122,12 +1126,19 @@
             mark.dataset.family = family;
             before.replaceWith(mark);
             mark.appendChild(before);
+            state.after = mark;
             return true
         }
         return false
     }
 
-    JSON.parse(document.getElementById('finding-highlights').textContent).forEach(item => item.terms.forEach(term => markTerm(rendered, term, item.index, item.family)));
+    JSON.parse(document.getElementById('finding-highlights').textContent).forEach(item => {
+        const renderedState = {after: null}, sourceState = {after: null};
+        item.terms.forEach(term => {
+            markTerm(rendered, term, item.index, item.family, renderedState);
+            markTerm(source, term, item.index, item.family, sourceState)
+        })
+    });
 
     function setMode(mode) {
         const isRendered = mode === 'rendered';

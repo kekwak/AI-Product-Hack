@@ -28,7 +28,10 @@ def _marked_source(document: str, findings: list[dict], escape: bool) -> str:
 
 
 def highlighted_source(document: str, findings: list[dict]) -> str:
-    return _marked_source(document, findings, escape=True)
+    # Highlight both views in the browser from the same normalized term list.
+    # Marking a whole raw quote here made source and rendered Markdown disagree:
+    # Markdown turns a table row into several independent text nodes.
+    return html.escape(document)
 
 
 def item_family(item: dict) -> str:
@@ -42,7 +45,8 @@ def highlight_terms(evidence: str) -> list[str]:
         line = raw_line.strip()
         if not line or line.startswith("```") or re.fullmatch(r"\|?[\s:|-]+\|?", line):
             continue
-        if "|" in line:
+        is_table_row = "|" in line
+        if is_table_row:
             candidates = [cell.strip() for cell in line.strip("|").split("|")]
         else:
             candidates = [re.sub(r"^(?:#{1,6}|[-*+] |\d+[.)] )\s*", "", line)]
@@ -53,14 +57,21 @@ def highlight_terms(evidence: str) -> list[str]:
             for segment in segments:
                 if not segment:
                     continue
-                link = re.fullmatch(r"\[([^]]+)]\([^)]+\)", segment)
-                if link:
-                    segment = link.group(1)
-                segment = segment.replace("`", "").strip("*~ ")
-                if len(segment) >= 3:
-                    # Do not deduplicate: repeated table cells must highlight
-                    # the same number of occurrences as in the evidence quote.
-                    terms.append(segment)
+                link = re.fullmatch(r"\[([^]]+)]\(([^)]+)\)", segment)
+                matchable_parts = [link.group(1), link.group(2)] if link else [segment]
+                for part in matchable_parts:
+                    normalized = " ".join(part.replace("`", "").strip("*~ ").split())
+                    # Standalone numbers and ellipsis placeholders have no useful
+                    # context. Matching them globally highlights unrelated values
+                    # (for example `100` inside `100 000`) before the actual row.
+                    if (
+                        (len(normalized) >= 3 or (is_table_row and normalized == "-"))
+                        and normalized not in {"...", "…"}
+                        and (normalized == "-" or not re.fullmatch(r"[\d\s.,:+-]+", normalized))
+                    ):
+                        # Do not deduplicate: repeated table cells must highlight
+                        # the same number of occurrences as in the evidence quote.
+                        terms.append(normalized)
     return terms
 
 
