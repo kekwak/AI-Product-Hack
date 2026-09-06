@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Pre-review ТЗ</title>
+    <title>AI-инструмент для анализа документации</title>
     <style>
         :root {
             --red: #f20d3a;
@@ -25,7 +25,11 @@
             padding: 36px 20px;
             background: var(--bg);
             color: var(--ink);
-            font: 15px/1.5 system-ui, sans-serif
+            font: 15px/1.5 Arial, sans-serif
+        }
+
+        button, input {
+            font-family: inherit
         }
 
         .card {
@@ -317,8 +321,8 @@
         }
 
         .timer small {
-            font-size: 14px;
-            color: var(--muted)
+            font: inherit;
+            color: inherit
         }
 
         .bar {
@@ -403,7 +407,7 @@
 <section class="card">
     <div class="brand">МТС</div>
     <h1>Pre-review технического задания</h1>
-    <p class="lead">Загрузите Markdown-документ — агент проверит его и подготовит понятный отчёт.</p>
+    <p class="lead">Загрузите Markdown-документ — агент проверит его и подготовит понятный отчет</p>
     {% if error and error != "Выберите Markdown-файл." %}
     <div class="error">{{ error }}<br><a href="{% url 'reviewapp:upload' %}"
                                          style="display:inline-flex;margin-top:12px;padding:9px 13px;border:1px solid currentColor;border-radius:9px;color:inherit;font-weight:750;text-decoration:none;background:#fff">Загрузить другой файл</a></div>
@@ -411,7 +415,7 @@
     <form method="post" enctype="multipart/form-data" id="form" novalidate>{% csrf_token %}<label class="title"
                                                                                                   for="document">Документ
         ТЗ</label><label class="dropzone" id="dropzone" for="document"><span><span class="drop-icon">⇧</span><span
-            class="drop-main">Перетащите Markdown-файл сюда</span><span class="drop-sub">или нажмите, чтобы выбрать · .md / .markdown · до 2 МБ</span><span
+            class="drop-main">Перетащите Markdown-файл сюда</span><span class="drop-sub">или нажмите, чтобы выбрать .md /markdown и до 2 МБ</span><span
             class="file-name" id="file-name"></span></span></label><input type="file" id="document" name="document"
                                                                           accept=".md,.markdown,text/markdown" required>
         <div class="file-warning{% if error == 'Выберите Markdown-файл.' %} visible{% endif %}" id="file-warning"
@@ -436,15 +440,14 @@
                 {% endfor %}
             </div>
         </div>
-        <div class="hint">Режим определяет модель, которая выполнит проверку документа.</div>
         <button id="submit" type="submit">Проверить мой документ</button>
     </form>
 </section>
 <div class="progress" id="progress">
     <div class="progress-box">
-        <div class="progress-mark">AI</div>
+        <div class="progress-mark">МТС</div>
         <h2>Проверяем ваш документ</h2>
-        <div class="progress-detail" id="progress-detail">Передаём документ нашему самому внимательному ревьюеру…</div>
+        <div class="progress-detail" id="progress-detail">Передаем документ нашему самому внимательному ревьюеру…</div>
         <div class="timer"><span id="seconds">0</span> <small id="seconds-unit">секунд</small></div>
         <div class="bar"><span></span></div>
     </div>
@@ -533,7 +536,7 @@
             'Спешим изо всех сил…',
             'Токены генерируются на скорости света ✨',
             'Ищем ошибки, которые притворяются фичами…',
-            'Проверяем, всё ли сходится…',
+            'Проверяем, все ли сходится…',
             'Таблички сверяются, Kafka волнуется…',
             'Нейросеть читает между строк…',
             'Собираем замечания по крупицам…',
@@ -551,16 +554,16 @@
             'Собираем пазл из данных и зависимостей…',
             'Ищем места, где разработчик может задуматься…',
             'Переводим сложное на однозначный…',
-            'Почти всё — осталось победить пару запятых…',
-            'Нашли след ошибки, идём по нему…',
-            'Формируем отчёт без воды и паники…',
-            'Задаём документу неудобные вопросы…',
+            'Почти все — осталось победить пару запятых…',
+            'Нашли след ошибки, идем по нему…',
+            'Формируем отчет без воды и паники…',
+            'Задаем документу неудобные вопросы…',
             'Отделяем важные замечания от придирок…',
             'Превращаем токены в полезные советы…',
             'Агент задумался — значит, работает…',
             'Немного магии, много проверок ✨',
-            'Последние штрихи перед отчётом…',
-            'Ещё немного — отчёт почти готов…',
+            'Последние штрихи перед отчетом…',
+            'Еще немного — отчет почти готов…',
             'Финишная прямая уже близко…'
         ];
         let elapsed = 0, phrase = 0;

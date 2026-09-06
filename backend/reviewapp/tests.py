@@ -7,15 +7,31 @@ from django.test import TestCase
 from .models import OpenRouterModel, Review, ReviewFinding
 from .rendering import highlight_terms, highlighted_source, rendered_markdown
 from run_inference import BASE_INSTRUCTIONS, Finding, Findings, build_prompt
+from .views import CHECK_ERROR_MESSAGES, _finding_sort_key
 
 from .reviewer import (
     ReviewError,
     _invoke_schema,
+    _resolve_evidence_quote,
     run_review,
 )
 
 
 class UploadTests(TestCase):
+    def test_findings_are_sorted_by_family_and_numeric_id(self):
+        findings = [
+            {"error_type_id": "U02"},
+            {"error_type_id": "D08"},
+            {"error_type_id": "D01"},
+            {"error_type_id": "OTHER"},
+            {"error_type_id": "T01"},
+            {"error_type_id": "U01"},
+        ]
+        self.assertEqual(
+            [item["error_type_id"] for item in sorted(findings, key=_finding_sort_key)],
+            ["D01", "D08", "T01", "U01", "U02", "OTHER"],
+        )
+
     def test_get_renders_form(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
@@ -42,7 +58,11 @@ class UploadTests(TestCase):
         self.assertContains(response, 'data-family="D"')
         self.assertContains(response, 'data-family="T"')
         self.assertContains(response, 'data-family="U"')
+        self.assertContains(response, 'data-family="D" data-count="1"')
+        self.assertContains(response, 'data-family="T" data-count="0"')
         self.assertNotContains(response, 'name="filters"')
+        self.assertNotContains(response, "{{ predictions|length }}")
+        self.assertNotContains(response, "{{ count }}")
         self.assertEqual(run_review.call_args.args, ("# ТЗ\nфрагмент", "minimax/minimax-m3"))
         self.assertEqual(run_review.call_args.kwargs, {
             "max_tokens": 65536,
@@ -101,16 +121,20 @@ class UploadTests(TestCase):
             "provider": "deepinfra",
         })
 
+    @patch("reviewapp.views.choice", return_value="Упс, что-то пошло не так. Попробуйте ещё раз.")
     @patch("reviewapp.views.run_review", side_effect=ReviewError("Ошибка провайдера"))
-    def test_error_page_allows_uploading_another_file(self, run_review):
+    def test_error_page_allows_uploading_another_file(self, run_review, choice):
         response = self.client.post("/", {
             "document": SimpleUploadedFile("spec.md", b"# spec"),
             "model": "minimax/minimax-m3",
         })
 
-        self.assertContains(response, "Ошибка провайдера")
+        self.assertContains(response, "Упс, что-то пошло не так")
+        self.assertNotContains(response, "Ошибка провайдера")
         self.assertContains(response, "Загрузить другой файл")
         self.assertContains(response, 'href="/"')
+        self.assertEqual(Review.objects.get().error, "Ошибка провайдера")
+        choice.assert_called_once_with(CHECK_ERROR_MESSAGES)
 
 
 class MarkdownRenderingTests(TestCase):
@@ -124,6 +148,14 @@ class MarkdownRenderingTests(TestCase):
     def test_builds_highlight_terms_for_markdown_table(self):
         terms = highlight_terms("| Поле | Тип |\n|---|---|\n| user_id | bigint |")
         self.assertEqual(terms, ["Поле", "Тип", "user_id", "bigint"])
+
+    def test_highlight_terms_preserve_repeated_cells(self):
+        terms = highlight_terms("| Greenplum | - |\n| Greenplum | - |")
+        self.assertEqual(terms, ["Greenplum", "Greenplum"])
+
+    def test_highlight_terms_split_inline_code_from_text(self):
+        terms = highlight_terms("Шаг 1. Фильтрация: `FIELD_LAT IS NOT NULL`.")
+        self.assertEqual(terms, ["Шаг 1. Фильтрация:", "FIELD_LAT IS NOT NULL"])
 
     def test_renders_list_without_blank_line_before_it(self):
         document = "Продуктовые метрики\n- Задержка: < 1 мин\n- Пропускная способность: 100 000\n\nЗаказчики\n- BigData"
@@ -140,7 +172,7 @@ class MarkdownRenderingTests(TestCase):
         self.assertIn("- not a list", result)
         self.assertNotIn("<li>", result)
 
-    def test_rendered_markdown_preserves_exact_multiline_evidence_boundaries(self):
+    def test_rendered_markdown_highlight_does_not_break_table_structure(self):
         document = "Kafka — 24 ч\n\nData Catalog\n- http://catalog/item"
         findings = [{
             "error_type_id": "D02", "family": "D",
@@ -149,8 +181,15 @@ class MarkdownRenderingTests(TestCase):
 
         result = rendered_markdown(document, findings)
 
-        self.assertEqual(result.count("\ue000R0S\ue001"), 1)
-        self.assertEqual(result.count("\ue000R0E\ue001"), 1)
+        self.assertNotIn("\ue000R0S\ue001", result)
+        self.assertIn("<ul>", result)
+
+        table = "| Поле | Тип |\n|---|---|\n| user_id | bigint |"
+        table_result = rendered_markdown(table, [{
+            "error_type_id": "D01", "family": "D", "evidence_quote": table,
+        }])
+        self.assertEqual(table_result.count("<table>"), 1)
+        self.assertEqual(table_result.count("<tr>"), 2)
 
     def test_source_marks_include_family(self):
         result = highlighted_source("ошибка здесь", [{
@@ -263,3 +302,23 @@ class ReviewerResilienceTests(TestCase):
             ("system", build_prompt(BASE_INSTRUCTIONS)),
             ("human", "# ПРОВЕРЯЕМЫЙ ДОКУМЕНТ\n\n```\nисходный документ\n```"),
         ])
+
+    def test_resolves_unique_quote_with_changed_whitespace(self):
+        document = "Строка с двумя  пробелами\nи переносом."
+        self.assertEqual(
+            _resolve_evidence_quote(document, "Строка с двумя пробелами и переносом."),
+            document,
+        )
+
+    def test_resolves_quote_with_small_text_difference(self):
+        document = "Шаг 1. Фильтрация данных выполняется до обогащения.\nСледующий этап."
+        self.assertEqual(
+            _resolve_evidence_quote(
+                document,
+                "Шаг 1. Фильтрация данных выполняется перед обогащением.\nСледующий этап.",
+            ),
+            document,
+        )
+
+    def test_does_not_resolve_ambiguous_quote(self):
+        self.assertIsNone(_resolve_evidence_quote("поле id и поле id", "поле id"))

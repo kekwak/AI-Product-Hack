@@ -1,5 +1,7 @@
 import os
+import re
 import time
+from difflib import SequenceMatcher
 
 from langchain_openrouter import ChatOpenRouter
 from run_inference import BASE_INSTRUCTIONS, Findings, build_prompt
@@ -52,6 +54,40 @@ def _invoke_schema(
     return parsed
 
 
+def _resolve_evidence_quote(document: str, quote: str) -> str | None:
+    """Map harmless whitespace changes back to one exact source substring."""
+    if quote and document.count(quote) == 1:
+        return quote
+    pieces = [re.escape(piece) for piece in re.split(r"\s+", quote.strip()) if piece]
+    if not pieces:
+        return None
+    matches = list(re.finditer(r"\s+".join(pieces), document, flags=re.MULTILINE))
+    if len(matches) == 1:
+        return matches[0].group(0)
+    if len(matches) > 1:
+        return None
+
+    quote_lines = [line for line in quote.splitlines() if line.strip()]
+    document_lines = list(re.finditer(r"[^\n]+(?:\n|$)", document))
+    if not quote_lines or not document_lines:
+        return None
+    normalized_quote = " ".join(quote.split()).casefold()
+    expected_lines = len(quote_lines)
+    best_score, best_candidate = 0.0, ""
+    for start in range(len(document_lines)):
+        for line_count in range(max(1, expected_lines - 2), expected_lines + 3):
+            end_index = min(start + line_count, len(document_lines))
+            start_offset = document_lines[start].start()
+            end_offset = document_lines[end_index - 1].end()
+            candidate = document[start_offset:end_offset].strip()
+            score = SequenceMatcher(
+                None, normalized_quote, " ".join(candidate.split()).casefold()
+            ).ratio()
+            if score > best_score:
+                best_score, best_candidate = score, candidate
+    return best_candidate if best_score >= 0.88 else None
+
+
 def _run_candidate_review(
     document: str,
     model: str,
@@ -85,7 +121,12 @@ def _run_candidate_review(
                 no_temperature=no_temperature,
                 provider=provider,
             )
-            return [item.model_dump() for item in parsed.errors]
+            results = [item.model_dump() for item in parsed.errors]
+            for result in results:
+                resolved_quote = _resolve_evidence_quote(document, result.get("evidence_quote", ""))
+                if resolved_quote is not None:
+                    result["evidence_quote"] = resolved_quote
+            return results
         except Exception as exc:
             if attempt < retries:
                 time.sleep(2 ** attempt)

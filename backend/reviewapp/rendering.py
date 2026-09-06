@@ -10,7 +10,7 @@ def _marked_source(document: str, findings: list[dict], escape: bool) -> str:
     spans = []
     for index, item in enumerate(findings):
         quote = item.get("evidence_quote", "")
-        if quote and document.count(quote) == 1:
+        if quote and quote in document:
             spans.append((document.index(quote), index, quote))
     spans.sort()
     result, cursor = [], 0
@@ -47,10 +47,20 @@ def highlight_terms(evidence: str) -> list[str]:
         else:
             candidates = [re.sub(r"^(?:#{1,6}|[-*+] |\d+[.)] )\s*", "", line)]
         for candidate in candidates:
-            candidate = re.sub(r"\[([^]]+)]\([^)]+\)", r"\1", candidate)
-            candidate = candidate.replace("`", "").strip("*~ ")
-            if len(candidate) >= 3 and candidate not in terms:
-                terms.append(candidate)
+            # Inline code and links become separate DOM text nodes after
+            # Markdown rendering, so search for each visible part separately.
+            segments = re.split(r"(`[^`]+`|\[[^]]+]\([^)]+\))", candidate)
+            for segment in segments:
+                if not segment:
+                    continue
+                link = re.fullmatch(r"\[([^]]+)]\([^)]+\)", segment)
+                if link:
+                    segment = link.group(1)
+                segment = segment.replace("`", "").strip("*~ ")
+                if len(segment) >= 3:
+                    # Do not deduplicate: repeated table cells must highlight
+                    # the same number of occurrences as in the evidence quote.
+                    terms.append(segment)
     return terms
 
 
@@ -78,42 +88,11 @@ def _normalize_loose_markdown(document: str) -> str:
     return "\n".join(normalized)
 
 
-def _render_input_with_markers(document: str, findings: list[dict]) -> str:
-    """Place inert markers around exact evidence after Markdown normalization."""
-    normalized_document = _normalize_loose_markdown(document)
-    spans: list[tuple[int, int, int]] = []
-    for index, item in enumerate(findings):
-        quote = item.get("evidence_quote", "")
-        if not quote:
-            continue
-        normalized_quote = _normalize_loose_markdown(quote)
-        if normalized_document.count(normalized_quote) == 1:
-            start = normalized_document.index(normalized_quote)
-            spans.append((start, start + len(normalized_quote), index))
-
-    non_overlapping: list[tuple[int, int, int]] = []
-    cursor = 0
-    for span in sorted(spans):
-        if span[0] >= cursor:
-            non_overlapping.append(span)
-            cursor = span[1]
-
-    for start, end, index in reversed(non_overlapping):
-        normalized_document = (
-            normalized_document[:start]
-            + f"\ue000R{index}S\ue001"
-            + normalized_document[start:end]
-            + f"\ue000R{index}E\ue001"
-            + normalized_document[end:]
-        )
-    return normalized_document
-
-
 def rendered_markdown(document: str, findings: list[dict]) -> str:
-    # Highlighting is applied to the resulting DOM in the browser so mark tags
-    # cannot break tables, fenced code blocks, lists, or other Markdown syntax.
+    # Render pristine Markdown. Markers inserted before parsing can split table
+    # delimiters and produce malformed rows with enormous cells.
     rendered = markdown.markdown(
-        _render_input_with_markers(document, findings),
+        _normalize_loose_markdown(document),
         extensions=["tables", "fenced_code", "sane_lists"],
     )
     tags = set(bleach.sanitizer.ALLOWED_TAGS) | {

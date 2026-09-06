@@ -1,4 +1,6 @@
 from pathlib import Path
+import re
+from secrets import choice
 
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
@@ -10,6 +12,25 @@ from .reviewer import ReviewError, run_review
 
 MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
 ALLOWED_SUFFIXES = {".md", ".markdown"}
+CHECK_ERROR_MESSAGES = (
+    "Упс, что-то пошло не так. Попробуйте ещё раз — со второго раза магия обычно послушнее",
+    "Кажется, нейросеть споткнулась о собственные токены. Давайте повторим проверку",
+    "Наш цифровой ревьюер взял незапланированный кофе-брейк. Попробуйте ещё раз через минуту",
+    "Документ оказался достойным соперником. Перезапустим проверку и возьмём реванш",
+    "Проверка ушла не по плану, зато ошибка уже записана. Можно спокойно попробовать снова",
+    "Где-то потерялся один очень важный нолик. Повторите попытку — мы уже ищем его",
+    "Сервер сказал «ой». Мы сохранили подробности, а вы можете запустить проверку ещё раз",
+    "Токены немного запутались в проводах. Ещё одна попытка должна всё распутать",
+)
+
+
+def _finding_sort_key(item):
+    error_id = str(item.get("error_type_id", "")).upper()
+    match = re.fullmatch(r"([DTU])(\d+)", error_id)
+    if match:
+        family, number = match.groups()
+        return {"D": 0, "T": 1, "U": 2}[family], int(number), error_id
+    return 3, 0, error_id
 
 
 def _upload_context(error=""):
@@ -57,7 +78,8 @@ def upload(request):
     except ReviewError as exc:
         review.error = str(exc)
         review.save(update_fields=["error"])
-        return render(request, "reviewapp/upload.html", _upload_context(f"Не удалось выполнить проверку: {exc}"))
+        return render(request, "reviewapp/upload.html", _upload_context(choice(CHECK_ERROR_MESSAGES)))
+    findings = sorted(findings, key=_finding_sort_key)
     review.findings = findings
     review.save(update_fields=["findings"])
     ReviewFinding.objects.bulk_create([
@@ -84,6 +106,7 @@ def upload(request):
         for index, item in enumerate(display_findings)
     ]
     family_counts = {family: sum(item["family"] == family for item in display_findings) for family in enabled}
+    primary_count = family_counts["D"] + family_counts["T"]
     criteria_count = sum({"D": 8, "T": 1, "U": 19, "OTHER": 1}[family] for family in enabled)
     return render(request, "reviewapp/report.html", {
         "document_name": review.document_name, "model": model,
@@ -91,5 +114,6 @@ def upload(request):
         "rendered_document": rendered_markdown(document, display_findings),
         "finding_highlights": finding_highlights,
         "family_counts": family_counts,
+        "primary_count": primary_count,
         "criteria_count": criteria_count,
     })

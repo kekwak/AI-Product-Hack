@@ -1,25 +1,1340 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Отчёт — {{ document_name }}</title><style>
-@media(min-width:901px){html body main{grid-template-columns:minmax(0,1fr)!important}html body aside{position:fixed!important;top:68px;right:0;width:420px;z-index:4}html body .document{width:100%;padding-left:30px;padding-right:30px}}
-@media(min-width:901px){html body .actions{display:grid;grid-template-columns:repeat(4,190px);align-items:stretch}html body .actions .btn{min-height:40px;display:flex;align-items:center;justify-content:center;white-space:nowrap;text-align:center}}
-.advanced-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#3f3f46;font:inherit;font-weight:750;cursor:pointer;text-align:left}.advanced-toggle:hover{border-color:#ffc9d4;background:#fff5f7}.advanced-toggle:after{content:"⌄";font-size:18px;transition:transform .2s}.advanced-toggle.open:after{transform:rotate(180deg)}.advanced-note{display:block;color:var(--muted);font-size:10px;font-weight:500}.family-filter.extra-filter{display:none}.family-filters.advanced-open .family-filter.extra-filter{display:inline-flex}.family-filter.has-tooltip:after{left:0;right:auto;width:250px}.family-filter[data-family=T].has-tooltip:after{left:auto;right:0}.family-filter[data-family=U].has-tooltip:after,.family-filter[data-family=OTHER].has-tooltip:after{bottom:auto;top:calc(100% + 9px)}@media(max-width:900px){.advanced-toggle{grid-column:1/-1;min-height:48px}.family-filters.advanced-open .family-filter.extra-filter{display:flex}.family-filter.has-tooltip:after{left:16px;right:16px;width:auto}}
-.filter-group-label{width:100%;margin:2px 0 1px;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.filter-group-label.extra{display:flex;align-items:center;gap:7px;margin-top:8px}.filter-group-label.extra:after{content:"расширение проекта";padding:2px 6px;border-radius:999px;background:#ffebef;color:var(--red);font-size:9px;letter-spacing:0;text-transform:none}.family-filter[data-family=U],.family-filter[data-family=OTHER]{border-style:dashed}.has-tooltip{position:relative;cursor:help}.has-tooltip:after{content:attr(data-tooltip);position:absolute;right:0;bottom:calc(100% + 9px);width:280px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#18181b;color:#fff;box-shadow:0 12px 35px #18181b2b;font-size:12px;font-weight:500;line-height:1.4;text-align:left;white-space:normal;opacity:0;visibility:hidden;transform:translateY(4px);transition:.15s;z-index:20;pointer-events:none}.has-tooltip:hover:after,.has-tooltip:focus:after{opacity:1;visibility:visible;transform:none}.badge.has-tooltip:after{right:auto;left:0;bottom:calc(100% + 7px)}.finding-card .title{display:flex;gap:5px;align-items:flex-start}.finding-card .title:before{content:"Пояснение:";color:var(--muted);font-size:11px;font-weight:600;line-height:1.9}@media(max-width:900px){.family-filters{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))}.family-filter{width:100%;min-height:42px}.filter-group-label{grid-column:1/-1}.has-tooltip:after,.badge.has-tooltip:after{position:fixed;left:16px;right:16px;bottom:16px;width:auto;max-width:none}.finding-card{padding:16px}.panel-head h2{font-size:20px}}
-@media(max-width:900px){.has-tooltip:after,.has-tooltip:hover:after,.has-tooltip:focus:after{display:none!important}.family-filters{gap:8px!important}.family-filter{justify-content:center;font-size:14px}.mobile-filter-help{grid-column:1/-1;padding:11px 12px;border-radius:10px;background:#f0f0f3;color:#52525b;font-size:12px;line-height:1.45}.mobile-filter-help[hidden]{display:none!important}.badge.has-tooltip{cursor:pointer}.mobile-criterion-help{margin:9px 0 2px;padding:10px 11px;border-left:3px solid var(--red);border-radius:0 8px 8px 0;background:#fff2f5;color:#52525b;font-size:12px;line-height:1.45}.mobile-criterion-help[hidden]{display:none!important}}
-@media(min-width:901px){html body .actions{grid-template-columns:repeat(3,190px)}.family-filter.has-tooltip:after{top:calc(100% + 8px);bottom:auto}.family-filter[data-family=D].has-tooltip:after{left:0;right:auto}.family-filter[data-family=T].has-tooltip:after{left:auto;right:0}}.actions>a.btn{display:none!important}
-.has-tooltip:after,.has-tooltip:hover:after,.has-tooltip:focus:after{display:none!important}.mobile-filter-help{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#f0f0f3;color:#52525b;font-size:12px;line-height:1.45}.mobile-filter-help[hidden]{display:none!important}
-.criterion-info-dot{margin-left:4px;font-size:10px;opacity:.8}.mobile-criterion-help{margin:9px 0 2px;padding:10px 11px;border-left:3px solid var(--red);border-radius:0 8px 8px 0;background:#fff2f5;color:#52525b;font:12px/1.45 system-ui,sans-serif}.mobile-criterion-help[hidden]{display:none!important}
-@media(max-width:900px){body.panel-closed aside{display:block!important;transform:translateX(105%)}aside{position:fixed!important;top:0!important;right:0;bottom:0;width:min(92vw,420px);height:100dvh!important;padding:20px!important;border:0!important;border-left:1px solid var(--line)!important;background:#fafafa;box-shadow:-20px 0 60px #18181b2b;transform:translateX(0);transition:transform .25s ease!important;z-index:40!important}body.mobile-panel-open{overflow:hidden}.mobile-backdrop{position:fixed;inset:0;display:block;background:#18181b66;opacity:1;transition:opacity .2s;z-index:35}.mobile-backdrop[hidden]{display:none!important}.mobile-panel-close{width:38px;height:38px;display:grid;place-items:center;margin-left:auto;margin-bottom:8px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#18181b;font-size:22px;cursor:pointer}#panel-toggle{border-color:#18181b;background:#18181b;color:#fff}.family-filter .info-dot{margin-left:6px;font-size:13px;opacity:.7}.mobile-filter-help{grid-column:1/-1}.actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px!important}.actions .btn{display:flex;align-items:center;justify-content:center;min-height:42px;padding:8px!important;text-align:center}.actions #panel-toggle{grid-column:1/-1;grid-row:1}.actions>a.btn{display:none!important}}
-.paper{overflow-x:auto}.rendered table{display:table!important;width:100%!important;table-layout:auto;border-collapse:collapse}.rendered thead,.rendered tbody{width:100%}.rendered tr{display:table-row}.rendered th,.rendered td{display:table-cell;min-width:120px;overflow-wrap:anywhere;word-break:normal}@media(max-width:900px){.rendered table{min-width:680px}.paper{overscroll-behavior-inline:contain}}
-mark[data-family=D]{background:#ffe18b}mark[data-family=T]{background:#f5d98f}mark[data-family=U]{background:#ffc4d0;color:#701029}mark[data-family=OTHER]{background:#dcc8ff;color:#41206f}mark[data-family].active{background:var(--red);color:#fff}mark[data-family].filtered-out{background:transparent;color:inherit;padding:0}
-@media(max-width:900px){.paper{overflow-x:hidden!important}.table-scroll{width:100%;margin:14px 0;overflow-x:auto;border:1px solid #d8d8dd;border-radius:9px;background:#fff;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}.table-scroll:before{content:"Проведите в сторону, чтобы посмотреть таблицу →";position:sticky;left:0;display:block;width:max-content;padding:7px 10px;color:var(--muted);font-size:11px}.table-scroll .rendered-table{width:max-content!important;min-width:850px!important;margin:0!important;border:0}.table-scroll .rendered-table th,.table-scroll .rendered-table td{min-width:145px;overflow-wrap:normal;word-break:normal}.table-scroll .rendered-table th:first-child,.table-scroll .rendered-table td:first-child{min-width:180px}}
-:root{--red:#f20d3a;--line:#e4e4e7;--muted:#71717a;--bg:#f6f6f7;--code:#f4f4f6}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#18181b;font:14px/1.5 system-ui,sans-serif}header{min-height:68px;display:flex;align-items:center;gap:15px;padding:10px 22px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}.brand{padding:5px 8px;background:var(--red);color:#fff;border-radius:5px;font-weight:900}.meta{color:var(--muted);font-size:12px}.spacer{flex:1}.actions{display:flex;gap:8px}.btn{padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:inherit;text-decoration:none;cursor:pointer;font:inherit}.btn:hover{background:#fff0f3}.btn.active{background:#18181b;color:#fff;border-color:#18181b}main{min-height:calc(100vh - 68px);display:grid;grid-template-columns:minmax(0,1fr) 420px;transition:.2s}.document{min-width:0;padding:30px;overflow:auto;display:flex;justify-content:center;align-items:flex-start}.paper{width:min(100%,1000px);padding:34px;background:#fff;border:1px solid var(--line);border-radius:13px}.source{white-space:pre-wrap;font:13px/1.65 ui-monospace,monospace}.rendered{font-size:14px;line-height:1.65}.rendered h1,.rendered h2,.rendered h3,.rendered h4{line-height:1.25;margin:1.5em 0 .65em}.rendered h1{font-size:25px;border-bottom:1px solid var(--line);padding-bottom:8px}.rendered h2{font-size:21px}.rendered h3{font-size:17px}.rendered p{margin:.6em 0 1em}.rendered ul,.rendered ol{padding-left:24px}.rendered pre{padding:14px;overflow:auto;background:var(--code);border:1px solid var(--line);border-radius:8px}.rendered code{padding:2px 5px;background:var(--code);border-radius:4px;font:12.5px ui-monospace,monospace}.rendered pre code{padding:0}.rendered table{width:100%;display:block;overflow-x:auto;border-collapse:collapse;margin:16px 0}.rendered th,.rendered td{min-width:120px;padding:8px 10px;border:1px solid #d8d8dd;text-align:left;vertical-align:top}.rendered th{background:#f0f0f3}.rendered tr:nth-child(even) td{background:#fafafa}.rendered a{color:var(--red)}aside{height:calc(100vh - 68px);position:sticky;top:68px;padding:20px;overflow:auto;background:#fafafa;border-left:1px solid var(--line);transition:.2s}.panel-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}.panel-head h2{margin:0;font-size:17px}.summary{color:var(--muted);font-size:12px}.family-filters{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}.family-filter{font-weight:800}.family-filter[data-family=D].active{background:#18181b;color:#fff}.family-filter[data-family=T].active{background:#f5e5b9;color:#604400}.family-filter[data-family=U].active,.family-filter[data-family=OTHER].active{background:#ffebef;color:var(--red);border-color:#ffc9d4}.card{padding:14px;margin-bottom:10px;background:#fff;border:1px solid var(--line);border-radius:11px;cursor:pointer}.card:hover{border-color:#c9c9cf}.badge{display:inline-block;padding:2px 7px;background:#ffebef;color:var(--red);border-radius:5px;font-size:11px;font-weight:800}.badge.D{background:#18181b;color:#fff}.badge.T{background:#f5e5b9;color:#604400}.title{margin:7px 0 4px;font-weight:750}.problem{margin-top:5px;color:var(--muted)}blockquote{margin:10px 0 0;padding:7px 10px;background:var(--code);border-left:3px solid var(--red);font:12px/1.5 ui-monospace,monospace;white-space:pre-wrap}body.panel-closed main{grid-template-columns:minmax(0,1fr)}body.panel-closed aside{display:none}mark{background:#ffe18b;border-radius:3px;padding:1px;scroll-margin:100px}mark.active{background:var(--red);color:#fff}mark.filtered-out{background:transparent;color:inherit;padding:0}[hidden]{display:none!important}@media(max-width:900px){header{align-items:flex-start;flex-wrap:wrap}.actions{width:100%;flex-wrap:wrap}main{grid-template-columns:1fr}.document{padding:16px}.paper{padding:22px}aside{position:static;height:auto;border-left:0;border-top:1px solid var(--line)}}
-</style></head><body><header><div class="brand">МТС</div><div><b>Отчёт pre-review</b><div class="meta">{{ document_name }} · {{ model }}</div></div><div class="spacer"></div><div class="actions"><button class="btn active" id="render-btn" type="button">Рендер Markdown</button><button class="btn" id="source-btn" type="button">Исходный Markdown</button><button class="btn" id="panel-toggle" type="button">Скрыть замечания</button><a class="btn" href="{% url 'reviewapp:upload' %}">Новая проверка</a></div></header><main><section class="document"><div class="paper rendered" id="rendered-document">{{ rendered_document|safe }}</div><div class="paper source" id="source-document" hidden>{{ highlighted_document|safe }}</div></section><aside id="findings-panel"><div class="panel-head"><div><h2>Замечания</h2><div class="summary">Показано <b id="visible-count">{{ predictions|length }}</b> из {{ predictions|length }}</div></div></div><div class="family-filters">{% for family,count in family_counts.items %}<button class="btn family-filter active" type="button" data-family="{{ family }}">{{ family }} · {{ count }}</button>{% endfor %}</div>{% for item in predictions %}<article class="card finding-card" data-index="{{ forloop.counter0 }}" data-family="{{ item.family }}"><span class="badge {{ item.family }}">{{ item.error_type_id }}</span><div class="title">{{ item.title }}</div><div class="problem">{{ item.problem }}</div>{% if item.reasoning %}<div class="problem"><b>Почему важно:</b> {{ item.reasoning }}</div>{% endif %}{% if item.recommendation %}<div class="problem"><b>Рекомендация:</b> {{ item.recommendation }}</div>{% endif %}<blockquote>{{ item.evidence_quote }}</blockquote></article>{% empty %}<div class="card">Значимых проблем не найдено.</div>{% endfor %}</aside></main>{{ finding_highlights|json_script:"finding-highlights" }}<script>
-const rendered=document.getElementById('rendered-document'),source=document.getElementById('source-document'),renderBtn=document.getElementById('render-btn'),sourceBtn=document.getElementById('source-btn'),panelToggle=document.getElementById('panel-toggle');function markTerm(container,term,index,family){const walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT);let node;while(node=walker.nextNode()){if(node.parentElement.closest('mark'))continue;const start=node.nodeValue.indexOf(term);if(start<0)continue;const before=node.splitText(start);before.splitText(term.length);const mark=document.createElement('mark');mark.dataset.index=index;mark.dataset.family=family;before.replaceWith(mark);mark.appendChild(before);return true}return false}JSON.parse(document.getElementById('finding-highlights').textContent).forEach(item=>item.terms.forEach(term=>markTerm(rendered,term,item.index,item.family)));function setMode(mode){const isRendered=mode==='rendered';rendered.hidden=!isRendered;source.hidden=isRendered;renderBtn.classList.toggle('active',isRendered);sourceBtn.classList.toggle('active',!isRendered)}renderBtn.addEventListener('click',()=>setMode('rendered'));sourceBtn.addEventListener('click',()=>setMode('source'));panelToggle.addEventListener('click',()=>{document.body.classList.toggle('panel-closed');panelToggle.textContent=document.body.classList.contains('panel-closed')?'Показать замечания':'Скрыть замечания'});document.querySelectorAll('.finding-card').forEach(card=>card.addEventListener('click',()=>{document.querySelectorAll('mark').forEach(mark=>mark.classList.remove('active'));const container=rendered.hidden?source:rendered,mark=container.querySelector('mark[data-index="'+card.dataset.index+'"]:not(.filtered-out)');if(mark){container.querySelectorAll('mark[data-index="'+card.dataset.index+'"]:not(.filtered-out)').forEach(item=>item.classList.add('active'));mark.scrollIntoView({behavior:'smooth',block:'center'})}}));document.querySelectorAll('.family-filter').forEach(button=>button.addEventListener('click',()=>{button.classList.toggle('active');const enabled=new Set([...document.querySelectorAll('.family-filter.active')].map(item=>item.dataset.family));let count=0;document.querySelectorAll('.finding-card').forEach(card=>{card.hidden=!enabled.has(card.dataset.family);if(!card.hidden)count++});document.querySelectorAll('mark[data-family]').forEach(mark=>{const filtered=!enabled.has(mark.dataset.family);mark.classList.toggle('filtered-out',filtered);if(filtered)mark.classList.remove('active')});document.getElementById('visible-count').textContent=count}));
-rendered.querySelectorAll('table').forEach(table=>{const wrapper=document.createElement('div');wrapper.className='table-scroll';table.classList.add('rendered-table');table.parentNode.insertBefore(wrapper,table);wrapper.appendChild(table)});
-const familyNames={D:'Domen',T:'Template',U:'Universal',OTHER:'Other'};const familyHelp={D:'Domen — проверки D01–D08: обязательные технические требования к данным, ссылкам, полям, фильтрам, Kafka и хранилищам.',T:'Template — проверка T01 на соответствие обязательной структуре шаблона, включая разделы, таблицы, поля и колонки.',U:'Universal — дополнительная проверка логики и согласованности ТЗ глазами аналитика, разработчика и тестировщика.',OTHER:'Other — существенные замечания, которые не относятся к критериям Domen, Template или Universal.'};
-const highlightData=JSON.parse(document.getElementById('finding-highlights').textContent);rendered.querySelectorAll('mark').forEach(mark=>mark.replaceWith(...mark.childNodes));const markerPattern=/\uE000R(\d+)([SE])\uE001/g;const markerNodes=[];const markerWalker=document.createTreeWalker(rendered,NodeFilter.SHOW_TEXT);while(markerWalker.nextNode())markerNodes.push(markerWalker.currentNode);markerNodes.forEach(node=>{if(!markerPattern.test(node.nodeValue)){markerPattern.lastIndex=0;return}markerPattern.lastIndex=0;const fragment=document.createDocumentFragment();let cursor=0,match;while((match=markerPattern.exec(node.nodeValue))){fragment.append(node.nodeValue.slice(cursor,match.index));fragment.append(document.createComment('review:'+match[1]+':'+match[2]));cursor=markerPattern.lastIndex}fragment.append(node.nodeValue.slice(cursor));node.replaceWith(fragment)});let activeIndex=null;const exactIndexes=new Set(),exactWalker=document.createTreeWalker(rendered,NodeFilter.SHOW_TEXT|NodeFilter.SHOW_COMMENT);const exactNodes=[];while(exactWalker.nextNode())exactNodes.push(exactWalker.currentNode);exactNodes.forEach(node=>{if(node.nodeType===Node.COMMENT_NODE&&node.nodeValue.startsWith('review:')){const [,index,edge]=node.nodeValue.split(':');if(edge==='S'){activeIndex=index;exactIndexes.add(Number(index))}else{activeIndex=null}node.remove();return}if(activeIndex!==null&&node.nodeValue){const mark=document.createElement('mark');mark.dataset.index=activeIndex;mark.dataset.family=highlightData[Number(activeIndex)]?.family||'';node.replaceWith(mark);mark.appendChild(node)}});highlightData.forEach(item=>{if(!exactIndexes.has(item.index))item.terms.forEach(term=>markTerm(rendered,term,item.index,item.family))});
-const criterionHelp={D01:'Для каждого потока должны быть указаны формат, схема или модель и способ сериализации/десериализации.',D02:'Для каждого источника и приёмника нужна прямая ссылка на соответствующий объект Data Catalog.',D03:'Для каждого поля должна быть явно указана обязательность: NOT NULL или NULLABLE.',D04:'Условия фильтрации при построении витрины и выгрузке данных должны быть описаны точно.',D05:'Предусмотренный этап нельзя молча пропускать: укажите «не применимо» или «нет».',D06:'Для каждого потокового источника и приёмника необходимо точное имя Kafka-кластера.',D07:'Для файлового приёмника нужны полный путь HDFS и формат хранения.',D08:'Перечислите все используемые справочники либо явно укажите, что они отсутствуют.',T01:'Документ должен содержать все обязательные разделы, поля, этапы, таблицы и колонки исходного шаблона.'};
-const filterBox=document.querySelector('.family-filters');if(filterBox){const buttons=[...filterBox.querySelectorAll('.family-filter')];buttons.forEach(button=>{const count=(button.textContent.split('·')[1]||'0').trim();button.textContent=(familyNames[button.dataset.family]||button.dataset.family)+' · '+count;button.classList.add('has-tooltip');button.dataset.tooltip=familyHelp[button.dataset.family]||'';const info=document.createElement('span');info.className='info-dot';info.textContent='ⓘ';info.setAttribute('aria-hidden','true');button.appendChild(info)});const primary=buttons.find(button=>button.dataset.family==='D'||button.dataset.family==='T');if(primary){const label=document.createElement('div');label.className='filter-group-label';label.textContent='Основные критерии';filterBox.insertBefore(label,primary)}const extraButtons=buttons.filter(button=>button.dataset.family==='U'||button.dataset.family==='OTHER');if(extraButtons.length){extraButtons.forEach(button=>button.classList.add('extra-filter'));const toggle=document.createElement('button');toggle.type='button';toggle.className='advanced-toggle';toggle.setAttribute('aria-expanded','false');toggle.innerHTML='<span>Расширенные проверки<span class="advanced-note">Universal и Other · расширение проекта</span></span>';filterBox.insertBefore(toggle,extraButtons[0]);toggle.addEventListener('click',()=>{const open=filterBox.classList.toggle('advanced-open');toggle.classList.toggle('open',open);toggle.setAttribute('aria-expanded',String(open))})}}
-document.querySelectorAll('.finding-card .badge').forEach(badge=>{const code=badge.textContent.trim(),card=badge.closest('.finding-card'),title=card.querySelector('.title')?.textContent.trim();badge.classList.add('has-tooltip');badge.tabIndex=0;badge.dataset.tooltip=criterionHelp[code]||title||'Дополнительный критерий проверки.';const info=document.createElement('span');info.className='criterion-info-dot';info.textContent='ⓘ';info.setAttribute('aria-hidden','true');badge.appendChild(info);badge.setAttribute('aria-label',code+': '+badge.dataset.tooltip)});
-if(filterBox){const mobileViewport=window.matchMedia('(max-width: 900px)'),filterHelp=document.createElement('div');filterHelp.className='mobile-filter-help';filterHelp.hidden=true;filterBox.appendChild(filterHelp);const showFilterHelp=button=>{filterHelp.dataset.family=button.dataset.family;filterHelp.textContent=button.dataset.tooltip;filterHelp.hidden=false};filterBox.querySelectorAll('.family-filter').forEach(button=>{button.addEventListener('mouseenter',()=>{if(!mobileViewport.matches)showFilterHelp(button)});button.addEventListener('focus',()=>{if(!mobileViewport.matches)showFilterHelp(button)});button.addEventListener('click',()=>{if(!mobileViewport.matches)return;const same=filterHelp.dataset.family===button.dataset.family&&!filterHelp.hidden;if(same){filterHelp.hidden=true}else{showFilterHelp(button)}})});document.querySelectorAll('.finding-card .badge').forEach(badge=>{const help=document.createElement('div');help.className='mobile-criterion-help';help.textContent=badge.dataset.tooltip;help.hidden=true;badge.insertAdjacentElement('afterend',help);badge.addEventListener('mouseenter',()=>{if(!mobileViewport.matches)help.hidden=false});badge.addEventListener('mouseleave',()=>{if(!mobileViewport.matches)help.hidden=true});badge.addEventListener('focus',()=>{if(!mobileViewport.matches)help.hidden=false});badge.addEventListener('blur',()=>{if(!mobileViewport.matches)help.hidden=true});badge.addEventListener('click',event=>{if(!mobileViewport.matches)return;event.stopPropagation();help.hidden=!help.hidden})});mobileViewport.addEventListener('change',()=>{filterHelp.hidden=true;document.querySelectorAll('.mobile-criterion-help').forEach(help=>help.hidden=true)})}
-const reportMobile=window.matchMedia('(max-width: 900px)'),findingsPanel=document.getElementById('findings-panel'),backdrop=document.createElement('div'),panelClose=document.createElement('button');backdrop.className='mobile-backdrop';backdrop.hidden=true;document.body.appendChild(backdrop);panelClose.type='button';panelClose.className='mobile-panel-close';panelClose.setAttribute('aria-label','Закрыть замечания');panelClose.textContent='×';findingsPanel.prepend(panelClose);const closeMobilePanel=()=>{document.body.classList.add('panel-closed');document.body.classList.remove('mobile-panel-open');backdrop.hidden=true};const syncReportLayout=()=>{if(reportMobile.matches){closeMobilePanel();panelToggle.textContent='☰ Замечания ('+document.querySelectorAll('.finding-card').length+')'}else{document.body.classList.remove('panel-closed','mobile-panel-open');backdrop.hidden=true;panelToggle.textContent='Скрыть замечания'}};panelToggle.addEventListener('click',()=>{if(!reportMobile.matches)return;const open=!document.body.classList.contains('panel-closed');document.body.classList.toggle('mobile-panel-open',open);backdrop.hidden=!open;panelToggle.textContent='☰ Замечания ('+document.querySelectorAll('.finding-card').length+')'});panelClose.addEventListener('click',closeMobilePanel);backdrop.addEventListener('click',closeMobilePanel);reportMobile.addEventListener('change',syncReportLayout);syncReportLayout();
-</script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Отчет — {{ document_name }}</title>
+    <style>
+        @media (min-width: 901px) {
+            html body main {
+                grid-template-columns:minmax(0, 1fr) !important
+            }
+
+            html body aside {
+                position: fixed !important;
+                top: 68px;
+                right: 0;
+                width: 420px;
+                z-index: 4
+            }
+
+            html body .document {
+                width: 100%;
+                padding-left: 30px;
+                padding-right: 30px
+            }
+        }
+
+        @media (min-width: 901px) {
+            html body .actions {
+                display: grid;
+                grid-template-columns:minmax(300px, 340px) 190px;
+                align-items: stretch
+            }
+
+            html body .actions .btn {
+                min-height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                white-space: nowrap;
+                text-align: center
+            }
+        }
+
+        .advanced-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 8px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            color: #3f3f46;
+            font: inherit;
+            font-weight: 750;
+            cursor: pointer;
+            text-align: left
+        }
+
+        .advanced-toggle:hover {
+            border-color: #ffc9d4;
+            background: #fff5f7
+        }
+
+        .advanced-toggle:after {
+            content: "⌄";
+            font-size: 18px;
+            transition: transform .2s
+        }
+
+        .advanced-toggle.open:after {
+            transform: rotate(180deg)
+        }
+
+        .advanced-note {
+            display: block;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 500
+        }
+
+        .family-filter.extra-filter {
+            display: none
+        }
+
+        .family-filters.advanced-open .family-filter.extra-filter {
+            display: inline-flex
+        }
+
+        .family-filter.has-tooltip:after {
+            left: 0;
+            right: auto;
+            width: 250px
+        }
+
+        .family-filter[data-family=T].has-tooltip:after {
+            left: auto;
+            right: 0
+        }
+
+        .family-filter[data-family=U].has-tooltip:after, .family-filter[data-family=OTHER].has-tooltip:after {
+            bottom: auto;
+            top: calc(100% + 9px)
+        }
+
+        @media (max-width: 900px) {
+            .advanced-toggle {
+                grid-column: 1/-1;
+                min-height: 48px
+            }
+
+            .family-filters.advanced-open .family-filter.extra-filter {
+                display: flex
+            }
+
+            .family-filter.has-tooltip:after {
+                left: 16px;
+                right: 16px;
+                width: auto
+            }
+        }
+
+        .filter-group-label {
+            width: 100%;
+            margin: 2px 0 1px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase
+        }
+
+        .filter-group-label.extra {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-top: 8px
+        }
+
+        .filter-group-label.extra:after {
+            content: "расширение проекта";
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: #ffebef;
+            color: var(--red);
+            font-size: 9px;
+            letter-spacing: 0;
+            text-transform: none
+        }
+
+        .family-filter[data-family=U], .family-filter[data-family=OTHER] {
+            border-style: dashed
+        }
+
+        .has-tooltip {
+            position: relative;
+            cursor: help
+        }
+
+        .has-tooltip:after {
+            content: attr(data-tooltip);
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 9px);
+            width: 280px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #18181b;
+            color: #fff;
+            box-shadow: 0 12px 35px #18181b2b;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.4;
+            text-align: left;
+            white-space: normal;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(4px);
+            transition: .15s;
+            z-index: 20;
+            pointer-events: none
+        }
+
+        .has-tooltip:hover:after, .has-tooltip:focus:after {
+            opacity: 1;
+            visibility: visible;
+            transform: none
+        }
+
+        .badge.has-tooltip:after {
+            right: auto;
+            left: 0;
+            bottom: calc(100% + 7px)
+        }
+
+        .finding-card .title {
+            display: flex;
+            gap: 5px;
+            align-items: flex-start
+        }
+
+        .finding-card .title:before {
+            content: "Пояснение:";
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1.9
+        }
+
+        @media (max-width: 900px) {
+            .family-filters {
+                display: grid !important;
+                grid-template-columns:repeat(2, minmax(0, 1fr))
+            }
+
+            .family-filter {
+                width: 100%;
+                min-height: 42px
+            }
+
+            .filter-group-label {
+                grid-column: 1/-1
+            }
+
+            .has-tooltip:after, .badge.has-tooltip:after {
+                position: fixed;
+                left: 16px;
+                right: 16px;
+                bottom: 16px;
+                width: auto;
+                max-width: none
+            }
+
+            .finding-card {
+                padding: 16px
+            }
+
+            .panel-head h2 {
+                font-size: 20px
+            }
+        }
+
+        @media (max-width: 900px) {
+            .has-tooltip:after, .has-tooltip:hover:after, .has-tooltip:focus:after {
+                display: none !important
+            }
+
+            .family-filters {
+                gap: 8px !important
+            }
+
+            .family-filter {
+                justify-content: center;
+                font-size: 14px
+            }
+
+            .mobile-filter-help {
+                grid-column: 1/-1;
+                padding: 11px 12px;
+                border-radius: 10px;
+                background: #f0f0f3;
+                color: #52525b;
+                font-size: 12px;
+                line-height: 1.45
+            }
+
+            .mobile-filter-help[hidden] {
+                display: none !important
+            }
+
+            .badge.has-tooltip {
+                cursor: pointer
+            }
+
+            .mobile-criterion-help {
+                margin: 9px 0 2px;
+                padding: 10px 11px;
+                border-left: 3px solid var(--red);
+                border-radius: 0 8px 8px 0;
+                background: #fff2f5;
+                color: #52525b;
+                font-size: 12px;
+                line-height: 1.45
+            }
+
+            .mobile-criterion-help[hidden] {
+                display: none !important
+            }
+        }
+
+        @media (min-width: 901px) {
+            html body .actions {
+                grid-template-columns:repeat(3, 190px)
+            }
+
+            .family-filter.has-tooltip:after {
+                top: calc(100% + 8px);
+                bottom: auto
+            }
+
+            .family-filter[data-family=D].has-tooltip:after {
+                left: 0;
+                right: auto
+            }
+
+            .family-filter[data-family=T].has-tooltip:after {
+                left: auto;
+                right: 0
+            }
+        }
+
+        .actions > a.btn {
+            display: none !important
+        }
+
+        .has-tooltip:after, .has-tooltip:hover:after, .has-tooltip:focus:after {
+            display: none !important
+        }
+
+        .mobile-filter-help {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #f0f0f3;
+            color: #52525b;
+            font-size: 12px;
+            line-height: 1.45
+        }
+
+        .mobile-filter-help[hidden] {
+            display: none !important
+        }
+
+        .criterion-info-dot {
+            margin-left: 7px;
+            font-size: 10px;
+            opacity: .8
+        }
+
+        .family-filter .info-dot {
+            width: 17px;
+            height: 17px;
+            display: inline-grid;
+            place-items: center;
+            flex: none;
+            margin-left: 9px;
+            border: 1.5px solid currentColor;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1
+        }
+
+        .mobile-criterion-help {
+            margin: 9px 0 2px;
+            padding: 10px 11px;
+            border-left: 3px solid var(--red);
+            border-radius: 0 8px 8px 0;
+            background: #fff2f5;
+            color: #52525b;
+            font: 12px/1.45 Arial, sans-serif
+        }
+
+        .mobile-criterion-help[hidden] {
+            display: none !important
+        }
+
+        @media (max-width: 900px) {
+            body.panel-closed aside {
+                display: block !important;
+                transform: translateX(105%)
+            }
+
+            aside {
+                position: fixed !important;
+                top: 0 !important;
+                right: 0;
+                bottom: 0;
+                width: min(92vw, 420px);
+                height: 100dvh !important;
+                padding: 20px !important;
+                border: 0 !important;
+                border-left: 1px solid var(--line) !important;
+                background: #fafafa;
+                box-shadow: -20px 0 60px #18181b2b;
+                transform: translateX(0);
+                transition: transform .25s ease !important;
+                z-index: 40 !important
+            }
+
+            body.mobile-panel-open {
+                overflow: hidden
+            }
+
+            .mobile-backdrop {
+                position: fixed;
+                inset: 0;
+                display: block;
+                background: #18181b66;
+                opacity: 1;
+                transition: opacity .2s;
+                z-index: 35
+            }
+
+            .mobile-backdrop[hidden] {
+                display: none !important
+            }
+
+            #panel-toggle {
+                border-color: #18181b;
+                background: #18181b;
+                color: #fff
+            }
+
+            .family-filter .info-dot {
+                margin-left: 9px
+            }
+
+            .mobile-filter-help {
+                grid-column: 1/-1
+            }
+
+            .actions {
+                display: grid !important;
+                grid-template-columns:repeat(2, minmax(0, 1fr));
+                gap: 7px !important
+            }
+
+            .actions .btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 42px;
+                padding: 8px !important;
+                text-align: center
+            }
+
+            .actions #panel-toggle {
+                grid-column: 1/-1;
+                grid-row: 1
+            }
+
+            .actions > a.btn {
+                display: none !important
+            }
+        }
+
+        .paper {
+            overflow-x: auto
+        }
+
+        .rendered table {
+            display: table !important;
+            width: 100% !important;
+            table-layout: auto;
+            border-collapse: collapse
+        }
+
+        .rendered thead, .rendered tbody {
+            width: 100%
+        }
+
+        .rendered tr {
+            display: table-row
+        }
+
+        .rendered th, .rendered td {
+            display: table-cell;
+            min-width: 120px;
+            overflow-wrap: anywhere;
+            word-break: normal
+        }
+
+        @media (max-width: 900px) {
+            .rendered table {
+                min-width: 680px
+            }
+
+            .paper {
+                overscroll-behavior-inline: contain
+            }
+        }
+
+        mark[data-family=D] {
+            background: #ffe18b
+        }
+
+        mark[data-family=T] {
+            background: #f5d98f
+        }
+
+        mark[data-family=U] {
+            background: #ffc4d0;
+            color: #701029
+        }
+
+        mark[data-family=OTHER] {
+            background: #dcc8ff;
+            color: #41206f
+        }
+
+        mark[data-family].active {
+            background: var(--red);
+            color: #fff
+        }
+
+        mark[data-family].filtered-out {
+            background: transparent;
+            color: inherit;
+            padding: 0
+        }
+
+        @media (max-width: 900px) {
+            .paper {
+                overflow-x: hidden !important
+            }
+
+            .table-scroll {
+                width: 100%;
+                margin: 14px 0;
+                overflow-x: auto;
+                border: 1px solid #d8d8dd;
+                border-radius: 9px;
+                background: #fff;
+                overscroll-behavior-inline: contain;
+                -webkit-overflow-scrolling: touch
+            }
+
+            .table-scroll:before {
+                content: "Проведите в сторону, чтобы посмотреть таблицу →";
+                position: sticky;
+                left: 0;
+                display: block;
+                width: max-content;
+                padding: 7px 10px;
+                color: var(--muted);
+                font-size: 11px
+            }
+
+            .table-scroll .rendered-table {
+                width: max-content !important;
+                min-width: 850px !important;
+                margin: 0 !important;
+                border: 0
+            }
+
+            .table-scroll .rendered-table th, .table-scroll .rendered-table td {
+                min-width: 145px;
+                overflow-wrap: normal;
+                word-break: normal
+            }
+
+            .table-scroll .rendered-table th:first-child, .table-scroll .rendered-table td:first-child {
+                min-width: 180px
+            }
+        }
+
+        :root {
+            --red: #f20d3a;
+            --line: #e4e4e7;
+            --muted: #71717a;
+            --bg: #f6f6f7;
+            --code: #f4f4f6
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: #18181b;
+            font: 14px/1.5 Arial, sans-serif
+        }
+
+        button, input {
+            font-family: inherit
+        }
+
+        header {
+            min-height: 68px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px 22px;
+            background: #fff;
+            border-bottom: 1px solid var(--line);
+            position: sticky;
+            top: 0;
+            z-index: 5
+        }
+
+        .brand {
+            padding: 5px 8px;
+            background: var(--red);
+            color: #fff;
+            border-radius: 5px;
+            font-weight: 900
+        }
+
+        .meta {
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .spacer {
+            flex: 1
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+            font: inherit
+        }
+
+        .btn:hover {
+            background: #fff0f3
+        }
+
+        .btn.active {
+            background: #18181b;
+            color: #fff;
+            border-color: #18181b
+        }
+
+        main {
+            min-height: calc(100vh - 68px);
+            display: grid;
+            grid-template-columns:minmax(0, 1fr) 420px;
+            transition: .2s
+        }
+
+        .document {
+            min-width: 0;
+            padding: 30px;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start
+        }
+
+        .paper {
+            width: min(100%, 1000px);
+            padding: 34px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 13px
+        }
+
+        .source {
+            white-space: pre-wrap;
+            font: 13px/1.65 ui-monospace, monospace
+        }
+
+        .rendered {
+            font-size: 14px;
+            line-height: 1.65
+        }
+
+        .rendered h1, .rendered h2, .rendered h3, .rendered h4 {
+            line-height: 1.25;
+            margin: 1.5em 0 .65em
+        }
+        .actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.toggle-group {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(145px, 1fr));
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: #f1f1f3;
+    isolation: isolate;
+}
+
+.toggle-group:before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    width: calc((100% - 8px) / 2);
+    border-radius: 9px;
+    background: #18181b;
+    box-shadow: 0 3px 10px #18181b24;
+    transition: transform .22s ease;
+}
+
+.toggle-group.source-active:before {
+    transform: translateX(100%);
+}
+
+.toggle-btn {
+    min-height: 40px;
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #52525b;
+    transition: color .22s ease;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.toggle-btn.active {
+    color: #fff;
+}
+
+.toggle-btn:hover:not(.active) {
+    color: #18181b;
+}
+
+.toggle-label-short {
+    display: none;
+}
+
+@media (min-width: 1101px) {
+    html body .actions {
+        grid-template-columns: 400px 190px;
+        column-gap: 14px;
+    }
+
+    .toggle-group {
+        width: 400px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 901px) and (max-width: 1100px) {
+    header {
+        flex-wrap: wrap;
+    }
+
+    html body .actions {
+        width: 100%;
+        grid-template-columns: minmax(0, 1fr) 190px;
+        column-gap: 14px;
+    }
+
+    .toggle-group {
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .toggle-label-full {
+        display: none;
+    }
+
+    .toggle-label-short {
+        display: inline;
+    }
+}
+
+@media (max-width: 900px) {
+    .toggle-group {
+        width: 100%;
+        grid-column: 1/-1;
+        grid-row: 2;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .toggle-btn {
+        padding-inline: 8px;
+        font-size: 13px;
+    }
+
+    .toggle-label-full {
+        display: none;
+    }
+
+    .toggle-label-short {
+        display: inline;
+    }
+}
+
+/* Остальные кнопки (чтобы не сломать стиль) */
+.actions .btn {
+    padding: 8px 18px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    color: #333;
+    transition: all 0.3s;
+}
+
+.actions .btn:hover {
+    background: #f5f5f5;
+    border-color: #bbb;
+}
+        .rendered h1 {
+            font-size: 25px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 8px
+        }
+
+        .rendered h2 {
+            font-size: 21px
+        }
+
+        .rendered h3 {
+            font-size: 17px
+        }
+
+        .rendered p {
+            margin: .6em 0 1em
+        }
+
+        .rendered ul, .rendered ol {
+            padding-left: 24px
+        }
+
+        .rendered pre {
+            padding: 14px;
+            overflow: auto;
+            background: var(--code);
+            border: 1px solid var(--line);
+            border-radius: 8px
+        }
+
+        .rendered code {
+            padding: 2px 5px;
+            background: var(--code);
+            border-radius: 4px;
+            font: 12.5px ui-monospace, monospace
+        }
+
+        .rendered pre code {
+            padding: 0
+        }
+
+        .rendered table {
+            width: 100%;
+            display: block;
+            overflow-x: auto;
+            border-collapse: collapse;
+            margin: 16px 0
+        }
+
+        .rendered th, .rendered td {
+            min-width: 120px;
+            padding: 8px 10px;
+            border: 1px solid #d8d8dd;
+            text-align: left;
+            vertical-align: top
+        }
+
+        .rendered th {
+            background: #f0f0f3
+        }
+
+        .rendered tr:nth-child(even) td {
+            background: #fafafa
+        }
+
+        .rendered a {
+            color: var(--red)
+        }
+
+        aside {
+            height: calc(100vh - 68px);
+            position: sticky;
+            top: 68px;
+            padding: 20px;
+            overflow: auto;
+            background: #fafafa;
+            border-left: 1px solid var(--line);
+            transition: .2s
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px
+        }
+
+        .panel-head h2 {
+            margin: 0;
+            font-size: 17px
+        }
+
+        .summary {
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        .family-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-bottom: 14px
+        }
+
+        .family-filter {
+            font-weight: 800
+        }
+
+        .family-filter[data-family=D].active {
+            background: #18181b;
+            color: #fff
+        }
+
+        .family-filter[data-family=T].active {
+            background: #f5e5b9;
+            color: #604400
+        }
+
+        .family-filter[data-family=U].active, .family-filter[data-family=OTHER].active {
+            background: #ffebef;
+            color: var(--red);
+            border-color: #ffc9d4
+        }
+
+        .card {
+            padding: 14px;
+            margin-bottom: 10px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 11px;
+            cursor: pointer
+        }
+
+        .card:hover {
+            border-color: #c9c9cf
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            background: #ffebef;
+            color: var(--red);
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 800
+        }
+
+        .badge.D {
+            background: #18181b;
+            color: #fff
+        }
+
+        .badge.T {
+            background: #f5e5b9;
+            color: #604400
+        }
+
+        .title {
+            margin: 7px 0 4px;
+            font-weight: 750
+        }
+
+        .problem {
+            margin-top: 5px;
+            color: var(--muted)
+        }
+
+        blockquote {
+            margin: 10px 0 0;
+            padding: 7px 10px;
+            background: var(--code);
+            border-left: 3px solid var(--red);
+            font: 12px/1.5 ui-monospace, monospace;
+            white-space: pre-wrap
+        }
+
+        body.panel-closed main {
+            grid-template-columns:minmax(0, 1fr)
+        }
+
+        body.panel-closed aside {
+            display: none
+        }
+
+        mark {
+            background: #ffe18b;
+            border-radius: 3px;
+            padding: 1px;
+            scroll-margin: 100px
+        }
+
+        mark.active {
+            background: var(--red);
+            color: #fff
+        }
+
+        mark.filtered-out {
+            background: transparent;
+            color: inherit;
+            padding: 0
+        }
+
+        [hidden] {
+            display: none !important
+        }
+
+        @media (max-width: 900px) {
+            header {
+                align-items: flex-start;
+                flex-wrap: wrap
+            }
+
+            .actions {
+                width: 100%;
+                flex-wrap: wrap
+            }
+
+            main {
+                grid-template-columns:1fr
+            }
+
+            .document {
+                padding: 16px
+            }
+
+            .paper {
+                padding: 22px
+            }
+
+            aside {
+                position: static;
+                height: auto;
+                border-left: 0;
+                border-top: 1px solid var(--line)
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <div class="brand">МТС</div>
+    <div><b>Отчет AI-инструмента для анализа документации</b>
+        <div class="meta">{{ document_name }},  {{ model }}</div>
+    </div>
+    <div class="spacer"></div>
+   <div class="actions">
+    <div class="toggle-group">
+        <button class="toggle-btn active" id="render-btn" type="button" aria-pressed="true"><span class="toggle-label-full">Рендер</span><span class="toggle-label-short">Рендер</span></button>
+        <button class="toggle-btn" id="source-btn" type="button" aria-pressed="false"><span class="toggle-label-full">Исходный</span><span class="toggle-label-short">Исходный</span></button>
+    </div>
+    <button class="btn" id="panel-toggle" type="button">Скрыть замечания</button>
+    <a class="btn" href="{% url 'reviewapp:upload' %}">Новая проверка</a>
+</div>
+</header>
+<main>
+    <section class="document">
+        <div class="paper rendered" id="rendered-document">{{ rendered_document|safe }}</div>
+        <div class="paper source" id="source-document" hidden>{{ highlighted_document|safe }}</div>
+    </section>
+    <aside id="findings-panel">
+        <div class="panel-head">
+            <div><h2>Замечания</h2>
+                <div class="summary">Показано <b id="visible-count">{{ primary_count }}</b> из {{ predictions|length }}</div>
+            </div>
+        </div>
+        <div class="family-filters">{% for family,count in family_counts.items %}
+            <button class="btn family-filter{% if family == 'D' or family == 'T' %} active{% endif %}" type="button" data-family="{{ family }}" data-count="{{ count }}">{{ family }} - {{ count }}</button>
+            {% endfor %}
+        </div>
+        {% for item in predictions %}
+        <article class="card finding-card" data-index="{{ forloop.counter0 }}" data-family="{{ item.family }}"><span
+                class="badge {{ item.family }}">{{ item.error_type_id }}</span>
+            <div class="title">{{ item.title }}</div>
+            <div class="problem">{{ item.problem }}</div>
+            {% if item.reasoning %}
+            <div class="problem"><b>Почему важно:</b> {{ item.reasoning }}</div>
+            {% endif %}{% if item.recommendation %}
+            <div class="problem"><b>Рекомендация:</b> {{ item.recommendation }}</div>
+            {% endif %}
+            <blockquote>{{ item.evidence_quote }}</blockquote>
+        </article>
+        {% empty %}
+        <div class="card">Значимых проблем не найдено.</div>
+        {% endfor %}
+    </aside>
+</main>
+{{ finding_highlights|json_script:"finding-highlights" }}
+<script>
+    const rendered = document.getElementById('rendered-document'), source = document.getElementById('source-document'),
+        renderBtn = document.getElementById('render-btn'), sourceBtn = document.getElementById('source-btn'),
+        panelToggle = document.getElementById('panel-toggle');
+
+    function markTerm(container, term, index, family) {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        let node;
+        while (node = walker.nextNode()) {
+            if (node.parentElement.closest('mark')) continue;
+            const pattern = term.trim().split(/\s+/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+            const match = node.nodeValue.match(new RegExp(pattern, 'u'));
+            if (!match) continue;
+            const start = match.index;
+            const before = node.splitText(start);
+            before.splitText(match[0].length);
+            const mark = document.createElement('mark');
+            mark.dataset.index = index;
+            mark.dataset.family = family;
+            before.replaceWith(mark);
+            mark.appendChild(before);
+            return true
+        }
+        return false
+    }
+
+    JSON.parse(document.getElementById('finding-highlights').textContent).forEach(item => item.terms.forEach(term => markTerm(rendered, term, item.index, item.family)));
+
+    function setMode(mode) {
+        const isRendered = mode === 'rendered';
+        rendered.hidden = !isRendered;
+        source.hidden = isRendered;
+        renderBtn.classList.toggle('active', isRendered);
+        sourceBtn.classList.toggle('active', !isRendered);
+        renderBtn.setAttribute('aria-pressed', String(isRendered));
+        sourceBtn.setAttribute('aria-pressed', String(!isRendered));
+        renderBtn.closest('.toggle-group').classList.toggle('source-active', !isRendered)
+    }
+
+    renderBtn.addEventListener('click', () => setMode('rendered'));
+    sourceBtn.addEventListener('click', () => setMode('source'));
+    panelToggle.addEventListener('click', () => {
+        document.body.classList.toggle('panel-closed');
+        panelToggle.textContent = document.body.classList.contains('panel-closed') ? 'Показать замечания' : 'Скрыть замечания'
+    });
+    document.querySelectorAll('.finding-card').forEach(card => card.addEventListener('click', () => {
+        document.querySelectorAll('mark').forEach(mark => mark.classList.remove('active'));
+        const container = rendered.hidden ? source : rendered,
+            mark = container.querySelector('mark[data-index="' + card.dataset.index + '"]:not(.filtered-out)');
+        if (mark) {
+            container.querySelectorAll('mark[data-index="' + card.dataset.index + '"]:not(.filtered-out)').forEach(item => item.classList.add('active'));
+            mark.scrollIntoView({behavior: 'smooth', block: 'center'})
+        }
+    }));
+    function applyFamilyFilters() {
+        const enabled = new Set([...document.querySelectorAll('.family-filter.active')].map(item => item.dataset.family));
+        let count = 0;
+        document.querySelectorAll('.finding-card').forEach(card => {
+            card.hidden = !enabled.has(card.dataset.family);
+            if (!card.hidden) count++
+        });
+        document.querySelectorAll('mark[data-family]').forEach(mark => {
+            const filtered = !enabled.has(mark.dataset.family);
+            mark.classList.toggle('filtered-out', filtered);
+            if (filtered) mark.classList.remove('active')
+        });
+        document.getElementById('visible-count').textContent = count
+    }
+    document.querySelectorAll('.family-filter').forEach(button => button.addEventListener('click', () => {
+        button.classList.toggle('active');
+        applyFamilyFilters()
+    }));
+    applyFamilyFilters();
+    rendered.querySelectorAll('table').forEach(table => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'table-scroll';
+        table.classList.add('rendered-table');
+        table.parentNode.insertBefore(wrapper, table);
+        wrapper.appendChild(table)
+    });
+    const familyNames = {D: 'Domen', T: 'Template', U: 'Universal', OTHER: 'Other'};
+    const familyHelp = {
+        D: 'Domen — проверки D01–D08: обязательные технические требования к данным, ссылкам, полям, фильтрам, Kafka и хранилищам.',
+        T: 'Template — проверка T01 на соответствие обязательной структуре шаблона, включая разделы, таблицы, поля и колонки.',
+        U: 'Universal — дополнительная проверка логики и согласованности ТЗ глазами аналитика, разработчика и тестировщика.',
+        OTHER: 'Other — существенные замечания, которые не относятся к критериям Domen, Template или Universal.'
+    };
+    const criterionHelp = {
+        D01: 'Для каждого потока должны быть указаны формат, схема или модель и способ сериализации/десериализации.',
+        D02: 'Для каждого источника и приёмника нужна прямая ссылка на соответствующий объект Data Catalog.',
+        D03: 'Для каждого поля должна быть явно указана обязательность: NOT NULL или NULLABLE.',
+        D04: 'Условия фильтрации при построении витрины и выгрузке данных должны быть описаны точно.',
+        D05: 'Предусмотренный этап нельзя молча пропускать: укажите «не применимо» или «нет».',
+        D06: 'Для каждого потокового источника и приёмника необходимо точное имя Kafka-кластера.',
+        D07: 'Для файлового приёмника нужны полный путь HDFS и формат хранения.',
+        D08: 'Перечислите все используемые справочники либо явно укажите, что они отсутствуют.',
+        T01: 'Документ должен содержать все обязательные разделы, поля, этапы, таблицы и колонки исходного шаблона.'
+    };
+    const filterBox = document.querySelector('.family-filters');
+    if (filterBox) {
+        const buttons = [...filterBox.querySelectorAll('.family-filter')];
+        buttons.forEach(button => {
+            const count = button.dataset.count;
+            button.textContent = (familyNames[button.dataset.family] || button.dataset.family) + ' - ' + count;
+            button.classList.add('has-tooltip');
+            button.dataset.tooltip = familyHelp[button.dataset.family] || '';
+            const info = document.createElement('span');
+            info.className = 'info-dot';
+            info.textContent = '!';
+            info.setAttribute('aria-hidden', 'true');
+            button.appendChild(info)
+        });
+        const primary = buttons.find(button => button.dataset.family === 'D' || button.dataset.family === 'T');
+        if (primary) {
+            const label = document.createElement('div');
+            label.className = 'filter-group-label';
+            label.textContent = 'Основные критерии';
+            filterBox.insertBefore(label, primary)
+        }
+        const extraButtons = buttons.filter(button => button.dataset.family === 'U' || button.dataset.family === 'OTHER');
+        if (extraButtons.length) {
+            extraButtons.forEach(button => button.classList.add('extra-filter'));
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'advanced-toggle';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.innerHTML = '<span>Расширенные проверки<span class="advanced-note">Universal и Other - расширение проекта</span></span>';
+            filterBox.insertBefore(toggle, extraButtons[0]);
+            toggle.addEventListener('click', () => {
+                const open = filterBox.classList.toggle('advanced-open');
+                toggle.classList.toggle('open', open);
+                toggle.setAttribute('aria-expanded', String(open))
+            })
+        }
+    }
+    document.querySelectorAll('.finding-card .badge').forEach(badge => {
+        const code = badge.textContent.trim(), card = badge.closest('.finding-card'),
+            title = card.querySelector('.title')?.textContent.trim();
+        badge.classList.add('has-tooltip');
+        badge.tabIndex = 0;
+        badge.dataset.tooltip = criterionHelp[code] || title || 'Дополнительный критерий проверки.';
+        const info = document.createElement('span');
+        info.className = 'criterion-info-dot';
+        info.textContent = 'ⓘ';
+        info.setAttribute('aria-hidden', 'true');
+        badge.appendChild(info);
+        badge.setAttribute('aria-label', code + ': ' + badge.dataset.tooltip)
+    });
+    if (filterBox) {
+        const mobileViewport = window.matchMedia('(max-width: 900px)'), filterHelp = document.createElement('div');
+        filterHelp.className = 'mobile-filter-help';
+        filterHelp.hidden = true;
+        filterBox.appendChild(filterHelp);
+        const showFilterHelp = button => {
+            filterHelp.dataset.family = button.dataset.family;
+            filterHelp.textContent = button.dataset.tooltip;
+            filterHelp.hidden = false
+        };
+        filterBox.querySelectorAll('.family-filter').forEach(button => {
+            button.addEventListener('mouseenter', () => {
+                if (!mobileViewport.matches) showFilterHelp(button)
+            });
+            button.addEventListener('focus', () => {
+                if (!mobileViewport.matches) showFilterHelp(button)
+            });
+            button.addEventListener('click', () => {
+                if (!mobileViewport.matches) return;
+                const same = filterHelp.dataset.family === button.dataset.family && !filterHelp.hidden;
+                if (same) {
+                    filterHelp.hidden = true
+                } else {
+                    showFilterHelp(button)
+                }
+            })
+        });
+        document.querySelectorAll('.finding-card .badge').forEach(badge => {
+            const help = document.createElement('div');
+            help.className = 'mobile-criterion-help';
+            help.textContent = badge.dataset.tooltip;
+            help.hidden = true;
+            badge.insertAdjacentElement('afterend', help);
+            badge.addEventListener('mouseenter', () => {
+                if (!mobileViewport.matches) help.hidden = false
+            });
+            badge.addEventListener('mouseleave', () => {
+                if (!mobileViewport.matches) help.hidden = true
+            });
+            badge.addEventListener('focus', () => {
+                if (!mobileViewport.matches) help.hidden = false
+            });
+            badge.addEventListener('blur', () => {
+                if (!mobileViewport.matches) help.hidden = true
+            });
+            badge.addEventListener('click', event => {
+                if (!mobileViewport.matches) return;
+                event.stopPropagation();
+                help.hidden = !help.hidden
+            })
+        });
+        mobileViewport.addEventListener('change', () => {
+            filterHelp.hidden = true;
+            document.querySelectorAll('.mobile-criterion-help').forEach(help => help.hidden = true)
+        })
+    }
+    const reportMobile = window.matchMedia('(max-width: 900px)'),
+        findingsPanel = document.getElementById('findings-panel'), backdrop = document.createElement('div');
+    backdrop.className = 'mobile-backdrop';
+    backdrop.hidden = true;
+    document.body.appendChild(backdrop);
+    const closeMobilePanel = () => {
+        document.body.classList.add('panel-closed');
+        document.body.classList.remove('mobile-panel-open');
+        backdrop.hidden = true
+    };
+    const syncReportLayout = () => {
+        if (reportMobile.matches) {
+            closeMobilePanel();
+            panelToggle.textContent = '☰ Замечания (' + document.querySelectorAll('.finding-card').length + ')'
+        } else {
+            document.body.classList.remove('panel-closed', 'mobile-panel-open');
+            backdrop.hidden = true;
+            panelToggle.textContent = 'Скрыть замечания'
+        }
+    };
+    panelToggle.addEventListener('click', () => {
+        if (!reportMobile.matches) return;
+        const open = !document.body.classList.contains('panel-closed');
+        document.body.classList.toggle('mobile-panel-open', open);
+        backdrop.hidden = !open;
+        panelToggle.textContent = '☰ Замечания (' + document.querySelectorAll('.finding-card').length + ')'
+    });
+    backdrop.addEventListener('click', closeMobilePanel);
+    reportMobile.addEventListener('change', syncReportLayout);
+    syncReportLayout();
+</script>
+</body>
+</html>
