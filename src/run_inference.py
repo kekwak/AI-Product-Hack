@@ -342,6 +342,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case", action="append", dest="cases")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--model", default=os.getenv("INFERENCE_MODEL", MODEL))
+    parser.add_argument("--provider", help="OpenRouter provider slug, например deepinfra")
     parser.add_argument("--prompt-file", type=Path, help="GEPA-оптимизированная часть инструкций")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--no-temperature", action="store_true")
@@ -370,12 +371,16 @@ async def run(args: argparse.Namespace) -> int:
         print("ERROR: документы не найдены", file=sys.stderr)
         return 2
 
+    provider_options: dict[str, Any] = {"require_parameters": True}
+    if args.provider:
+        provider_options.update({"only": [args.provider], "allow_fallbacks": False})
+
     chat_options: dict[str, Any] = {
         "model": args.model,
         "api_key": os.getenv("OPENROUTER_API_KEY"),
         "max_tokens": args.max_tokens,
         "max_retries": 0,
-        "openrouter_provider": {"require_parameters": True},
+        "openrouter_provider": provider_options,
     }
     chat_options["reasoning"] = (
         {"enabled": False}
@@ -408,6 +413,7 @@ async def run(args: argparse.Namespace) -> int:
                 job_type="inference",
                 config={
                     "model": args.model,
+                    "provider": args.provider,
                     "input": str(args.input),
                     "output": str(args.output),
                     "document_count": len(documents),

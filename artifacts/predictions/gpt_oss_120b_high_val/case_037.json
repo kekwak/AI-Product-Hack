@@ -1,0 +1,26 @@
+[
+  {
+    "error_type_id": "D04",
+    "evidence_quote": "Учитываются события не ранее 7 дней назад и не позже 2 часов вперед от текущего времени на стороне обработки; момент фиксации текущего времени и включение границ не определены.",
+    "title": "Неопределённые условия фильтрации",
+    "problem": "Условия фильтрации указаны лишь приблизительно, без чёткой границы включения/исключения и без обработки NULL, что приводит к неоднозначному поведению."
+  },
+  {
+    "error_type_id": "D06",
+    "evidence_quote": "`TOPIC_DATA_SESSION_END_V3` | Kafka; кластер не указан | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | Protocol Buffers; message `mts.dpi.v3.DataSessionEnd`, descriptor set `dpi-session-v3.desc`, contract version 3.4, Schema Registry subject `TOPIC_DATA_SESSION_END_V3-value`, compatibility `BACKWARD_TRANSITIVE`; Confluent Protobuf framing и десериализация по schema ID.",
+    "title": "Не указан Kafka‑кластер для входного потока",
+    "problem": "Отсутствует указание имени Kafka‑кластера в описании входного топика, что необходимо для настройки коннектора и может привести к ошибкам подключения."
+  },
+  {
+    "error_type_id": "T01",
+    "evidence_quote": "| Служебная колонка 01 | Тип источника | Ссылка на источник | Сериализация |",
+    "title": "Отсутствует обязательный столбец «Описание источника» в таблице Источники данных",
+    "problem": "Таблица «Источники данных» использует заголовок «Служебная колонка 01» вместо обязательного «Описание источника», нарушая структуру шаблона и затрудняя автоматическую обработку."
+  },
+  {
+    "error_type_id": "U13",
+    "evidence_quote": "- `THROUGHPUT_LOW`, если `avg_throughput_kbps < min_throughput_kbps`; - `RTT_HIGH`, если `p95_rtt_ms > max_rtt_ms`; - `PACKET_LOSS_HIGH`, если `packet_loss_pct >= max_packet_loss_pct`.",
+    "title": "Не определено поведение при NULL‑значениях полей QoE",
+    "problem": "Документ не описывает, как обрабатывать случаи, когда входные поля `avg_throughput_kbps`, `p95_rtt_ms` или `packet_loss_pct` имеют значение NULL, что может вызвать ошибки выполнения или некорректные алерты."
+  }
+]

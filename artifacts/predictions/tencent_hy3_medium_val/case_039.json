@@ -1,0 +1,14 @@
+[
+  {
+    "error_type_id": "D06",
+    "evidence_quote": "| `TOPIC_DATA_SESSION_END_V3` | Kafka; кластер не указан | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) |",
+    "title": "Не указан Kafka-кластер источника в таблице",
+    "problem": "В таблице источников данных для потокового Kafka-источника явно написано «кластер не указан», тогда как требуется точное имя кластера. Несмотря на упоминание `kafka-dpi-prod-03` в ссылке и схеме, обязательное поле в таблице не заполнено, что может привести к ошибке конфигурации подключения."
+  },
+  {
+    "error_type_id": "U17",
+    "evidence_quote": "Каждый запуск записывает результат в режиме append.",
+    "title": "Противоречие append и upsert/retract в публикации",
+    "problem": "Утверждение о режиме append противоречит DDL с `connector = 'upsert-kafka'` и описанию алгоритма (upsert/retract tombstone, `cleanup.policy=compact,delete`, обновление по ключу). Разные части документа несовместимы, что даёт неоднозначную реализацию: append создаст дубли вместо идемпотентного обновления состояния потребителя."
+  }
+]

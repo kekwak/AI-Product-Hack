@@ -1,0 +1,110 @@
+[
+  {
+    "error_type_id": "T01",
+    "evidence_quote": "| **Служебное поле 02** | Система проактивного сервиса должна получать детерминированный сигнал деградации без повторов и без раскрытия исходного IMSI. В скоупе — завершённые 4G/5G data-сессии розничных абонентов; незавершённые, корпоративные, тестовые и не нарушившие пороги сессии не публикуются. Результат также должен обеспечивать прогноз значений на следующие 30 дней. |",
+    "title": "Отсутствует обязательная строка «Решаемая проблема»",
+    "problem": "В таблице «Общие сведения» вместо шаблонной строки «Решаемая проблема» приведена строка «Служебное поле 02», чьё соответствие обязательному полю не является однозначным; обязательный элемент структуры отсутствует."
+  },
+  {
+    "error_type_id": "D01",
+    "evidence_quote": "| `TOPIC_DATA_SESSION_END_V3` | Kafka; конкретный кластер не зафиксирован | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | JSON; схема и версия не указаны |",
+    "title": "Неполный контракт сериализации входного потока",
+    "problem": "Для входного Kafka-потока указан только JSON, но не указаны схема/модель и версия, необходимые для однозначной десериализации и проверки совместимости."
+  },
+  {
+    "error_type_id": "D02",
+    "evidence_quote": "| `TOPIC_QOE_DEGRADATION_V1` | Kafka, кластер `kafka-care-prod-01` | Ссылка будет добавлена после релиза | Для upsert: Protocol Buffers message `mts.care.qoe.v1.DegradationAlert`, descriptor `qoe-alert-v1.desc`, версия 1.2, Schema Registry subject `TOPIC_QOE_DEGRADATION_V1-value`, compatibility `BACKWARD_TRANSITIVE`, Confluent framing по schema ID 18427. Для retract: Kafka tombstone с тем же UTF-8 key `alert_id` и null value; это часть версии 1.2. |",
+    "title": "Нет прямой ссылки на Data Catalog для приёмника",
+    "problem": "Для выходного потока `TOPIC_QOE_DEGRADATION_V1` ссылка на каталог заменена обещанием добавить её после релиза, поэтому конкретный объект в Data Catalog не зафиксирован."
+  },
+  {
+    "error_type_id": "D03",
+    "evidence_quote": "| FIELD_ALERT_ID | string или bigint; окончательный физический тип не выбран | SHA-256 ID, 64 lowercase hex; обязательность поля `FIELD_ALERT_ID` не определена | Расчёт | `session_id` | STRING | `sha256(concat('qoe-v1', chr(124), session_id))` |\n| FIELD_EVENT_TS | TIMESTAMP_LTZ(3) | Окончание сессии UTC; обязательность поля `FIELD_EVENT_TS` не определена | `TOPIC_DATA_SESSION_END_V3` | `session_end_ts` | BIGINT | Epoch ms |",
+    "title": "Не указана обязательность полей",
+    "problem": "Для `FIELD_ALERT_ID` и `FIELD_EVENT_TS` явно сказано, что обязательность не определена, хотя для каждого поля витрины требуется `NOT NULL` или `NULLABLE`."
+  },
+  {
+    "error_type_id": "D05",
+    "evidence_quote": "TBD после выбора справочника.\n\n#### Шаг 3. Классификация и формирование результата\n\nGROUP BY выполняется только по region_code и vendor_name; category_code выбирается произвольно из группы.\n\nTBD после согласования выходного расчета.",
+    "title": "Этапы обогащения и классификации содержат TBD",
+    "problem": "Обязательные этапы обработки не заполнены и не помечены как неприменимые: в шаге 2 и шаге 3 есть TBD, из-за чего нельзя однозначно реализовать обогащение и формирование результата."
+  },
+  {
+    "error_type_id": "D06",
+    "evidence_quote": "| `TOPIC_DATA_SESSION_END_V3` | Kafka; конкретный кластер не зафиксирован | [Data Catalog: TOPIC_DATA_SESSION_END_V3](https://datacatalog.corp.mts.ru/kafka/kafka-dpi-prod-03/TOPIC_DATA_SESSION_END_V3) | JSON; схема и версия не указаны |",
+    "title": "Не зафиксирован Kafka-кластер источника",
+    "problem": "Для потокового источника указано, что конкретный кластер не зафиксирован, а резервный кластер выбирает эксплуатация; точное имя кластера для реализации и мониторинга не определено."
+  },
+  {
+    "error_type_id": "D08",
+    "evidence_quote": "| Неуказанный справочник | Ссылка будет добавлена позднее | Используется для обогащения; поля и версия не перечислены |",
+    "title": "Не перечислены/не идентифицированы справочники",
+    "problem": "Используемый справочник `DICT_CELL_REGION_SCD` не приведён в таблице источников обогащения, а отдельный справочник назван «Неуказанный» без полей и версии; состав нормативно-справочных данных не зафиксирован."
+  },
+  {
+    "error_type_id": "U01",
+    "evidence_quote": "Результат также должен обеспечивать прогноз значений на следующие 30 дней.",
+    "title": "Заявленный прогноз не создаётся алгоритмом",
+    "problem": "В цели указано, что результат должен обеспечивать прогноз на 30 дней, но выходная структура и алгоритм формируют только алерты по завершённым сессиям; поля и расчёт прогноза отсутствуют."
+  },
+  {
+    "error_type_id": "U03",
+    "evidence_quote": "После JOIN при расхождении всегда используется значение второго источника.",
+    "title": "Не определён источник истины",
+    "problem": "До обогащения авторитетным назван «первый источник из таблицы», а после JOIN — «второй источник», но в документе не указано, какие именно источники являются первым и вторым; таблица источников данных содержит один источник."
+  },
+  {
+    "error_type_id": "U04",
+    "evidence_quote": "Одна строка результата должна соответствовать комбинации region_code, vendor_name и category_code.",
+    "title": "Противоречие в гранулярности результата",
+    "problem": "Это противоречит заявленной гранулярности «одна выходная запись соответствует одной уникальной сессии» и ключу `FIELD_ALERT_ID` на сессию; `vendor_name` и `category_code` отсутствуют в структуре данных и DDL, а шаг 3 выполняет GROUP BY только по `region_code` и `vendor_name`."
+  },
+  {
+    "error_type_id": "U08",
+    "evidence_quote": "После JOIN при расхождении всегда используется значение второго источника.\n\nВсе найденные версии передаются в результат без выбора актуальной записи и проверки кардинальности.\n\nСправочник содержит версии записей по идентификатору и effective_date, но JOIN выполняется только по идентификатору.",
+    "title": "Некорректная механика обогащения",
+    "problem": "Описанный JOIN противоречит temporal lookup и выбору версии по event time/checkpoint: передаются все версии без выбора актуальной, без проверки кардинальности и fallback, что может размножать строки или давать недетерминированный результат."
+  },
+  {
+    "error_type_id": "U11",
+    "evidence_quote": "Любое позднее событие автоматически включается ближайшим replay без ограничения по возрасту.",
+    "title": "Противоречие в обработке поздних событий и backfill",
+    "problem": "Шаг 4 ограничивает backfill сохранением offsets в Kafka (не более 72 часов) и для события старше retention не создаёт алерт, а FAQ утверждает, что любое позднее событие включается без ограничения по возрасту; правила обработки поздних данных несовместимы."
+  },
+  {
+    "error_type_id": "U11",
+    "evidence_quote": "session_end_ts <= processing_time + 2 minutes",
+    "title": "Фильтр зависит от processing time и нарушает детерминированность replay",
+    "problem": "Фильтр использует processing time, а backfill перечитывает те же offsets позже и «применяет тот же алгоритм»; результат фильтрации может измениться при повторной обработке, что нарушает детерминированность и идемпотентность upsert/retract."
+  },
+  {
+    "error_type_id": "U12",
+    "evidence_quote": "| FIELD_ALERT_ID | string или bigint; окончательный физический тип не выбран | SHA-256 ID, 64 lowercase hex; обязательность поля `FIELD_ALERT_ID` не определена | Расчёт | `session_id` | STRING | `sha256(concat('qoe-v1', chr(124), session_id))` |",
+    "title": "Не согласован физический тип ключевого поля",
+    "problem": "Физический тип `FIELD_ALERT_ID` задан как «string или bigint», хотя описание требует 64 lowercase hex; тип ключа и value не согласован с DDL и примерами."
+  },
+  {
+    "error_type_id": "U13",
+    "evidence_quote": "Две записи с одинаковыми `session_id`, revision и разным payload блокируют Kafka-транзакцию.",
+    "title": "Не определено поведение при конфликтующих записях",
+    "problem": "Не определено, что именно происходит при блокировке транзакции: остановка job, отброс записи, quarantine, алерт или повтор; два исполнителя могут реализовать по-разному, возможны потеря данных или остановка потока."
+  },
+  {
+    "error_type_id": "U13",
+    "evidence_quote": "Если один обязательный источник недоступен, расчет продолжается по данным остальных источников и результат публикуется.",
+    "title": "Противоречие в поведении при недоступности источника",
+    "problem": "Далее указано, что при недоступности справочника, порогов или sink offsets не коммитятся, а недоступность Kafka/Schema Registry останавливает job; поведение при недоступности обязательного источника/справочника противоречиво."
+  },
+  {
+    "error_type_id": "U14",
+    "evidence_quote": "Частичная публикация считается успешной; признак неполноты, отдельная метрика и оповещение не предусмотрены.",
+    "title": "Частичная публикация противоречит exactly-once",
+    "problem": "Это противоречит заявленному exactly-once и транзакционной записи в Kafka: потребитель может материализовать неполное состояние без детектирования, а повторная обработка не гарантирует целостность."
+  },
+  {
+    "error_type_id": "U17",
+    "evidence_quote": "CREATE TABLE TOPIC_QOE_DEGRADATION_V1 (\n    FIELD_ALERT_ID_legacy STRING NOT NULL,\n    FIELD_EVENT_TS TIMESTAMP_LTZ(3) NOT NULL,\n    FIELD_EVENT_DATE DATE NOT NULL,\n    FIELD_SUBSCRIBER_TOKEN STRING NOT NULL,\n    FIELD_REGION_CODE STRING NOT NULL,\n    FIELD_CELL_ID BIGINT NOT NULL,\n    FIELD_NETWORK_TECH STRING NOT NULL,\n    FIELD_QOE_CLASS STRING NOT NULL,\n    FIELD_AVG_THROUGHPUT_KBPS BIGINT NOT NULL,\n    FIELD_P95_RTT_MS INT NOT NULL,\n    FIELD_PACKET_LOSS_PCT DECIMAL(6,3) NOT NULL,\n    FIELD_REASON_CODES ARRAY<STRING> NOT NULL,\n    FIELD_THRESHOLD_VERSION STRING NOT NULL,\n    FIELD_SOURCE_REVISION BIGINT NOT NULL,\n    FIELD_PROC_TS TIMESTAMP_LTZ(3) NOT NULL,\n    PRIMARY KEY (FIELD_ALERT_ID) NOT ENFORCED",
+    "title": "DDL ссылается на несуществующий ключевой столбец",
+    "problem": "В DDL столбец назван `FIELD_ALERT_ID_legacy`, а PRIMARY KEY ссылается на `FIELD_ALERT_ID`; структура данных и примеры используют `FIELD_ALERT_ID`, поэтому DDL не соответствует описанной схеме."
+  }
+]
