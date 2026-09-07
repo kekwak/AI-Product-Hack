@@ -1,0 +1,281 @@
+{
+  "seed": 20260903,
+  "error_count_distribution": {
+    "1": 2,
+    "2": 2,
+    "3": 2,
+    "4": 1,
+    "5": 1,
+    "6": 2,
+    "7": 2,
+    "8": 1,
+    "9": 2,
+    "10": 2,
+    "11": 1,
+    "12": 2,
+    "13": 6,
+    "14": 2,
+    "15": 2,
+    "16": 2,
+    "17": 6,
+    "18": 2,
+    "19": 1,
+    "20": 2,
+    "21": 2,
+    "22": 2,
+    "23": 1,
+    "24": 2
+  },
+  "cases": [
+    {
+      "document_id": "case_001",
+      "source_clean_document": "clean_01.md",
+      "error_count": 16
+    },
+    {
+      "document_id": "case_002",
+      "source_clean_document": "clean_01.md",
+      "error_count": 17
+    },
+    {
+      "document_id": "case_003",
+      "source_clean_document": "clean_01.md",
+      "error_count": 17
+    },
+    {
+      "document_id": "case_004",
+      "source_clean_document": "clean_01.md",
+      "error_count": 17
+    },
+    {
+      "document_id": "case_005",
+      "source_clean_document": "clean_01.md",
+      "error_count": 17
+    },
+    {
+      "document_id": "case_006",
+      "source_clean_document": "clean_02.md",
+      "error_count": 14
+    },
+    {
+      "document_id": "case_007",
+      "source_clean_document": "clean_02.md",
+      "error_count": 13
+    },
+    {
+      "document_id": "case_008",
+      "source_clean_document": "clean_02.md",
+      "error_count": 13
+    },
+    {
+      "document_id": "case_009",
+      "source_clean_document": "clean_02.md",
+      "error_count": 13
+    },
+    {
+      "document_id": "case_010",
+      "source_clean_document": "clean_02.md",
+      "error_count": 13
+    },
+    {
+      "document_id": "case_011",
+      "source_clean_document": "clean_03.md",
+      "error_count": 17
+    },
+    {
+      "document_id": "case_012",
+      "source_clean_document": "clean_03.md",
+      "error_count": 13
+    },
+    {
+      "document_id": "case_013",
+      "source_clean_document": "clean_03.md",
+      "error_count": 9
+    },
+    {
+      "document_id": "case_014",
+      "source_clean_document": "clean_03.md",
+      "error_count": 20
+    },
+    {
+      "document_id": "case_015",
+      "source_clean_document": "clean_03.md",
+      "error_count": 3
+    },
+    {
+      "document_id": "case_016",
+      "source_clean_document": "clean_04.md",
+      "error_count": 23
+    },
+    {
+      "document_id": "case_017",
+      "source_clean_document": "clean_04.md",
+      "error_count": 12
+    },
+    {
+      "document_id": "case_018",
+      "source_clean_document": "clean_04.md",
+      "error_count": 3
+    },
+    {
+      "document_id": "case_019",
+      "source_clean_document": "clean_04.md",
+      "error_count": 7
+    },
+    {
+      "document_id": "case_020",
+      "source_clean_document": "clean_04.md",
+      "error_count": 18
+    },
+    {
+      "document_id": "case_021",
+      "source_clean_document": "clean_05.md",
+      "error_count": 14
+    },
+    {
+      "document_id": "case_022",
+      "source_clean_document": "clean_05.md",
+      "error_count": 17
+    },
+    {
+      "document_id": "case_023",
+      "source_clean_document": "clean_05.md",
+      "error_count": 1
+    },
+    {
+      "document_id": "case_024",
+      "source_clean_document": "clean_05.md",
+      "error_count": 20
+    },
+    {
+      "document_id": "case_025",
+      "source_clean_document": "clean_05.md",
+      "error_count": 10
+    },
+    {
+      "document_id": "case_026",
+      "source_clean_document": "clean_06.md",
+      "error_count": 6
+    },
+    {
+      "document_id": "case_027",
+      "source_clean_document": "clean_06.md",
+      "error_count": 19
+    },
+    {
+      "document_id": "case_028",
+      "source_clean_document": "clean_06.md",
+      "error_count": 22
+    },
+    {
+      "document_id": "case_029",
+      "source_clean_document": "clean_06.md",
+      "error_count": 15
+    },
+    {
+      "document_id": "case_030",
+      "source_clean_document": "clean_06.md",
+      "error_count": 1
+    },
+    {
+      "document_id": "case_031",
+      "source_clean_document": "clean_07.md",
+      "error_count": 2
+    },
+    {
+      "document_id": "case_032",
+      "source_clean_document": "clean_07.md",
+      "error_count": 24
+    },
+    {
+      "document_id": "case_033",
+      "source_clean_document": "clean_07.md",
+      "error_count": 10
+    },
+    {
+      "document_id": "case_034",
+      "source_clean_document": "clean_07.md",
+      "error_count": 21
+    },
+    {
+      "document_id": "case_035",
+      "source_clean_document": "clean_07.md",
+      "error_count": 6
+    },
+    {
+      "document_id": "case_036",
+      "source_clean_document": "clean_08.md",
+      "error_count": 24
+    },
+    {
+      "document_id": "case_037",
+      "source_clean_document": "clean_08.md",
+      "error_count": 7
+    },
+    {
+      "document_id": "case_038",
+      "source_clean_document": "clean_08.md",
+      "error_count": 16
+    },
+    {
+      "document_id": "case_039",
+      "source_clean_document": "clean_08.md",
+      "error_count": 4
+    },
+    {
+      "document_id": "case_040",
+      "source_clean_document": "clean_08.md",
+      "error_count": 11
+    },
+    {
+      "document_id": "case_041",
+      "source_clean_document": "clean_09.md",
+      "error_count": 13
+    },
+    {
+      "document_id": "case_042",
+      "source_clean_document": "clean_09.md",
+      "error_count": 21
+    },
+    {
+      "document_id": "case_043",
+      "source_clean_document": "clean_09.md",
+      "error_count": 9
+    },
+    {
+      "document_id": "case_044",
+      "source_clean_document": "clean_09.md",
+      "error_count": 18
+    },
+    {
+      "document_id": "case_045",
+      "source_clean_document": "clean_09.md",
+      "error_count": 2
+    },
+    {
+      "document_id": "case_046",
+      "source_clean_document": "clean_10.md",
+      "error_count": 22
+    },
+    {
+      "document_id": "case_047",
+      "source_clean_document": "clean_10.md",
+      "error_count": 15
+    },
+    {
+      "document_id": "case_048",
+      "source_clean_document": "clean_10.md",
+      "error_count": 8
+    },
+    {
+      "document_id": "case_049",
+      "source_clean_document": "clean_10.md",
+      "error_count": 5
+    },
+    {
+      "document_id": "case_050",
+      "source_clean_document": "clean_10.md",
+      "error_count": 12
+    }
+  ]
+}

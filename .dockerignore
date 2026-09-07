@@ -1,0 +1,14 @@
+.git
+.idea
+.venv
+__pycache__
+*.py[cod]
+*.sqlite3
+*.sqlite3-journal
+.env
+.DS_Store
+.pytest_cache
+.mypy_cache
+dataset
+case
+docs

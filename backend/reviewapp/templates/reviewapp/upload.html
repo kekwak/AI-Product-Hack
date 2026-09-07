@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/reviewapp/favicon.png?v=3">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/reviewapp/apple-touch-icon.png?v=3">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/static/reviewapp/favicon.svg?v=3">
+    <link rel="shortcut icon" href="/static/reviewapp/favicon.png?v=3">
+    <title>AI-инструмент для анализа документации</title>
+    <style>
+        :root {
+            --red: #f20d3a;
+            --ink: #18181b;
+            --muted: #71717a;
+            --line: #e4e4e7;
+            --bg: #f6f6f7
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 36px 20px;
+            background: var(--bg);
+            color: var(--ink);
+            font: 15px/1.5 Arial, sans-serif
+        }
+
+        button, input {
+            font-family: inherit
+        }
+
+        .card {
+            width: min(720px, 100%);
+            padding: 48px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: 0 24px 70px #18181b12
+        }
+
+        .brand {
+            display: inline-block;
+            padding: 6px 9px;
+            margin-bottom: 16px;
+            background: var(--red);
+            color: #fff;
+            border-radius: 6px;
+            font-weight: 900
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 30px;
+            letter-spacing: -.03em
+        }
+
+        .lead {
+            margin: 0 0 30px;
+            color: var(--muted)
+        }
+
+        .error {
+            margin-bottom: 20px;
+            padding: 12px 15px;
+            border: 1px solid #ffc2cf;
+            border-radius: 10px;
+            background: #ffedf1;
+            color: #a60025
+        }
+
+        .title {
+            display: block;
+            margin: 22px 0 9px;
+            font-weight: 750
+        }
+
+        .dropzone {
+            min-height: 210px;
+            display: grid;
+            place-items: center;
+            padding: 30px;
+            border: 2px dashed #cfcfd5;
+            border-radius: 16px;
+            background: #fafafa;
+            text-align: center;
+            cursor: pointer;
+            transition: .2s
+        }
+
+        .dropzone:hover, .dropzone.dragging {
+            border-color: var(--red);
+            background: #fff2f5;
+            transform: translateY(-1px)
+        }
+
+        .drop-icon, .drop-main, .drop-sub, .file-name {
+            display: block
+        }
+
+        .drop-icon {
+            font-size: 38px;
+            line-height: 1;
+            margin-bottom: 14px
+        }
+
+        .drop-main {
+            font-size: 17px;
+            font-weight: 750
+        }
+
+        .drop-sub {
+            margin-top: 7px
+        }
+
+        .drop-sub, .hint {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .file-name {
+            margin-top: 14px;
+            color: var(--red);
+            font-weight: 700
+        }
+
+        input[type=file] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none
+        }
+
+        .mode-select {
+            position: relative
+        }
+
+        .mode-trigger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 15px;
+            border: 1px solid var(--line);
+            border-radius: 13px;
+            background: #fff;
+            color: var(--ink);
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+            box-shadow: 0 1px 2px #18181b0a
+        }
+
+        .mode-trigger:hover, .mode-select.open .mode-trigger {
+            border-color: #ff9eb2;
+            box-shadow: 0 0 0 4px #fff0f3
+        }
+
+        .mode-symbol {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            flex: none;
+            border-radius: 9px;
+            background: #fff0f3;
+            color: var(--red);
+            font-size: 12px;
+            font-weight: 900
+        }
+
+        .mode-copy {
+            min-width: 0;
+            flex: 1
+        }
+
+        .mode-name {
+            display: block;
+            font-weight: 750
+        }
+
+        .mode-slug {
+            display: block;
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 11px;
+            text-overflow: ellipsis;
+            white-space: nowrap
+        }
+
+        .chevron {
+            font-size: 18px;
+            transition: .2s
+        }
+
+        .mode-select.open .chevron {
+            transform: rotate(180deg)
+        }
+
+        .mode-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            display: none;
+            padding: 7px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            box-shadow: 0 18px 55px #18181b24;
+            z-index: 10
+        }
+
+        .mode-select.open .mode-menu {
+            display: block
+        }
+
+        .mode-option {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 11px;
+            border: 0;
+            border-radius: 10px;
+            background: #fff;
+            color: var(--ink);
+            font: inherit;
+            text-align: left;
+            cursor: pointer
+        }
+
+        .mode-option:hover, .mode-option.selected {
+            background: #fff0f3
+        }
+
+        .mode-option.selected .mode-symbol {
+            background: var(--red);
+            color: #fff
+        }
+
+        button[type=submit] {
+            width: 100%;
+            margin-top: 28px;
+            padding: 16px;
+            border: 0;
+            border-radius: 12px;
+            background: var(--red);
+            color: #fff;
+            font-size: 17px;
+            font-weight: 850;
+            cursor: pointer
+        }
+
+        button:disabled {
+            opacity: .6
+        }
+
+        .hint {
+            margin-top: 12px
+        }
+
+        .progress {
+            position: fixed;
+            inset: 0;
+            display: none;
+            place-items: center;
+            padding: 24px;
+            background: #f3f3f5;
+            z-index: 20
+        }
+
+        .progress.visible {
+            display: grid
+        }
+
+        .progress-box {
+            width: min(480px, 100%);
+            aspect-ratio: 1/1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 46px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            box-shadow: 0 24px 80px #18181b14;
+            text-align: center
+        }
+
+        .progress-mark {
+            width: 58px;
+            height: 58px;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 22px;
+            background: var(--red);
+            color: #fff;
+            border-radius: 14px;
+            font-weight: 950;
+            font-size: 21px
+        }
+
+        .progress h2 {
+            margin: 0 0 10px;
+            font-size: 25px
+        }
+
+        .progress-detail {
+            min-height: 48px;
+            color: var(--muted)
+        }
+
+        .timer {
+            margin: 18px 0;
+            font-size: 34px;
+            font-weight: 900
+        }
+
+        .timer small {
+            font: inherit;
+            color: inherit
+        }
+
+        .bar {
+            height: 8px;
+            overflow: hidden;
+            background: #e8e8eb;
+            border-radius: 8px
+        }
+
+        .bar span {
+            display: block;
+            width: 38%;
+            height: 100%;
+            background: var(--red);
+            border-radius: 8px;
+            animation: move 1.4s ease-in-out infinite
+        }
+
+        @keyframes move {
+            0% {
+                transform: translateX(-100%)
+            }
+            100% {
+                transform: translateX(270%)
+            }
+        }
+
+        @media (max-width: 620px) {
+            .card {
+                padding: 28px
+            }
+
+            .progress-box {
+                aspect-ratio: auto;
+                min-height: 420px;
+                padding: 30px
+            }
+        }
+
+        /* Slightly roomier desktop layout */
+        @media (min-width: 621px) {
+            .card {
+                width: min(820px, 100%);
+                padding: 56px
+            }
+
+            .dropzone {
+                min-height: 240px
+            }
+        }
+
+        .file-warning {
+            display: none;
+            margin: 8px 2px 0;
+            color: var(--red);
+            font-size: 14px;
+            font-weight: 700
+        }
+
+        .file-warning.visible {
+            display: flex;
+            align-items: center;
+            gap: 7px
+        }
+
+        .file-warning.visible:before {
+            content: "!";
+            width: 18px;
+            height: 18px;
+            display: grid;
+            place-items: center;
+            flex: none;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: 900;
+            line-height: 1
+        }
+    </style>
+</head>
+<body>
+<section class="card">
+    <div class="brand">МТС</div>
+    <h1>AI-инструмент для анализа документации</h1>
+    <p class="lead">Загрузите Markdown-документ — агент проверит его и подготовит понятный отчет</p>
+    {% if error and error != "Для проверки добавьте файлы." %}
+    <div class="error">{{ error }}<br><a href="{% url 'reviewapp:upload' %}"
+                                         style="display:inline-flex;margin-top:12px;padding:9px 13px;border:1px solid currentColor;border-radius:9px;color:inherit;font-weight:750;text-decoration:none;background:#fff">Загрузить другой файл</a></div>
+    {% endif %}
+    <form method="post" action="{% url 'reviewapp:reports_api' %}" enctype="multipart/form-data" id="form" novalidate>{% csrf_token %}<label class="title"
+                                                                                                  for="document">Документ
+        ТЗ</label><label class="dropzone" id="dropzone" for="document"><span><span class="drop-icon">⇧</span><span
+            class="drop-main">Перетащите Markdown-файл сюда</span><span class="drop-sub">или нажмите, чтобы выбрать .md /markdown и до 2 МБ</span><span
+            class="file-name" id="file-name"></span></span></label><input type="file" id="document" name="document"
+                                                                          accept=".md,.markdown,text/markdown" required>
+        <div class="file-warning{% if error == 'Для проверки добавьте файлы.' %} visible{% endif %}" id="file-warning"
+             role="alert">Для проверки добавьте файлы
+        </div>
+        <label class="title" id="mode-label">Режим проверки</label>
+        <div class="mode-select" id="mode-select"><input type="hidden" id="model" name="model" required>
+            <button class="mode-trigger" id="mode-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span class="mode-symbol">AI</span><span class="mode-copy"><span class="mode-name" id="selected-name">Выберите режим</span><span
+                    class="mode-slug" id="selected-slug">Модель для проверки документа</span></span><span
+                    class="chevron">⌄</span></button>
+            <div class="mode-menu" id="mode-menu" role="listbox" aria-labelledby="mode-label">
+                {% for item in available_models %}
+                <button class="mode-option{% if item.slug == default_model %} selected{% endif %}" type="button"
+                        role="option" data-value="{{ item.slug }}" data-name="{{ item.name }}"
+                        aria-selected="{% if item.slug == default_model %}true{% else %}false{% endif %}"><span
+                        class="mode-symbol">AI</span><span class="mode-copy"><span
+                        class="mode-name">{{ item.name }}</span><span class="mode-slug">{{ item.slug }}</span></span>
+                </button>
+                {% empty %}
+                <div class="mode-option">Нет доступных режимов</div>
+                {% endfor %}
+            </div>
+        </div>
+        <button id="submit" type="submit">Проверить мой документ</button>
+    </form>
+</section>
+<div class="progress" id="progress">
+    <div class="progress-box">
+        <div class="progress-mark">МТС</div>
+        <h2>Проверяем ваш документ</h2>
+        <div class="progress-detail" id="progress-detail">Передаем документ нашему самому внимательному ревьюеру…</div>
+        <div class="timer"><span id="seconds">0</span> <small id="seconds-unit">секунд</small></div>
+        <div class="bar"><span></span></div>
+    </div>
+</div>
+<script>
+    const uploadForm = document.getElementById('form'), uploadInput = document.getElementById('document'),
+        uploadDropzone = document.getElementById('dropzone'), uploadWarning = document.getElementById('file-warning');
+
+    function clearUploadWarning() {
+        if (uploadInput.files.length) {
+            uploadWarning.classList.remove('visible');
+            uploadDropzone.classList.remove('invalid')
+        }
+    }
+
+    uploadInput.addEventListener('change', clearUploadWarning);
+    uploadDropzone.addEventListener('drop', () => setTimeout(clearUploadWarning));
+    uploadForm.addEventListener('submit', event => {
+        if (!uploadInput.files.length) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            uploadWarning.classList.add('visible');
+            uploadDropzone.classList.add('invalid');
+            uploadDropzone.scrollIntoView({behavior: 'smooth', block: 'center'})
+        }
+    }, true);
+    const form = document.getElementById('form'), input = document.getElementById('document'),
+        dropzone = document.getElementById('dropzone'), fileName = document.getElementById('file-name'),
+        modeSelect = document.getElementById('mode-select'), modeTrigger = document.getElementById('mode-trigger'),
+        modelInput = document.getElementById('model');
+
+    function showFile() {
+        fileName.textContent = input.files[0] ? 'Выбран файл: ' + input.files[0].name : ''
+    }
+
+    input.addEventListener('change', showFile);
+    ['dragenter', 'dragover'].forEach(name => dropzone.addEventListener(name, event => {
+        event.preventDefault();
+        dropzone.classList.add('dragging')
+    }));
+    ['dragleave', 'drop'].forEach(name => dropzone.addEventListener(name, event => {
+        event.preventDefault();
+        dropzone.classList.remove('dragging')
+    }));
+    dropzone.addEventListener('drop', event => {
+        if (event.dataTransfer.files.length) {
+            input.files = event.dataTransfer.files;
+            showFile()
+        }
+    });
+
+    function chooseMode(option) {
+        document.querySelectorAll('.mode-option[data-value]').forEach(item => {
+            const selected = item === option;
+            item.classList.toggle('selected', selected);
+            item.setAttribute('aria-selected', selected)
+        });
+        modelInput.value = option.dataset.value;
+        document.getElementById('selected-name').textContent = option.dataset.name;
+        document.getElementById('selected-slug').textContent = option.dataset.value;
+        modeSelect.classList.remove('open');
+        modeTrigger.setAttribute('aria-expanded', 'false')
+    }
+
+    modeTrigger.addEventListener('click', () => {
+        modeSelect.classList.toggle('open');
+        modeTrigger.setAttribute('aria-expanded', modeSelect.classList.contains('open'))
+    });
+    document.querySelectorAll('.mode-option[data-value]').forEach(option => option.addEventListener('click', () => chooseMode(option)));
+    document.addEventListener('click', event => {
+        if (!modeSelect.contains(event.target)) {
+            modeSelect.classList.remove('open');
+            modeTrigger.setAttribute('aria-expanded', 'false')
+        }
+    });
+    const initial = document.querySelector('.mode-option.selected') || document.querySelector('.mode-option[data-value]');
+    if (initial) chooseMode(initial);
+
+    async function waitForReport(apiUrl) {
+        while (true) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                cache: 'no-store',
+                headers: {'Accept': 'application/json'}
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || 'Не удалось получить статус проверки.')
+            }
+            if (payload.status === 'completed') return payload;
+            if (payload.status === 'failed') {
+                throw new Error(payload.message || 'Упс, проверка завершилась с ошибкой. Попробуйте ещё раз.')
+            }
+            if (payload.status !== 'pending' && payload.status !== 'running') {
+                throw new Error('Сервер вернул неизвестный статус проверки.')
+            }
+        }
+    }
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const button = document.getElementById('submit'), progress = document.getElementById('progress'),
+            detail = document.getElementById('progress-detail'), seconds = document.getElementById('seconds'),
+            secondsUnit = document.getElementById('seconds-unit');
+        button.disabled = true;
+        progress.classList.add('visible');
+        const phrases = [
+            'Спешим изо всех сил…',
+            'Токены генерируются на скорости света ✨',
+            'Ищем ошибки, которые притворяются фичами…',
+            'Проверяем, все ли сходится…',
+            'Таблички сверяются, Kafka волнуется…',
+            'Нейросеть читает между строк…',
+            'Собираем замечания по крупицам…',
+            'Проверяем каждую строчку дважды…',
+            'Наводим порядок в требованиях…',
+            'Сверяем факты и укрощаем JSON…',
+            'Ловим противоречия с поличным…',
+            'Разматываем клубок требований…',
+            'Ищем потерявшиеся ссылки…',
+            'Проверяем, не спрятался ли баг в таблице…',
+            'Прогреваем нейроны и не торопим магию…',
+            'Расставляем замечания по важности…',
+            'Документ сопротивляется, но мы настойчивее…',
+            'Проверяем требования на прочность…',
+            'Собираем пазл из данных и зависимостей…',
+            'Ищем места, где разработчик может задуматься…',
+            'Переводим сложное на однозначный…',
+            'Почти все — осталось победить пару запятых…',
+            'Нашли след ошибки, идем по нему…',
+            'Формируем отчет без воды и паники…',
+            'Задаем документу неудобные вопросы…',
+            'Отделяем важные замечания от придирок…',
+            'Превращаем токены в полезные советы…',
+            'Агент задумался — значит, работает…',
+            'Немного магии, много проверок ✨',
+            'Последние штрихи перед отчетом…',
+            'Еще немного — отчет почти готов…',
+            'Финишная прямая уже близко…'
+        ];
+        let elapsed = 0, phrase = 0;
+        const timer = setInterval(() => {
+            elapsed++;
+            seconds.textContent = elapsed;
+            const lastTwo = elapsed % 100, last = elapsed % 10;
+            secondsUnit.textContent = lastTwo >= 11 && lastTwo <= 14
+                ? 'секунд'
+                : last === 1
+                    ? 'секунда'
+                    : last >= 2 && last <= 4 ? 'секунды' : 'секунд';
+            if (elapsed % 8 === 0) {
+                phrase = (phrase + 1) % phrases.length;
+                detail.textContent = phrases[phrase]
+            }
+        }, 1000);
+        try {
+            const response = await fetch(form.action || location.href, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {'X-Requested-With': 'fetch'}
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || 'Упс, что-то пошло не так. Попробуйте ещё раз.')
+            }
+            if (!payload.report_url) {
+                throw new Error('Сервер не вернул ссылку на отчёт.')
+            }
+            const completedReport = await waitForReport(payload.api_url);
+            clearInterval(timer);
+            window.location.assign(completedReport.report_url)
+        } catch (error) {
+            clearInterval(timer);
+            progress.classList.remove('visible');
+            button.disabled = false;
+            alert(error.message || 'Соединение прервано. Повторите проверку.')
+        }
+    });
+</script>
+</body>
+</html>

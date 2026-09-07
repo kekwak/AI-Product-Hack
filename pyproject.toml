@@ -7,4 +7,33 @@ authors = [
     { name = "kekwak", email = "kekwak@mail.ru" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "bleach>=6.2.0",
+    "django>=5.2,<6.1",
+    "gepa>=0.1.4",
+    "gunicorn>=23.0.0",
+    "langchain-openrouter>=0.2.8",
+    "langgraph>=1.2.11",
+    "markdown>=3.8",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.5",
+    "tqdm>=4.67.1",
+    "wandb>=0.29.0",
+    "whitenoise>=6.9.0",
+]
+
+[project.scripts]
+dataset-generate = "generate_dataset:main"
+evaluate-predictions = "evaluate_predictions:main"
+infer-documents = "run_inference:main"
+validate-ensemble = "validate_ensemble:main"
+aggregate-ensemble = "aggregate_ensemble:main"
+optimize-prompt = "optimize_prompt:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["paths", "generate_dataset", "evaluate_predictions", "run_inference", "validate_ensemble", "aggregate_ensemble", "optimize_prompt"]

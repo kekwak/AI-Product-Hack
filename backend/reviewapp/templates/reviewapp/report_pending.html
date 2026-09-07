@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/reviewapp/favicon.png?v=3">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/reviewapp/apple-touch-icon.png?v=3">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/static/reviewapp/favicon.svg?v=3">
+    <title>Проверяем {{ document_name }}</title>
+    <style>
+        * { box-sizing: border-box }
+        body {
+            min-height: 100vh; margin: 0; display: grid; place-items: center;
+            padding: 24px; background: #f6f6f7; color: #18181b;
+            font: 16px/1.5 Arial, sans-serif
+        }
+        main {
+            width: min(520px, 100%); padding: 48px 36px; background: #fff;
+            border: 1px solid #e4e4e7; border-radius: 22px; text-align: center;
+            box-shadow: 0 24px 70px #18181b12
+        }
+        .brand {
+            display: inline-block; padding: 7px 10px; border-radius: 8px;
+            background: #f20d3a; color: #fff; font-weight: 900
+        }
+        h1 { margin: 22px 0 8px; font-size: 27px }
+        p { margin: 0; color: #71717a }
+        .track {
+            height: 8px; margin-top: 34px; overflow: hidden;
+            border-radius: 999px; background: #e4e4e7
+        }
+        .track:after {
+            content: ""; display: block; width: 35%; height: 100%;
+            border-radius: inherit; background: #f20d3a;
+            animation: progress 1.25s ease-in-out infinite alternate
+        }
+        @keyframes progress { from { transform: translateX(-100%) } to { transform: translateX(285%) } }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">МТС</div>
+    <h1>Проверяем документ</h1>
+    <p>{{ document_name }}</p>
+    <div class="track" aria-label="Проверка выполняется"></div>
+</main>
+<script>
+    const apiUrl = '{{ api_url|escapejs }}';
+    async function poll() {
+        try {
+            const response = await fetch(apiUrl, {cache: 'no-store', headers: {'Accept': 'application/json'}});
+            const result = await response.json();
+            if (result.status === 'completed' || result.status === 'failed') {
+                location.reload();
+                return
+            }
+        } catch (error) {
+            // Временный сетевой сбой не должен останавливать ожидание результата.
+        }
+        setTimeout(poll, 5000)
+    }
+    setTimeout(poll, 5000)
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "document_id": "case_030",
+  "source_clean_document": "clean_06.md",
+  "error_count": 1,
+  "errors": [
+    {
+      "error_type_id": "U03",
+      "source_type": 3,
+      "difficulty": "high",
+      "evidence_quote": "Перед записью значения заменяются данными master-feed; способ подключения и поля не описаны.",
+      "title": "Алгоритм зависит от неописанного источника истины",
+      "problem": "Финальные значения должны сверяться с внешним master-feed, которого нет среди источников и контракт которого неизвестен."
+    }
+  ]
+}

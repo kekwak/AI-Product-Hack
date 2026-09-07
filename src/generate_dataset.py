@@ -1,0 +1,776 @@
+#!/usr/bin/env python3
+"""Create deterministic corrupted variants and auditable sidecar metadata."""
+
+from __future__ import annotations
+
+import json
+import random
+import re
+from collections import Counter
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+from paths import DATASET_DIR
+
+ROOT = DATASET_DIR
+CLEAN_DIR = ROOT / "clean"
+OUT_DIR = ROOT / "corrupted"
+SEED = 20260903
+ERROR_COUNTS = (
+    16, 23, 5, 8, 11,
+    4, 14, 19, 0, 25,
+    17, 13, 9, 20, 3,
+    23, 12, 3, 7, 18,
+    14, 17, 1, 20, 10,
+    6, 19, 22, 15, 1,
+    2, 24, 10, 21, 6,
+    24, 7, 16, 4, 11,
+    13, 21, 9, 18, 2,
+    22, 15, 8, 5, 12,
+)
+
+
+def normalized_heading(line: str) -> str:
+    return re.sub(r"^#{1,6}\s+", "", line.strip())
+
+
+def find_heading(lines: list[str], heading: str, *, prefix: bool = False) -> int:
+    matches = []
+    for index, line in enumerate(lines):
+        normalized = normalized_heading(line)
+        if normalized == heading or (prefix and normalized.startswith(heading)):
+            matches.append(index)
+    if len(matches) != 1:
+        raise ValueError(f"expected one heading {heading!r}, found {len(matches)}")
+    return matches[0]
+
+
+def split_row(line: str) -> list[str]:
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        raise ValueError(f"not a Markdown table row: {line!r}")
+
+    return [cell.strip() for cell in re.split(r"(?<!\\)\|", stripped[1:-1])]
+
+
+def join_row(cells: list[str]) -> str:
+    return "| " + " | ".join(cells) + " |"
+
+
+def append_intro_field(text: str, label: str, sentence: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    pattern = re.compile(rf"^\|\s*\*\*{re.escape(label)}\*\*\s*\|")
+    matches = [index for index, line in enumerate(lines) if pattern.match(line)]
+    if len(matches) != 1:
+        raise ValueError(f"expected one intro field {label!r}, found {len(matches)}")
+    index = matches[0]
+    cells = split_row(lines[index])
+    cells[1] = cells[1].rstrip() + " " + sentence
+    lines[index] = join_row(cells)
+    return "\n".join(lines) + "\n", sentence
+
+
+def replace_intro_field(text: str, label: str, value: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    pattern = re.compile(rf"^\|\s*\*\*{re.escape(label)}\*\*\s*\|")
+    matches = [index for index, line in enumerate(lines) if pattern.match(line)]
+    if len(matches) != 1:
+        raise ValueError(f"expected one intro field {label!r}, found {len(matches)}")
+    index = matches[0]
+    cells = split_row(lines[index])
+    cells[1] = value
+    lines[index] = join_row(cells)
+    return "\n".join(lines) + "\n", value
+
+
+def insert_after_heading(text: str, heading: str, sentence: str, *, prefix: bool = False) -> tuple[str, str]:
+    lines = text.splitlines()
+    index = find_heading(lines, heading, prefix=prefix)
+    insertion = index + 1
+    if insertion < len(lines) and not lines[insertion].strip():
+        insertion += 1
+    lines[insertion:insertion] = [sentence, ""]
+    return "\n".join(lines) + "\n", sentence
+
+
+def replace_section_body(text: str, heading: str, body: str, *, prefix: bool = False) -> tuple[str, str]:
+    lines = text.splitlines()
+    index = find_heading(lines, heading, prefix=prefix)
+    current_level = len(lines[index]) - len(lines[index].lstrip("#"))
+    end = len(lines)
+    for candidate in range(index + 1, len(lines)):
+        stripped = lines[candidate].lstrip()
+        if not stripped.startswith("#"):
+            continue
+        level = len(stripped) - len(stripped.lstrip("#"))
+        if level <= current_level:
+            end = candidate
+            break
+    replacement = ["", body, ""]
+    lines[index + 1 : end] = replacement
+    return "\n".join(lines) + "\n", body
+
+
+def table_data_row_indices(lines: list[str], heading: str) -> list[int]:
+    heading_index = find_heading(lines, heading, prefix=heading == "Структура данных")
+    table_start = next(
+        (index for index in range(heading_index + 1, len(lines)) if lines[index].strip().startswith("|")),
+        None,
+    )
+    if table_start is None:
+        raise ValueError(f"table not found after {heading!r}")
+    table_indices: list[int] = []
+    for index in range(table_start, len(lines)):
+        if not lines[index].strip().startswith("|"):
+            break
+        table_indices.append(index)
+    separator_positions = [
+        position
+        for position, index in enumerate(table_indices)
+        if all(re.fullmatch(r":?-{3,}:?", cell) for cell in split_row(lines[index]))
+    ]
+    if not separator_positions:
+        raise ValueError(f"separator not found after {heading!r}")
+    candidates = table_indices[separator_positions[0] + 1 :]
+    return [
+        index
+        for index in candidates
+        if not any(token in " ".join(split_row(lines[index])) for token in ("**Атрибут**", "Приемники"))
+    ]
+
+
+def mutate_table_cell(
+    text: str,
+    heading: str,
+    cell_index: int,
+    value: str,
+    *,
+    predicate: Callable[[list[str]], bool] | None = None,
+    occurrence: int = 0,
+) -> tuple[str, str]:
+    lines = text.splitlines()
+    candidates = [
+        index
+        for index in table_data_row_indices(lines, heading)
+        if predicate is None or predicate(split_row(lines[index]))
+    ]
+    if occurrence >= len(candidates):
+        raise ValueError(f"no applicable row in {heading!r}")
+    chosen = candidates[occurrence]
+    cells = split_row(lines[chosen])
+    if cell_index >= len(cells):
+        raise ValueError(f"cell {cell_index} absent in row {lines[chosen]!r}")
+    cells[cell_index] = value
+    lines[chosen] = join_row(cells)
+    return "\n".join(lines) + "\n", value
+
+
+def remove_first_nullability(text: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    for index in table_data_row_indices(lines, "Структура данных"):
+        cells = split_row(lines[index])
+        original = cells[2]
+        cleaned = re.sub(r"[;,]?\s*`?(?:NOT NULL|NULLABLE)`?", "", original, count=1).strip()
+        if cleaned != original:
+            evidence = f"{cleaned}; обязательность поля `{cells[0]}` не определена"
+            cells[2] = evidence
+            lines[index] = join_row(cells)
+            return "\n".join(lines) + "\n", evidence
+    raise ValueError("no nullability marker found")
+
+
+def corrupt_reference_catalog(text: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    candidates = table_data_row_indices(lines, "Источники обогащения данных")
+    if not candidates:
+        raise ValueError("enrichment row not found")
+    index = candidates[0]
+    cells = split_row(lines[index])
+    cells[0] = "Неуказанный справочник"
+    cells[1] = "Ссылка на справочник отсутствует"
+    cells[2] = "Используется для обогащения; поля и версия не перечислены"
+    lines[index] = join_row(cells)
+    return "\n".join(lines) + "\n", "Неуказанный справочник"
+
+
+def rename_heading(text: str, heading: str, replacement: str, *, prefix: bool = False) -> tuple[str, str]:
+    lines = text.splitlines()
+    index = find_heading(lines, heading, prefix=prefix)
+    hashes = re.match(r"^(#{1,6}\s+)", lines[index].strip())
+    prefix_text = hashes.group(1) if hashes else ""
+    lines[index] = prefix_text + replacement
+    return "\n".join(lines) + "\n", replacement
+
+
+def rename_intro_field(text: str, label: str, replacement: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    pattern = re.compile(rf"^\|\s*\*\*{re.escape(label)}\*\*\s*\|")
+    matches = [index for index, line in enumerate(lines) if pattern.match(line)]
+    if len(matches) != 1:
+        raise ValueError(f"expected one intro field {label!r}, found {len(matches)}")
+    index = matches[0]
+    cells = split_row(lines[index])
+    cells[0] = f"**{replacement}**"
+    lines[index] = join_row(cells)
+    return "\n".join(lines) + "\n", replacement
+
+
+def rename_table_column(
+    text: str,
+    heading: str,
+    column_name: str,
+    replacement: str,
+) -> tuple[str, str]:
+    lines = text.splitlines()
+    heading_index = find_heading(lines, heading, prefix=heading == "Структура данных")
+    table_start = next(
+        (index for index in range(heading_index + 1, len(lines)) if lines[index].strip().startswith("|")),
+        None,
+    )
+    if table_start is None:
+        raise ValueError(f"table not found after {heading!r}")
+    table_indices: list[int] = []
+    for index in range(table_start, len(lines)):
+        if not lines[index].strip().startswith("|"):
+            break
+        table_indices.append(index)
+
+    for index in table_indices:
+        normalized_cells = [cell.replace("**", "").strip() for cell in split_row(lines[index])]
+        if column_name not in normalized_cells:
+            continue
+        cells = split_row(lines[index])
+        column_index = normalized_cells.index(column_name)
+        bold = cells[column_index].startswith("**") and cells[column_index].endswith("**")
+        cells[column_index] = f"**{replacement}**" if bold else replacement
+        lines[index] = join_row(cells)
+        return "\n".join(lines) + "\n", replacement
+    raise ValueError(f"column {column_name!r} not found in table after {heading!r}")
+
+
+def remove_last_example_row(text: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    candidates = table_data_row_indices(lines, "Пример данных")
+    if len(candidates) != 10:
+        raise ValueError(f"expected 10 example rows, found {len(candidates)}")
+    lines.pop(candidates[-1])
+    evidence = "### Пример данных"
+    return "\n".join(lines) + "\n", evidence
+
+
+def corrupt_first_ddl_type(text: str) -> tuple[str, str]:
+    lines = text.splitlines()
+    structure_indices = table_data_row_indices(lines, "Структура данных")
+    field_name = split_row(lines[structure_indices[0]])[0].strip("`")
+    ddl_index = find_heading(lines, "DDL")
+    field_pattern = re.compile(rf"^(\s*{re.escape(field_name)}\s+)([A-Za-z]+(?:\([0-9, ]+\))?)(.*)$", re.IGNORECASE)
+    for index in range(ddl_index + 1, len(lines)):
+        match = field_pattern.match(lines[index])
+        if not match:
+            continue
+        old_type = match.group(2).upper()
+        new_type = "BIGINT" if any(token in old_type for token in ("CHAR", "STRING", "TEXT")) else "STRING"
+        lines[index] = match.group(1) + new_type + match.group(3)
+        evidence = lines[index].strip()
+        return "\n".join(lines) + "\n", evidence
+    raise ValueError(f"DDL field {field_name!r} not found")
+
+
+def corrupt_typed_example_value(text: str) -> tuple[str, str]:
+    """Put a value that cannot satisfy the declared type into the first example row."""
+
+    lines = text.splitlines()
+    structure_rows = table_data_row_indices(lines, "Структура данных")
+    example_rows = table_data_row_indices(lines, "Пример данных")
+    invalid_by_type = (
+        (re.compile(r"(?:INT|LONG|DECIMAL|NUMERIC|FLOAT|DOUBLE)", re.IGNORECASE), "not_a_number"),
+        (re.compile(r"TIMESTAMP|DATETIME", re.IGNORECASE), "2026-02-30T25:61:00Z"),
+        (re.compile(r"\bDATE\b", re.IGNORECASE), "2026-02-30"),
+        (re.compile(r"BOOL", re.IGNORECASE), "NOT_BOOLEAN"),
+    )
+    for column, structure_row in enumerate(structure_rows):
+        structure_cells = split_row(lines[structure_row])
+        field_name = structure_cells[0].strip("`")
+        field_type = structure_cells[1]
+        invalid = next(
+            (value for pattern, value in invalid_by_type if pattern.search(field_type)),
+            None,
+        )
+        if invalid is None:
+            continue
+        example_cells = split_row(lines[example_rows[0]])
+        if column >= len(example_cells):
+            raise ValueError(f"example column absent for {field_name!r}")
+        evidence = f"INVALID_{field_name.upper()}={invalid}"
+        example_cells[column] = evidence
+        lines[example_rows[0]] = join_row(example_cells)
+        return "\n".join(lines) + "\n", evidence
+    raise ValueError("no example field with a restrictive scalar type")
+
+
+def corrupt_first_ddl_field_name(text: str) -> tuple[str, str]:
+    """Rename a target field only in DDL, leaving the mapping contract unchanged."""
+
+    lines = text.splitlines()
+    structure_rows = table_data_row_indices(lines, "Структура данных")
+    field_name = split_row(lines[structure_rows[0]])[0].strip("`")
+    ddl_index = find_heading(lines, "DDL")
+    field_pattern = re.compile(rf"^(\s*){re.escape(field_name)}(\s+.+)$", re.IGNORECASE)
+    for index in range(ddl_index + 1, len(lines)):
+        match = field_pattern.match(lines[index])
+        if not match:
+            continue
+        replacement = f"{field_name}_legacy"
+        lines[index] = match.group(1) + replacement + match.group(2)
+        evidence = lines[index].strip()
+        return "\n".join(lines) + "\n", evidence
+    raise ValueError(f"DDL field {field_name!r} not found")
+
+
+def sequence(*edits: Callable[[str], tuple[str, str]]) -> Callable[[str], tuple[str, str]]:
+    """Combine several edits into one logical mutation; the last edit is its evidence."""
+
+    def apply(text: str) -> tuple[str, str]:
+        evidence = ""
+        for edit in edits:
+            text, evidence = edit(text)
+        return text, evidence
+
+    return apply
+
+
+def intro_edit(label: str, sentence: str) -> Callable[[str], tuple[str, str]]:
+    return lambda text: append_intro_field(text, label, sentence)
+
+
+def section_edit(heading: str, sentence: str, *, prefix: bool = False) -> Callable[[str], tuple[str, str]]:
+    return lambda text: insert_after_heading(text, heading, sentence, prefix=prefix)
+
+
+def rename_edit(heading: str, replacement: str, *, prefix: bool = False) -> Callable[[str], tuple[str, str]]:
+    return lambda text: rename_heading(text, heading, replacement, prefix=prefix)
+
+
+def cell_edit(
+    heading: str,
+    cell_index: int,
+    value: str,
+    *,
+    predicate: Callable[[list[str]], bool] | None = None,
+    occurrence: int = 0,
+) -> Callable[[str], tuple[str, str]]:
+    return lambda text: mutate_table_cell(
+        text, heading, cell_index, value, predicate=predicate, occurrence=occurrence
+    )
+
+
+@dataclass(frozen=True)
+class Mutation:
+    mutation_id: str
+    error_type_id: str
+    source_type: int
+    difficulty: str
+    title: str
+    description: str
+    apply: Callable[[str], tuple[str, str]]
+
+
+DOMAIN_MUTATIONS = [
+    Mutation("D01_SIMPLE_SERIALIZATION", "D01", 1, "medium", "Неполная спецификация сериализации", "Для одного входного потока оставлен только формат без схемы, версии и способа десериализации.", lambda text: mutate_table_cell(text, "Источники данных", 3, "JSON; схема и версия не указаны")),
+    Mutation("D02_MISSING_CATALOG_LINK", "D02", 1, "low", "Нет прямой ссылки на Data Catalog", "У одного источника удалена прямая ссылка на карточку каталога.", lambda text: mutate_table_cell(text, "Источники данных", 2, "Data Catalog: ссылка отсутствует")),
+    Mutation("D03_MISSING_NULLABILITY", "D03", 1, "low", "Не указана обязательность поля", "Для одного целевого поля удален признак NOT NULL/NULLABLE.", remove_first_nullability),
+    Mutation("D04_VAGUE_FILTER", "D04", 1, "medium", "Не описаны точные фильтры", "Точные условия отбора заменены субъективным требованием о корректности записей.", lambda text: replace_section_body(text, "Шаг 1. Фильтрация данных", "В обработку включаются только корректные и актуальные записи; конкретные условия определяет разработчик.", prefix=True)),
+    Mutation("D05_UNSPECIFIED_ENRICHMENT_STAGE", "D05", 1, "low", "Этап не заполнен и не отмечен как неприменимый", "Раздел обогащения оставлен без алгоритма и без явного «не применимо».", lambda text: replace_section_body(text, "Шаг 2. Обогащение данных", "Описание этого этапа будет согласовано после начала разработки.", prefix=True)),
+    Mutation("D06_MISSING_KAFKA_CLUSTER", "D06", 1, "low", "Не указан Kafka-кластер", "Для одного Kafka-источника удалено имя кластера.", lambda text: mutate_table_cell(text, "Источники данных", 1, "Kafka; кластер не указан", predicate=lambda cells: any("kafka" in cell.lower() for cell in cells))),
+    Mutation("D07_MISSING_HDFS_PATH", "D07", 1, "low", "Не указан полный путь файлового приемника", "Для одного HDFS-приемника удален полный путь хранения.", lambda text: mutate_table_cell(text, "Приемники данных", 1, "HDFS; путь не указан", predicate=lambda cells: len(cells) > 1 and "hdfs" in cells[1].lower())),
+    Mutation("D08_UNIDENTIFIED_REFERENCE", "D08", 1, "medium", "Не идентифицирован справочник", "Источник обогащения заменен общим упоминанием без точного имени, ссылки, версии и состава полей.", corrupt_reference_catalog),
+    Mutation("D01_INPUT_OUTPUT_FORMAT_ONLY", "D01", 1, "high", "Сериализация не определена на обоих концах", "У источника и приемника одновременно оставлен только формат без схемы, версии и способа сериализации или десериализации.", sequence(cell_edit("Приемники данных", 3, "JSON; схема, версия и способ сериализации не указаны"), cell_edit("Источники данных", 3, "JSON; схема, версия и способ десериализации не указаны"))),
+    Mutation("D01_TWO_INPUTS_USE_LATEST", "D01", 1, "high", "Два потока читаются по плавающей схеме", "Для двух входов зафиксирован формат, но reader использует неопределенную latest-версию вместо совместимого контракта.", sequence(cell_edit("Источники данных", 3, "Avro; reader всегда использует latest-схему из registry"), cell_edit("Источники данных", 3, "Protobuf; версия сообщения выбирается автоматически", occurrence=1))),
+    Mutation("D02_SOURCE_AND_SINK_LINKS", "D02", 1, "medium", "Не прослеживаются источник и результат", "Прямые ссылки на карточки Data Catalog удалены одновременно у входа и приемника.", sequence(cell_edit("Источники данных", 2, "Карточка каталога не указана"), cell_edit("Приемники данных", 2, "Карточка каталога не указана для результата"))),
+    Mutation("D02_REFERENCE_AND_SINK_LINKS", "D02", 1, "medium", "Нет ссылок на справочник и приемник", "У справочника и результирующего объекта отсутствуют конкретные ссылки Data Catalog.", sequence(cell_edit("Источники обогащения данных", 1, "Ссылка будет добавлена позднее"), cell_edit("Приемники данных", 2, "Ссылка будет добавлена после релиза"))),
+    Mutation("D03_TWO_FIELDS_WITHOUT_NULLABILITY", "D03", 1, "medium", "Обязательность нескольких полей не определена", "Признак NULLABLE/NOT NULL удален сразу у двух полей результата.", sequence(remove_first_nullability, remove_first_nullability)),
+    Mutation("D03_THREE_FIELDS_WITHOUT_NULLABILITY", "D03", 1, "high", "Контракт NULL нарушен системно", "Обязательность не задана для трех последовательных полей, поэтому поведение отсутствующих значений нельзя проверить.", sequence(remove_first_nullability, remove_first_nullability, remove_first_nullability)),
+    Mutation("D04_FILTERS_SPLIT_AND_VAGUE", "D04", 1, "high", "Фильтры оставлены на усмотрение реализации", "Основной фильтр заменен субъективным правилом, а дополнительные исключения объявлены без условий.", sequence(lambda text: replace_section_body(text, "Шаг 1. Фильтрация данных", "Система должна оставлять качественные записи по правилам реализации.", prefix=True), section_edit("Шаг 1. Фильтрация данных", "Дополнительные исключения команда определяет после анализа первых запусков.", prefix=True))),
+    Mutation("D04_ONLINE_EXPORT_FILTER_GAP", "D04", 1, "high", "Не заданы фильтры расчета и повторной выгрузки", "Раздел фильтрации целиком заменен ссылкой на внешнюю реализацию: точные условия online-расчета и replay в документации отсутствуют.", lambda text: replace_section_body(text, "Шаг 1. Фильтрация данных", "Online-расчет и replay используют разные наборы фильтров из кода приложения; конкретные условия, границы и исключения в документации не перечислены.", prefix=True)),
+    Mutation("D05_TWO_UNDEFINED_STAGES", "D05", 1, "high", "Два этапа оставлены незаполненными", "Обогащение и целевая трансформация обозначены как будущая работа без явного «не применимо».", sequence(lambda text: replace_section_body(text, "Шаг 2. Обогащение данных", "Логика будет определена командой разработки.", prefix=True), lambda text: replace_section_body(text, "Шаг 3.", "Описание появится после проверки прототипа.", prefix=True))),
+    Mutation("D05_ENRICHMENT_AND_TRANSFORMATION_TBD", "D05", 1, "high", "Обязательные этапы заменены TBD", "Обогащение и целевая трансформация сохранены формально, но не описаны и не отмечены как неприменимые.", sequence(lambda text: replace_section_body(text, "Шаг 2. Обогащение данных", "TBD после выбора справочника.", prefix=True), lambda text: replace_section_body(text, "Шаг 3.", "TBD после согласования выходного расчета.", prefix=True))),
+    Mutation("D06_TWO_KAFKA_CLUSTERS_MISSING", "D06", 1, "medium", "Не идентифицированы два Kafka-подключения", "Имена кластеров удалены сразу у двух Kafka-источников.", sequence(cell_edit("Источники данных", 1, "Kafka; кластер выбирается окружением", predicate=lambda cells: any("kafka" in cell.lower() for cell in cells)), cell_edit("Источники данных", 1, "Kafka; кластер выбирается конфигурацией", predicate=lambda cells: any("kafka" in cell.lower() for cell in cells), occurrence=1))),
+    Mutation("D06_PRIMARY_AND_BACKUP_UNKNOWN", "D06", 1, "medium", "Не определены основной и резервный Kafka-кластеры", "В таблице потеряно имя рабочего кластера, а в общих сведениях добавлен неидентифицированный резервный.", sequence(cell_edit("Источники данных", 1, "Kafka; конкретный кластер не зафиксирован", predicate=lambda cells: any("kafka" in cell.lower() for cell in cells)), intro_edit("Системы-источники", "При недоступности используется резервный Kafka-кластер, имя которого выбирает эксплуатация."))),
+    Mutation("D07_PATH_AND_FORMAT_MISSING", "D07", 1, "high", "У файлового приемника нет пути и формата", "В одной строке приемника одновременно удалены полный путь и параметры формата хранения.", sequence(cell_edit("Приемники данных", 3, "Формат файла выбирается writer по умолчанию", predicate=lambda cells: len(cells) > 1 and "hdfs" in cells[1].lower()), cell_edit("Приемники данных", 1, "HDFS-кластер указан в runtime; полный путь отсутствует", predicate=lambda cells: len(cells) > 1 and "hdfs" in cells[1].lower()))),
+    Mutation("D07_BASE_AND_PARTITION_PATH_GAP", "D07", 1, "high", "Не определены базовый и партиционный пути", "Полный HDFS-путь удален и из карточки приемника, и из раздела партиционирования.", sequence(cell_edit("Приемники данных", 1, "HDFS; кластер и базовый путь не указаны", predicate=lambda cells: len(cells) > 1 and "hdfs" in cells[1].lower()), lambda text: replace_section_body(text, "Формирование ключа (kafka) / партиции (hdfs)", "Партиция создается в HDFS по внутренней конфигурации; полный физический путь и шаблон каталогов в документе не указаны."))),
+    Mutation("D08_REFERENCE_SET_INCOMPLETE", "D08", 1, "high", "Состав справочников неполон", "Один справочник обезличен в таблице, а алгоритм дополнительно ссылается на второй неописанный нормативный источник.", sequence(section_edit("Шаг 2. Обогащение данных", "После основного JOIN выполняется проверка по дополнительному корпоративному справочнику; его имя и версия не зафиксированы.", prefix=True), corrupt_reference_catalog)),
+    Mutation("D08_REFERENCE_IDENTITY_AND_VERSION", "D08", 1, "high", "Справочник нельзя однозначно выбрать", "В карточке обогащения одновременно потеряны идентификатор справочника, ссылка и версия используемого среза.", sequence(cell_edit("Источники обогащения данных", 0, "Корпоративный справочник"), cell_edit("Источники обогащения данных", 1, "Ссылка отсутствует"), cell_edit("Источники обогащения данных", 2, "Используется актуальная версия с необходимыми полями"))),
+]
+
+
+TEMPLATE_MUTATIONS = [
+    Mutation("T01_RENAME_DOCUMENT_TITLE", "T01", 2, "low", "Отсутствует заголовок документа", "Заголовок документа о потоковых данных или витрине заменен несопоставимым служебным заголовком.", lambda text: rename_heading(text, "Потоковые данные/витрины", "Служебный документ проекта")),
+    Mutation("T01_RENAME_GENERAL_INFO", "T01", 2, "low", "Отсутствует поле «Общие сведения»", "Название обязательного поля «Общие сведения» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Общие сведения", "Служебное поле 01")),
+    Mutation("T01_RENAME_PROBLEM", "T01", 2, "low", "Отсутствует поле «Решаемая проблема»", "Название обязательного поля «Решаемая проблема» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Решаемая проблема", "Служебное поле 02")),
+    Mutation("T01_RENAME_PRODUCT_METRICS", "T01", 2, "low", "Отсутствует поле «Продуктовые метрики»", "Название обязательного поля «Продуктовые метрики» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Продуктовые метрики", "Служебное поле 03")),
+    Mutation("T01_RENAME_CUSTOMERS", "T01", 2, "low", "Отсутствует поле «Заказчики»", "Название обязательного поля «Заказчики» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Заказчики", "Служебное поле 04")),
+    Mutation("T01_RENAME_NFR", "T01", 2, "low", "Отсутствует поле «Нефункциональные требования»", "Название обязательного поля «Нефункциональные требования» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Нефункциональные требования", "Служебное поле 05")),
+    Mutation("T01_RENAME_SOURCE_SYSTEMS", "T01", 2, "low", "Отсутствует поле «Системы-источники»", "Название обязательного поля «Системы-источники» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Системы-источники", "Служебное поле 06")),
+    Mutation("T01_RENAME_DATA_CATALOG", "T01", 2, "low", "Отсутствует поле «Data Catalog»", "Название обязательного поля «Data Catalog» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Data Catalog", "Служебное поле 07")),
+    Mutation("T01_RENAME_PROJECT_SOURCES", "T01", 2, "low", "Отсутствует поле «Исходники проекта»", "Название обязательного поля «Исходники проекта» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Исходники проекта", "Служебное поле 08")),
+    Mutation("T01_RENAME_TEAM", "T01", 2, "low", "Отсутствует поле «Команда»", "Название обязательного поля «Команда» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "Команда", "Служебное поле 09")),
+    Mutation("T01_RENAME_JIRA", "T01", 2, "low", "Отсутствует поле «JIRA»", "Название обязательного поля «JIRA» заменено несопоставимой служебной меткой.", lambda text: rename_intro_field(text, "JIRA", "Служебное поле 10")),
+    Mutation("T01_RENAME_SOURCES", "T01", 2, "low", "Отсутствует раздел «Источники данных»", "Обязательный раздел «Источники данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Источники данных", "Входные материалы проекта")),
+    Mutation("T01_RENAME_SOURCES_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы источников", "Обязательная колонка «Описание источника» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Источники данных", "Описание источника", "Служебная колонка 01")),
+    Mutation("T01_RENAME_ENRICHMENT_SOURCES", "T01", 2, "low", "Отсутствует раздел «Источники обогащения данных»", "Обязательный раздел «Источники обогащения данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Источники обогащения данных", "Дополнительные материалы проекта")),
+    Mutation("T01_RENAME_ENRICHMENT_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы источников обогащения", "Обязательная колонка «Описание» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Источники обогащения данных", "Описание", "Служебная колонка 02")),
+    Mutation("T01_RENAME_RECEIVERS", "T01", 2, "low", "Отсутствует раздел «Приемники данных»", "Обязательный раздел «Приемники данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Приемники данных", "Результаты проекта")),
+    Mutation("T01_RENAME_RECEIVERS_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы приемников", "Обязательная колонка «Сериализация» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Приемники данных", "Сериализация", "Служебная колонка 03")),
+    Mutation("T01_RENAME_FLOW", "T01", 2, "low", "Отсутствует раздел «Схема потоков данных»", "Обязательный раздел «Схема потоков данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Схема потоков данных", "Иллюстрации проекта")),
+    Mutation("T01_RENAME_ALGORITHM", "T01", 2, "low", "Отсутствует раздел «Алгоритм обработки потока»", "Обязательный раздел «Алгоритм обработки потока» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Алгоритм обработки потока", "Рабочие заметки")),
+    Mutation("T01_RENAME_FILTER_STEP", "T01", 2, "low", "Отсутствует шаг фильтрации данных", "Обязательный шаг 1 с описанием фильтрации переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Шаг 1. Фильтрация данных", "Этап A. Подготовка", prefix=True)),
+    Mutation("T01_RENAME_ENRICHMENT_STEP", "T01", 2, "low", "Отсутствует шаг обогащения данных", "Обязательный шаг 2 с описанием обогащения переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Шаг 2. Обогащение данных", "Этап B. Подготовка", prefix=True)),
+    Mutation("T01_STEP3_PLACEHOLDER", "T01", 2, "low", "Не указан третий шаг преобразования", "Название обязательного третьего шага заменено незаполненным плейсхолдером.", lambda text: rename_heading(text, "Шаг 3.", "Шаг 3. <Наименование шага 3>", prefix=True)),
+    Mutation("T01_RENAME_KEYS", "T01", 2, "low", "Отсутствует раздел формирования ключа или партиции", "Обязательный раздел формирования Kafka key или HDFS partition переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Формирование ключа (kafka) / партиции (hdfs)", "Параметры выполнения")),
+    Mutation("T01_RENAME_STRUCTURE", "T01", 2, "low", "Отсутствует раздел «Структура данных»", "Обязательный раздел «Структура данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Структура данных", "Технические материалы")),
+    Mutation("T01_RENAME_STRUCTURE_COLUMN", "T01", 2, "medium", "Отсутствует колонка таблицы структуры данных", "Обязательная колонка «Комментарий» заменена несопоставимым служебным названием.", lambda text: rename_table_column(text, "Структура данных", "Комментарий", "Служебная колонка 04")),
+    Mutation("T01_RENAME_EXAMPLE", "T01", 2, "low", "Отсутствует раздел «Пример данных»", "Обязательный раздел «Пример данных» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "Пример данных", "Контрольный фрагмент")),
+    Mutation("T01_SHORT_EXAMPLE", "T01", 2, "low", "В примере данных меньше десяти строк", "Из обязательного примера данных удалена одна строка, поэтому вместо десяти строк осталось девять.", remove_last_example_row),
+    Mutation("T01_RENAME_DDL", "T01", 2, "low", "Отсутствует раздел «DDL»", "Обязательный раздел «DDL» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "DDL", "Техническое приложение")),
+    Mutation("T01_RENAME_FAQ", "T01", 2, "low", "Отсутствует раздел «FAQ»", "Обязательный раздел «FAQ» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "FAQ", "Прочие материалы")),
+    Mutation("T01_RENAME_CHANGE_HISTORY", "T01", 2, "low", "Отсутствует раздел «История изменений»", "Обязательный раздел «История изменений» переименован в несопоставимый заголовок.", lambda text: rename_heading(text, "История изменений", "Архив проекта")),
+]
+
+
+UNIVERSAL_MUTATIONS = [
+    Mutation("U01_SCOPE_OUTPUT_GAP", "U01", 3, "high", "Заявленный результат не обеспечен контрактом", "В цель добавлен прогноз, которого нет в выходной схеме и алгоритме.", lambda text: append_intro_field(text, "Решаемая проблема", "Результат также должен обеспечивать прогноз значений на следующие 30 дней.")),
+    Mutation("U01_UNCLEAR_BUSINESS_PROBLEM", "U01", 3, "medium", "Не определена решаемая бизнес-проблема", "Вместо бизнес-задачи указано только намерение сформировать технический набор данных; ожидаемое решение или изменение процесса не описано.", lambda text: replace_intro_field(text, "Решаемая проблема", "Требуется сформировать новый технический набор данных; решаемая бизнес-проблема и ожидаемое изменение процесса пока не определены.")),
+    Mutation("U01_MISSING_USER_SCENARIO", "U01", 3, "medium", "Не определен пользователь нового результата", "В скоуп добавлен отдельный результат для ручного решения, но его пользователь, рабочий сценарий и принимаемое решение не определены.", sequence(intro_edit("Решаемая проблема", "Дополнительно должен формироваться отдельный список объектов для ручного решения."), intro_edit("Заказчики", "Для нового списка пользователь, рабочий сценарий и решение по результату пока не определены."))),
+    Mutation("U01_UNDEFINED_SCOPE_BOUNDARIES", "U01", 3, "high", "Не определены границы задачи", "Состав входящих и исключаемых сущностей и периодов оставлен изменяемым между запусками без зафиксированного правила.", lambda text: append_intro_field(text, "Решаемая проблема", "Состав включаемых и исключаемых бизнес-сущностей и периодов определяется отдельно перед каждым запуском и в документе не фиксируется.")),
+    Mutation("U02_UNDEFINED_ACTIVE", "U02", 3, "medium", "Термин «активная запись» имеет два значения", "Состав выборки зависит от термина, который в алгоритме и FAQ определен по двум несовместимым признакам.", sequence(section_edit("Алгоритм обработки потока", "Активной считается запись, имеющая разрешающий статус источника."), section_edit("FAQ", "Активной считается любая запись, обновленная за последние 30 дней, независимо от статуса источника."))),
+    Mutation("U02_SAME_ENTITY_DIFFERENT_NAMES", "U02", 3, "medium", "Не определено соответствие бизнес-сущностей", "Алгоритм считает строки по объектам, а требования — по единицам учета, причем одна единица может включать несколько объектов и правило преобразования отсутствует.", sequence(section_edit("Алгоритм обработки потока", "Расчет и уникальность результата определяются на уровне объекта."), section_edit("FAQ", "Продуктовые требования заданы на уровне единицы учета; она может включать один или несколько объектов, но правило соответствия между ними не определено."))),
+    Mutation("U02_SAME_NAME_DIFFERENT_ENTITIES", "U02", 3, "high", "Одно название обозначает разные сущности", "Термин «владелец» одновременно обозначает владельца исходной записи и оператора процесса, поэтому ссылки на него неоднозначны.", sequence(section_edit("Алгоритм обработки потока", "В этом разделе владельцем называется владелец исходной записи."), section_edit("FAQ", "В FAQ и описании использования владельцем называется оператор, отвечающий за запуск процесса."))),
+    Mutation("U02_UNDEFINED_BUSINESS_MEANING", "U02", 3, "medium", "Не определен бизнес-смысл показателя", "Документ требует рассчитывать «уровень результата», но не объясняет, что этот показатель означает и как интерпретировать его значения.", sequence(intro_edit("Продуктовые метрики", "Ключевой показатель решения — уровень результата."), section_edit("FAQ", "Бизнес-смысл показателя «уровень результата» и интерпретация его значений пока не определены."))),
+    Mutation("U03_CONFLICTING_SOURCES", "U03", 3, "high", "Не задан источник истины", "При конфликте источников разрешен произвольный выбор.", lambda text: append_intro_field(text, "Системы-источники", "При расхождении значений между источниками допускается использовать значение любого из них.")),
+    Mutation("U03_RESULT_WITHOUT_AUTHORITY", "U03", 3, "high", "Для результата не назначен источник истины", "Для финального значения основного бизнес-показателя не указан источник, которому следует доверять при расхождении входных данных.", sequence(intro_edit("Системы-источники", "Источники могут содержать разные значения основного бизнес-показателя."), section_edit("Алгоритм обработки потока", "Авторитетный источник финального значения основного бизнес-показателя не назначен."))),
+    Mutation("U03_UNDEFINED_SOURCE_ROLES", "U03", 3, "medium", "Не определены роли двух представлений источника", "Источник предоставляет исходное и скорректированное значения одного показателя, но документация не назначает авторитетное представление при расхождении.", sequence(section_edit("Источники данных", "Источник предоставляет поля base_business_value и corrected_business_value; оба могут быть заполнены и различаться."), section_edit("Алгоритм обработки потока", "Для итогового business_value используется одно из двух представлений источника, но приоритет base_business_value и corrected_business_value не задан."))),
+    Mutation("U03_REQUIRED_FIELD_ABSENT", "U03", 3, "high", "Алгоритм использует отсутствующее поле источника", "Фильтрация зависит от source_quality_flag, которого нет ни в одном контракте источника и для которого не задан способ получения.", sequence(section_edit("Шаг 1. Фильтрация данных", "В результат включаются только записи с source_quality_flag = true.", prefix=True), section_edit("FAQ", "Поле source_quality_flag отсутствует в контрактах перечисленных источников; отдельный способ его получения не предусмотрен."))),
+    Mutation("U04_GRAIN_CONTRADICTION", "U04", 3, "high", "Противоречиво определена гранулярность", "Одна строка одновременно названа событием и агрегатом за период.", lambda text: insert_after_heading(text, "Алгоритм обработки потока", "Одна строка результата одновременно соответствует отдельному событию и агрегату за расчетный период.")),
+    Mutation("U04_GRAIN_UNDEFINED", "U04", 3, "medium", "Не определена гранулярность результата", "Документ допускает несколько несовместимых трактовок одной строки и не фиксирует единую гранулярность результата.", lambda text: insert_after_heading(text, "Алгоритм обработки потока", "Одна строка результата может соответствовать событию, объекту или периоду; окончательная гранулярность в документе не определена.")),
+    Mutation("U04_NON_UNIQUE_BUSINESS_KEY", "U04", 3, "high", "Бизнес-ключ не гарантирует уникальность", "Для результата допускаются повторяющиеся строки с одним бизнес-ключом, а отличающий атрибут и правило уникальности отсутствуют.", lambda text: insert_after_heading(text, "Формирование ключа (kafka) / партиции (hdfs)", "В результате допускается несколько строк с одинаковым бизнес-ключом; отличающий атрибут и правило уникальности не заданы.")),
+    Mutation("U04_TECHNICAL_KEY_TOO_FINE", "U04", 3, "high", "Технический ключ мельче бизнес-гранулярности", "Ключ суточного результата включает идентификатор запуска и время обработки, поэтому повторный расчет создает новый ключ для той же бизнес-сущности.", sequence(section_edit("Алгоритм обработки потока", "Одна бизнес-строка результата соответствует объекту за календарный день."), section_edit("Формирование ключа (kafka) / партиции (hdfs)", "Ключ дополнительно включает run_id и processing_timestamp, которые меняются при каждом повторном расчете."))),
+    Mutation("U04_DECLARED_DIMENSION_ABSENT", "U04", 3, "high", "Заявленное измерение отсутствует в результате", "Обязательное измерение гранулярности scope_dimension_code не передается в структуру результата, поэтому разные сущности становятся неразличимыми.", sequence(section_edit("Алгоритм обработки потока", "Гранулярность результата обязательно включает измерение scope_dimension_code."), section_edit("Структура данных", "Поле scope_dimension_code отсутствует в структуре и в приемник не передается."))),
+    Mutation("U05_AMBIGUOUS_MAPPING", "U05", 3, "medium", "Неоднозначен маппинг поля", "Для одного результата заданы два входных атрибута, которые могут различаться, но правило выбора и приоритет отсутствуют.", sequence(section_edit("Структура данных", "Поле resolved_value заполняется из primary_value или fallback_value; оба значения могут присутствовать и различаться."), section_edit("Шаг 3.", "При одновременном наличии primary_value и fallback_value выбирается любое из них; приоритет не задан.", prefix=True))),
+    Mutation("U05_OUTPUT_WITHOUT_LINEAGE", "U05", 3, "medium", "Выходное поле не имеет происхождения", "Для первого выходного поля одновременно удалены источник, входной атрибут и формула расчета.", sequence(cell_edit("Структура данных", 3, "Источник не указан"), cell_edit("Структура данных", 4, "Атрибут источника не указан"), cell_edit("Структура данных", 6, "Формула и правило получения поля не указаны"))),
+    Mutation("U05_SEMANTIC_MISMATCH", "U05", 3, "high", "Поля несовместимы по бизнес-смыслу", "Первый целевой атрибут предлагается заполнять датой рождения клиента, хотя эти поля описывают разные бизнес-сущности.", sequence(cell_edit("Структура данных", 4, "customer_birth_date"), cell_edit("Структура данных", 6, "Копируется без преобразования, несмотря на иной бизнес-смысл целевого атрибута"))),
+    Mutation("U05_FORMULA_UNDECLARED_INPUT", "U05", 3, "high", "Формула использует необъявленный вход", "Формула зависит от external_adjustment_factor, которого нет в источниках, структуре и среди описанных способов расчета.", sequence(section_edit("Шаг 3.", "Итоговый показатель умножается на external_adjustment_factor.", prefix=True), section_edit("FAQ", "Поле external_adjustment_factor отсутствует в контрактах источников и отдельно не рассчитывается."))),
+    Mutation("U06_ARBITRARY_OPERATION_ORDER", "U06", 3, "high", "Не определен порядок операций", "Фильтрация и обогащение разрешены в любом порядке, хотя это может менять состав данных.", lambda text: insert_after_heading(text, "Алгоритм обработки потока", "Фильтрацию и обогащение можно выполнять в любом порядке по усмотрению реализации.")),
+    Mutation("U06_HIDDEN_PREREQUISITE", "U06", 3, "high", "Пропущен обязательный шаг преобразования", "Обогащение требует normalized_join_key, но алгоритм не содержит шага, который создает это поле до JOIN.", sequence(section_edit("Шаг 2. Обогащение данных", "JOIN выполняется только по полю normalized_join_key.", prefix=True), section_edit("FAQ", "Шаг формирования normalized_join_key в алгоритме отсутствует; готового поля в источниках нет."))),
+    Mutation("U06_CYCLIC_DEPENDENCY", "U06", 3, "high", "Шаги имеют циклическую зависимость", "Фильтрация требует enriched_status из следующего шага, а обогащение выполняется только для строк, уже прошедших эту фильтрацию.", sequence(section_edit("Шаг 1. Фильтрация данных", "До обогащения сохраняются только строки с enriched_status = ACTIVE.", prefix=True), section_edit("Шаг 2. Обогащение данных", "Поле enriched_status создается на этом шаге только для строк, прошедших шаг 1.", prefix=True))),
+    Mutation("U07_OPEN_TIME_BOUNDARY", "U07", 3, "high", "Не определено скользящее окно отбора", "Фильтр «7 дней назад / 2 часа вперед» не задает момент фиксации текущего времени и включение границ, поэтому состав выборки зависит от реализации.", lambda text: insert_after_heading(text, "Шаг 1. Фильтрация данных", "Учитываются события не ранее 7 дней назад и не позже 2 часов вперед от текущего времени на стороне обработки; момент фиксации текущего времени и включение границ не определены.", prefix=True)),
+    Mutation("U08_JOIN_CARDINALITY_GAP", "U08", 3, "high", "Не определена кардинальность JOIN", "Для соединения со справочником не указано ожидаемое число совпадений на одну входную запись и допустимость размножения результата.", lambda text: insert_after_heading(text, "Шаг 2. Обогащение данных", "JOIN со справочником выполняется по идентификатору; при нескольких совпадениях сохраняются все строки, ожидаемая кардинальность и допустимость размножения результата не определены.", prefix=True)),
+    Mutation("U09_NONDETERMINISTIC_LAST", "U09", 3, "high", "Недетерминирован выбор последней записи", "Для выбора записи по бизнес-ключу задано только время получения без дополнительного порядка при равенстве, поэтому повторный расчет может выбрать другую запись.", lambda text: insert_after_heading(text, "Шаг 3.", "Для каждого бизнес-ключа выбирается запись с максимальным временем получения; при равенстве времени сохраняется произвольная запись.", prefix=True)),
+    Mutation("U10_CONFLICTING_ZERO_RULES", "U10", 3, "high", "Для нулевого значения заданы два результата", "Одно и то же нулевое значение одновременно удовлетворяет двум правилам с разными выходами, а приоритет ветвей не определен.", lambda text: insert_after_heading(text, "Шаг 3.", "Если показатель равен 0, записать 0; одновременно значение 0 считается неизвестным и должно быть записано как NULL, приоритет правил не задан.", prefix=True)),
+    Mutation("U11_TIMEZONE_AMBIGUITY", "U11", 3, "high", "Не определена временная зона преобразования", "Региональные сдвиги перечислены без исходного и целевого часового пояса, поэтому одинаковый timestamp может быть преобразован по-разному.", sequence(section_edit("Алгоритм обработки потока", "Для региона east к timestamp прибавляется 7 часов, для central, nw, volga и south — 3 часа."), section_edit("Алгоритм обработки потока", "Часовой пояс исходного timestamp и целевой часовой пояс хранения не указаны."))),
+    Mutation("U12_AMBIGUOUS_PHYSICAL_TYPE", "U12", 3, "medium", "Не выбран физический тип поля", "Для первого поля результата допускаются два несовместимых физических типа, поэтому правила хранения и проверки значения не определены.", lambda text: mutate_table_cell(text, "Структура данных", 1, "string или bigint; окончательный физический тип не выбран")),
+    Mutation("U13_ARBITRARY_BAD_DATA", "U13", 3, "high", "Не определена обработка поврежденной записи", "Для неразбираемых числовых и временных значений не выбрано единое действие и не описано влияние ошибки на публикацию результата.", lambda text: insert_after_heading(text, "Шаг 1. Фильтрация данных", "Запись с неразбираемым числом или timestamp можно сохранить либо отбросить; правило выбора, quarantine, логирование и влияние на публикацию не определены.", prefix=True)),
+    Mutation("U14_NON_IDEMPOTENT_RETRY", "U14", 3, "high", "Не определена семантика повторного запуска", "Повтор может выполнять append или overwrite и поэтому менять число строк.", lambda text: insert_after_heading(text, "Формирование ключа (kafka) / партиции (hdfs)", "При повторном запуске партиция может дополняться или перезаписываться по выбору оператора.")),
+    Mutation("U15_UNVERSIONED_SCHEMA_CHANGE", "U15", 3, "high", "Допущено несовместимое изменение схемы", "Тип поля разрешено менять без новой версии контракта.", lambda text: insert_after_heading(text, "FAQ", "Тип существующего поля можно изменить без выпуска новой версии, если его имя сохраняется.")),
+    Mutation("U16_IMPOSSIBLE_ZERO_LATENCY", "U16", 3, "medium", "Задано нереализуемое требование задержки", "При пиковом объеме требуется строго нулевая задержка, что невозможно объективно выполнить.", lambda text: append_intro_field(text, "Нефункциональные требования", "При любом пиковом объеме задержка обработки должна быть строго 0 секунд.")),
+    Mutation("U17_DDL_TYPE_CONFLICT", "U17", 3, "low", "Тип поля расходится с DDL", "Тип первого целевого поля изменен только в DDL и конфликтует с таблицей структуры.", corrupt_first_ddl_type),
+    Mutation("U18_VAGUE_ACCEPTANCE", "U18", 3, "low", "Непроверяемый критерий качества", "Добавлена метрика без формулы, порога и периода измерения.", lambda text: append_intro_field(text, "Продуктовые метрики", "Дополнительная метрика: качество результата должно быть высоким.")),
+    Mutation("U19_UNMASKED_SENSITIVE_LOG", "U19", 3, "medium", "Чувствительные данные сохраняются без ограничений", "Полный payload с идентификаторами разрешено бессрочно писать в журнал.", lambda text: insert_after_heading(text, "FAQ", "Для диагностики полный payload с абонентскими идентификаторами сохраняется в журнале без маскирования и ограничения срока.")),
+    Mutation("U01_ALERTS_WITHOUT_OUTPUT", "U01", 3, "high", "Обещаны алерты без выходного контракта", "В цели появились персональные алерты, но ни приемник, ни схема доставки, ни поля уведомления не определены.", sequence(intro_edit("Решаемая проблема", "Результат обязан отправлять персональные алерты владельцам затронутых объектов."), section_edit("Приемники данных", "Канал уведомлений, адресаты и контракт сообщения будут определены после запуска."))),
+    Mutation("U01_HISTORY_OUTSIDE_RESULT", "U01", 3, "high", "Заявлена история, которой нет в результате", "Документ обещает аудит всех прошлых состояний, хотя приемник хранит только актуальную версию и алгоритм истории не формирует.", sequence(intro_edit("Решаемая проблема", "Пользователь должен видеть полную историю каждого изменения результата."), section_edit("Приемники данных", "В приемнике сохраняется только последняя опубликованная версия без журнала изменений."))),
+    Mutation("U02_TWO_MEANINGS_OF_CONFIRMED", "U02", 3, "high", "Термин «подтвержденный» определен противоречиво", "Один термин в разных частях документа означает прохождение проверки и наличие двух событий, что меняет состав результата.", sequence(section_edit("Алгоритм обработки потока", "Подтвержденной считается запись, прошедшая синтаксическую валидацию."), section_edit("FAQ", "Подтвержденная запись — запись, для которой получено не менее двух событий из источника."))),
+    Mutation("U02_UNDEFINED_CURRENT_VERSION", "U02", 3, "medium", "Не определена «текущая версия»", "Выбор данных и повторный расчет зависят от текущей версии, но точка времени и правило ее определения отсутствуют.", sequence(section_edit("Шаг 2. Обогащение данных", "Для обогащения всегда используется текущая версия записи.", prefix=True), section_edit("FAQ", "Понятие текущей версии определяется владельцем источника при каждом запуске."))),
+    Mutation("U03_SOURCE_PRIORITY_CHANGES", "U03", 3, "high", "Приоритет источников меняется между этапами", "До обогащения главным объявлен первый источник, после него — второй; правила разрешения расхождений нет.", sequence(section_edit("Алгоритм обработки потока", "До обогащения авторитетным считается первый источник из таблицы."), section_edit("Шаг 2. Обогащение данных", "После JOIN при расхождении всегда используется значение второго источника.", prefix=True))),
+    Mutation("U03_UNDECLARED_AUTHORITATIVE_FEED", "U03", 3, "high", "Алгоритм зависит от неописанного источника истины", "Финальные значения должны сверяться с внешним master-feed, которого нет среди источников и контракт которого неизвестен.", sequence(intro_edit("Системы-источники", "Финальным источником истины является корпоративный master-feed."), section_edit("Шаг 3.", "Перед записью значения заменяются данными master-feed; способ подключения и поля не описаны.", prefix=True))),
+    Mutation("U04_KEY_OMITS_DECLARED_DIMENSION", "U04", 3, "high", "Бизнес-ключ не соответствует гранулярности", "В гранулярность добавлено измерение, но бизнес-ключ и дедупликация его не учитывают, поэтому разные строки схлопываются.", sequence(section_edit("Алгоритм обработки потока", "Гранулярность дополнительно включает канал поступления source_channel."), section_edit("Формирование ключа (kafka) / партиции (hdfs)", "При построении бизнес-ключа source_channel намеренно не учитывается."))),
+    Mutation("U04_TWO_GRAINS_FOR_RECEIVER", "U04", 3, "high", "Для одного приемника заданы две гранулярности", "Алгоритм публикует строки по событиям, а описание приемника требует суточный агрегат без правила преобразования между уровнями.", sequence(section_edit("Приемники данных", "Одна строка приемника является суточным агрегатом объекта."), section_edit("Алгоритм обработки потока", "Каждое прошедшее фильтр событие записывается отдельной строкой без агрегации."))),
+    Mutation("U05_TWO_FORMULAS_FOR_TARGET", "U05", 3, "high", "Одно поле рассчитывается двумя способами", "В маппинге и алгоритме заявлены несовместимые формулы одного выходного показателя без приоритета.", sequence(section_edit("Структура данных", "Основной показатель рассчитывается как сумма исходных значений."), section_edit("Шаг 3.", "Тот же основной показатель рассчитывается как среднее исходных значений; приоритет формул не задан.", prefix=True))),
+    Mutation("U05_HIDDEN_INTERMEDIATE_FIELD", "U05", 3, "high", "Маппинг зависит от необъявленного промежуточного поля", "Расчет использует нормализованный атрибут, которого нет ни в источниках, ни среди шагов его получения.", sequence(section_edit("Структура данных", "Для заполнения результата требуется промежуточное поле normalized_source_value."), section_edit("Шаг 3.", "normalized_source_value передается в приемник без дополнительного преобразования.", prefix=True))),
+    Mutation("U06_DEDUP_AFTER_AGGREGATION", "U06", 3, "high", "Дедупликация выполняется после агрегации", "Дубли сначала попадают в сумму, а удаляются только из уже агрегированного результата, поэтому восстановить корректные показатели невозможно.", sequence(section_edit("Шаг 3.", "Сначала все входные строки агрегируются без дедупликации.", prefix=True), section_edit("Шаг 3.", "После расчета агрегатов дубли удаляются по идентификатору исходного события.", prefix=True))),
+    Mutation("U06_TWO_OPERATION_ORDERS", "U06", 3, "high", "В документе заданы два порядка обработки", "Схема требует фильтрацию до JOIN, а текст алгоритма — JOIN до фильтрации; результаты могут различаться.", sequence(section_edit("Схема потоков данных", "Обязательный порядок: фильтрация → обогащение → агрегация."), section_edit("Алгоритм обработки потока", "Реализация сначала обогащает все записи, затем применяет входные фильтры."))),
+    Mutation("U07_OVERLAPPING_PERIODS", "U07", 3, "high", "Соседние расчетные периоды пересекаются", "Конец одного периода и начало следующего включают один timestamp, поэтому граничная запись попадает в два результата.", sequence(section_edit("Шаг 1. Фильтрация данных", "Период M включает timestamp от start_M включительно до end_M включительно.", prefix=True), section_edit("Шаг 1. Фильтрация данных", "Следующий период начинается с timestamp = end_M и также включает эту границу.", prefix=True))),
+    Mutation("U07_NULL_FILTER_DISAGREEMENT", "U07", 3, "high", "Фильтры противоречат друг другу для NULL", "Одна и та же запись с отсутствующим status одновременно должна попасть в результат и быть исключена, поэтому состав выборки не определен.", sequence(section_edit("Шаг 1. Фильтрация данных", "Запись с NULL status включается в выборку как состояние по умолчанию.", prefix=True), section_edit("Шаг 1. Фильтрация данных", "Любая запись с NULL status исключается до применения значения по умолчанию.", prefix=True))),
+    Mutation("U08_PARTIAL_KEY_AND_FANOUT", "U08", 3, "high", "Неполный ключ JOIN размножает строки", "Соединение игнорирует дату и версию составного ключа, а несколько совпадений сохраняются без ограничения, поэтому одна входная запись превращается в несколько выходных.", sequence(section_edit("Шаг 2. Обогащение данных", "Справочник содержит версии записей по идентификатору и effective_date, но JOIN выполняется только по идентификатору.", prefix=True), section_edit("Шаг 2. Обогащение данных", "Все найденные версии передаются в результат без выбора актуальной записи и проверки кардинальности.", prefix=True))),
+    Mutation("U08_INNER_JOIN_WITH_FALLBACK", "U08", 3, "high", "Тип JOIN делает fallback недостижимым", "INNER JOIN удаляет строки без справочника до выполнения ветки, которая должна сохранить такую строку со специальным значением.", sequence(section_edit("Шаг 2. Обогащение данных", "Сначала выполняется INNER JOIN, поэтому записи без соответствия в справочнике удаляются.", prefix=True), section_edit("Шаг 2. Обогащение данных", "После JOIN запись без соответствия должна быть сохранена со значением UNKNOWN.", prefix=True))),
+    Mutation("U09_DISTINCT_BEFORE_REVISION", "U09", 3, "high", "DISTINCT уничтожает данные для выбора ревизии", "Поле revision исключается до выбора максимальной версии, поэтому требуемую последнюю запись уже невозможно определить.", sequence(section_edit("Шаг 3.", "Сначала выполняется DISTINCT по бизнес-полям без revision, поле revision после этого недоступно.", prefix=True), section_edit("Шаг 3.", "Затем для каждого бизнес-ключа требуется выбрать строку с максимальной revision.", prefix=True))),
+    Mutation("U09_GROUPING_MISSES_DIMENSION", "U09", 3, "high", "GROUP BY не реализует заявленную гранулярность", "Размерность объявлена частью одной строки результата, но отсутствует в GROUP BY и выбирается произвольно, поэтому разные группы сливаются.", sequence(section_edit("Алгоритм обработки потока", "Одна строка результата должна соответствовать комбинации region_code, vendor_name и category_code."), section_edit("Шаг 3.", "GROUP BY выполняется только по region_code и vendor_name; category_code выбирается произвольно из группы.", prefix=True))),
+    Mutation("U10_OVERLAPPING_PRIORITY", "U10", 3, "high", "Пересекающиеся условия не имеют приоритета", "Для значений score от 50 до 80 одновременно выполняются две ветви с разными статусами, а порядок выбора результата не указан.", sequence(section_edit("Шаг 3.", "Если score >= 50, установить статус REVIEW.", prefix=True), section_edit("Шаг 3.", "Если score <= 80, установить статус ACCEPT; приоритет для диапазона 50–80 не задан.", prefix=True))),
+    Mutation("U10_MISSING_ELSE", "U10", 3, "medium", "Не определен результат для неизвестного состояния", "Правила задают выход только для состояний A и B, хотя входной контракт допускает новые значения, поэтому часть записей не имеет ожидаемого результата.", sequence(section_edit("Шаг 3.", "Для state=A записывается 1, для state=B записывается 0; ветка по умолчанию отсутствует.", prefix=True), section_edit("FAQ", "Источник может присылать новые значения state без предварительного уведомления."))),
+    Mutation("U11_CURRENT_REFERENCE_FOR_BACKFILL", "U11", 3, "high", "Исторический пересчет использует текущий справочник", "Онлайн-расчет выбирает историческую версию справочника на момент события, а backfill использует текущий snapshot, поэтому прошлый результат меняется без изменения исходных событий.", sequence(section_edit("Шаг 2. Обогащение данных", "Онлайн-обработка выбирает версию справочника, действовавшую на event time.", prefix=True), section_edit("FAQ", "При backfill любого прошлого периода используется последний snapshot справочника на дату запуска."))),
+    Mutation("U11_LATE_EVENT_TWO_POLICIES", "U11", 3, "high", "Для позднего события заданы несовместимые политики", "Одно правило окончательно отбрасывает событие после watermark, а другое требует включить любое позднее событие через replay, поэтому исторический результат не воспроизводим.", sequence(section_edit("Алгоритм обработки потока", "Событие, пришедшее после watermark, окончательно отбрасывается и не меняет опубликованные данные."), section_edit("FAQ", "Любое позднее событие автоматически включается ближайшим replay без ограничения по возрасту."))),
+    Mutation("U12_SCALE_AND_ROUNDING_CONFLICT", "U12", 3, "high", "Точность хранения не поддерживает расчет", "Формула требует шесть знаков после запятой, а физический тип хранит только два; правило округления и допустимая потеря точности не заданы.", sequence(section_edit("Структура данных", "Расчетный коэффициент должен сохранять ровно шесть знаков после запятой."), section_edit("DDL", "Для коэффициента используется DECIMAL(12,2); режим округления и допустимая потеря точности не определены."))),
+    Mutation("U12_DEFAULT_OUTSIDE_ENUM", "U12", 3, "high", "Значение по умолчанию нарушает контракт поля", "Поле допускает только ACTIVE и INACTIVE, но алгоритм записывает UNKNOWN, поэтому значение результата не соответствует объявленному enum.", sequence(section_edit("Структура данных", "Поле status допускает только значения ACTIVE и INACTIVE."), section_edit("Шаг 3.", "Если исходный status отсутствует, в результат записывается UNKNOWN.", prefix=True))),
+    Mutation("U12_IDENTIFIER_LEADING_ZERO_LOSS", "U12", 3, "high", "Тип поля уничтожает значимые ведущие нули", "Абонентский идентификатор допускает ведущие нули, но перед записью преобразуется в BIGINT, поэтому сохраненное значение нельзя однозначно восстановить.", sequence(section_edit("Структура данных", "Абонентский идентификатор состоит из цифр, может начинаться с нулей, и все позиции являются значимыми."), section_edit("Структура данных", "Перед записью абонентский идентификатор преобразуется в BIGINT без сохранения исходного строкового значения."))),
+    Mutation("U13_BAD_DATA_BECOMES_VALID", "U13", 3, "high", "Поврежденные значения маскируются валидным default", "Ошибки разбора числа и времени заменяются обычными значениями без технического признака, поэтому поврежденные записи проходят проверки как корректные.", sequence(section_edit("Шаг 1. Фильтрация данных", "Неразбираемое число заменяется на 0 и считается валидным бизнес-значением.", prefix=True), section_edit("Шаг 1. Фильтрация данных", "Неразбираемый timestamp заменяется началом эпохи без признака ошибки и передается дальше.", prefix=True))),
+    Mutation("U13_EMPTY_INPUT_PUBLISHES_ZERO", "U13", 3, "high", "Пустой вход публикуется как реальные нулевые данные", "При отсутствии входных записей создаются штатные строки с нулевыми показателями без признака неполноты, поэтому сбой поставки выглядит как бизнес-результат.", sequence(section_edit("Алгоритм обработки потока", "Пустой вход считается успешным расчетом и не блокирует публикацию."), section_edit("Шаг 3.", "Для каждой ожидаемой группы создается строка с нулевыми показателями без технического флага неполноты.", prefix=True))),
+    Mutation("U13_PARTIAL_BATCH_PUBLISHED", "U13", 3, "high", "Частичный пакет публикуется как полный результат", "При недоступности одного обязательного источника расчет продолжается по оставшимся данным без флага, метрики и оповещения, поэтому потребитель не видит неполноту результата.", sequence(section_edit("Алгоритм обработки потока", "Если один обязательный источник недоступен, расчет продолжается по данным остальных источников и результат публикуется."), section_edit("FAQ", "Частичная публикация считается успешной; признак неполноты, отдельная метрика и оповещение не предусмотрены."))),
+    Mutation("U14_APPEND_RETRY_DUPLICATES", "U14", 3, "high", "Retry повторно добавляет опубликованные строки", "Первый запуск пишет append, а повтор не проверяет идентификатор загрузки и снова добавляет тот же набор.", sequence(section_edit("Формирование ключа (kafka) / партиции (hdfs)", "Каждый запуск записывает результат в режиме append."), section_edit("FAQ", "Retry повторяет запись целиком; batch_id в приемнике не хранится и дубли не удаляются."))),
+    Mutation("U14_DELETE_AND_CORRECTION_IGNORED", "U14", 3, "high", "Повторная обработка не применяет исправления", "Replay добавляет новые ревизии, но не удаляет старые строки и игнорирует tombstone, поэтому состояние зависит от истории запусков.", sequence(section_edit("Алгоритм обработки потока", "Replay добавляет исправленные события рядом с ранее опубликованными."), section_edit("FAQ", "DELETE и tombstone подтверждаются, но соответствующие строки приемника не изменяются."))),
+    Mutation("U15_REQUIRED_FIELD_WITHOUT_MIGRATION", "U15", 3, "high", "Добавлено обязательное поле без миграции", "Новая версия требует NOT NULL-поле, но не задает default, backfill истории и порядок обновления потребителей.", sequence(section_edit("Структура данных", "В следующем релизе добавляется обязательное поле processing_status NOT NULL без default."), section_edit("FAQ", "Старые партиции и потребители остаются без изменений; план миграции не предусмотрен."))),
+    Mutation("U15_RENAME_CHANGES_MEANING", "U15", 3, "high", "Поле переименовывается вместе со смыслом без версии", "Существующее поле получает новое имя и другую семантику в той же версии схемы, а старые данные не преобразуются.", sequence(section_edit("Структура данных", "Поле total_count переименовывается в successful_count и начинает учитывать только успешные записи."), section_edit("FAQ", "Версия контракта при этом не меняется, исторические значения сохраняют прежний смысл."))),
+    Mutation("U16_WATERMARK_EXCEEDS_SLA", "U16", 3, "high", "SLA меньше необходимого ожидания данных", "Результат требуется публиковать раньше закрытия watermark, хотя до watermark он еще может измениться.", sequence(intro_edit("Продуктовые метрики", "Финальный результат публикуется не позднее чем через 2 минуты."), intro_edit("Нефункциональные требования", "Watermark закрывает расчет только через 30 минут после периода."))),
+    Mutation("U16_REPLAY_LONGER_THAN_RETENTION", "U16", 3, "high", "Горизонт replay превышает retention", "Документ обещает автоматический пересчет периода, для которого исходные данные уже гарантированно удалены.", sequence(intro_edit("Нефункциональные требования", "Retention авторитетного сырья составляет 7 суток."), section_edit("FAQ", "Автоматический replay гарантирован для любых периодов за последние 90 суток."))),
+    Mutation("U17_EXAMPLE_OUTSIDE_CONTRACT", "U17", 3, "medium", "Пример нарушает тип поля", "В первую строку примера записано значение, которое заведомо не приводится к объявленному числовому, временному или логическому типу поля.", corrupt_typed_example_value),
+    Mutation("U17_DDL_FIELD_NAME_CONFLICT", "U17", 3, "high", "Имя поля расходится между маппингом и DDL", "Первое целевое поле переименовано только в DDL: маппинг и пример продолжают использовать прежнее имя.", corrupt_first_ddl_field_name),
+    Mutation("U18_NO_PASS_FAIL_THRESHOLDS", "U18", 3, "medium", "Приемка зависит от субъективной оценки", "Два ключевых свойства результата объявлены обязательными, но для них нет формулы, порога, периода и источника проверки.", sequence(intro_edit("Продуктовые метрики", "Полнота результата должна быть достаточной для бизнеса."), intro_edit("Продуктовые метрики", "Свежесть данных должна оцениваться как приемлемая владельцем продукта."))),
+    Mutation("U18_CONTROLS_WITHOUT_EXPECTED_VALUES", "U18", 3, "high", "Контрольные показатели нельзя интерпретировать", "Предлагается считать расхождения и дубли, но не заданы допустимые значения и действие при нарушении.", sequence(section_edit("FAQ", "После загрузки рассчитываются число дублей и расхождение с источником."), section_edit("FAQ", "Порог срабатывания, период сравнения и блокировка публикации определяются вручную после проверки."))),
+    Mutation("U19_PUBLIC_RAW_IDENTIFIERS", "U19", 3, "high", "Сырые идентификаторы публикуются без ограничений", "Результат содержит прямые идентификаторы, доступ выдан всем сотрудникам, а назначение и маскирование не определены.", sequence(section_edit("Структура данных", "В результат дополнительно передаются исходные персональные идентификаторы без токенизации."), section_edit("FAQ", "Чтение таблицы разрешено общей корпоративной роли без согласования цели доступа."))),
+    Mutation("U19_SENSITIVE_DEBUG_AND_BACKUP", "U19", 3, "high", "Чувствительные данные бесконтрольно копируются", "Полный payload пишется в debug-таблицу и резервную копию без владельца, ACL, маскирования и согласованного удаления.", sequence(section_edit("FAQ", "При ошибке полный исходный payload сохраняется в общей debug-таблице."), section_edit("FAQ", "Debug-таблица ежедневно копируется в бессрочный backup; правила доступа и удаления отсутствуют."))),
+    Mutation("U14_PARTIAL_FAILURE_RECOVERY_UNDEFINED", "U14", 3, "high", "Не определено восстановление после частичного сбоя", "После сбоя в середине записи партиции неизвестно, какие строки уже опубликованы, и как продолжить без дублей и потерь.", lambda text: insert_after_heading(text, "FAQ", "При сбое после частичной записи партиции повторный запуск не проверяет, какие строки уже опубликованы, и может продублировать или пропустить часть данных.")),
+    Mutation("U16_PARTITION_KEY_SKEW", "U16", 3, "high", "Ключ партиционирования не учитывает перекос нагрузки", "Единственный ключ партиционирования не подходит под заявленный объем и создает горячую партицию, а способ устранения перекоса не описан.", sequence(intro_edit("Нефункциональные требования", "Единственный ключ партиционирования — country_code, хотя основная часть событий приходится на одно значение этого поля."), section_edit("Формирование ключа (kafka) / партиции (hdfs)", "Дополнительный salt или составной ключ для устранения перекоса нагрузки не предусмотрен."))),
+    Mutation("U17_METRIC_FORMULA_MISMATCH", "U17", 3, "medium", "Формула метрики расходится между разделами", "Продуктовая метрика полноты определена одной формулой в метриках и другой в FAQ, поэтому расчет неоднозначен.", sequence(intro_edit("Продуктовые метрики", "Дополнительно: полнота результата — доля непустых обязательных полей."), section_edit("FAQ", "Полнота результата — это доля объектов, для которых опубликована хотя бы одна строка; формула отличается от определения в продуктовых метриках."))),
+    Mutation("U18_MANUAL_APPROVAL_WITHOUT_CRITERIA", "U18", 3, "medium", "Приемка не имеет объективных критериев", "Финальная приемка оставлена ручному решению без формулы, порогов и ожидаемых значений, поэтому два проверяющих могут получить разный pass/fail.", sequence(intro_edit("Продуктовые метрики", "Финальная приемка результата выполняется экспертно."), section_edit("FAQ", "Проверяющий самостоятельно решает, считать ли результат корректным; формула, пороги и обязательные ожидаемые значения для pass/fail не заданы."))),
+    Mutation("U19_SENSITIVE_STAGING_NO_RETENTION", "U19", 3, "high", "Для чувствительной технической копии нет срока хранения", "Полный чувствительный payload копируется в отдельное диагностическое хранилище, на которое не распространяется retention приемника; TTL и удаление не заданы.", sequence(section_edit("Структура данных", "Исходный payload содержит customer_contact и другие данные ограниченного доступа."), section_edit("FAQ", "Полный payload копируется в отдельное диагностическое хранилище вне приемника; общий retention результата на него не распространяется, TTL и процедура удаления не определены."))),
+]
+
+
+OTHER_MUTATIONS = [
+    Mutation("O01_INCIDENT_OWNER_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "За первичный разбор одного инцидента одновременно назначены две команды, причем каждая освобождена от участия по соседнему правилу.", lambda text: insert_after_heading(text, "FAQ", "Эксплуатационный регламент: первичный разбор инцидента выполняет NOC, команда данных не подключается; одновременно первичный разбор возложен на команду данных, а NOC только получает итог.")),
+    Mutation("O02_PUBLICATION_APPROVAL_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Неясно, допускается ли автоматическая публикация: два обязательных правила требуют противоположного порядка согласования.", lambda text: insert_after_heading(text, "FAQ", "Регламент публикации: успешный расчет публикуется автоматически без согласования; одновременно каждая публикация должна ждать ручного подтверждения владельца продукта.")),
+    Mutation("O03_INCIDENT_SEVERITY_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Одинаковая задержка данных получает разные уровни инцидента, поэтому невозможно определить обязательную процедуру реагирования.", lambda text: insert_after_heading(text, "FAQ", "Классификация инцидента: задержка более 30 минут считается SEV-1; одновременно задержка до двух часов считается информационным событием и не открывает инцидент.")),
+    Mutation("O04_SUPPORT_CALENDAR_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Срок поддержки должен считаться по двум различным производственным календарям без правила выбора.", lambda text: insert_after_heading(text, "FAQ", "Регламент поддержки: рабочие дни определяются производственным календарем РФ; одновременно сроки считаются по локальному календарю региона заказчика, который может от него отличаться.")),
+    Mutation("O05_REFERENCE_CORRECTION_AUTHORITY", "O", 4, "high", "Найдена не типизированная ошибка", "Два правила противоположно определяют право команды продукта исправлять ошибочное значение справочника.", lambda text: insert_after_heading(text, "FAQ", "Регламент исправлений: команда продукта самостоятельно корректирует ошибочные значения справочника; одновременно любые изменения справочника разрешены только его владельцу, а локальная коррекция запрещена.")),
+    Mutation("O06_ESCALATION_CHANNEL_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Для обязательной эскалации назначены два взаимоисключающих канала, каждый из которых объявлен единственным допустимым.", lambda text: insert_after_heading(text, "FAQ", "Регламент эскалации: инцидент регистрируется только в JIRA и сообщения в другие каналы не считаются уведомлением; одновременно единственным официальным уведомлением признается письмо, а задача JIRA создается необязательно.")),
+    Mutation("O07_ROLLBACK_AUTHORITY_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Не определено, кто принимает обязательное решение об откате: автоматический механизм или дежурный инженер.", lambda text: insert_after_heading(text, "FAQ", "Регламент rollback: при нарушении контроля качества откат выполняется автоматически без участия человека; одновременно откат запрещен без ручного решения дежурного инженера.")),
+    Mutation("O08_INCIDENT_CLOSURE_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Одни и те же полномочия по закрытию инцидента одновременно исключительным образом назначены разным ролям.", lambda text: insert_after_heading(text, "FAQ", "Регламент закрытия: инцидент закрывает только владелец продукта после проверки показателей; одновременно закрытие выполняет только дежурный NOC, согласование владельца продукта не требуется.")),
+    Mutation("O09_ACCEPTANCE_AUTHORITY_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Документ не позволяет определить, чье решение является достаточным для приемки результата.", lambda text: insert_after_heading(text, "FAQ", "Регламент приемки: итог утверждает QA без дополнительного согласования; одновременно приемка действительна только после решения бизнес-заказчика, а заключение QA носит справочный характер.")),
+    Mutation("O10_RECOVERY_DEADLINE_CONFLICT", "O", 4, "high", "Найдена не типизированная ошибка", "Для одного производственного сбоя установлены два несовместимых обязательных срока восстановления без приоритета.", lambda text: insert_after_heading(text, "FAQ", "Регламент восстановления: производственный сбой должен быть устранен за 30 минут; одновременно допустимый срок восстановления — до конца следующего рабочего дня без промежуточного ограничения.")),
+]
+
+
+COVERAGE_SEPARATED_UNIVERSAL_TYPES = {"U06", "U07", "U08", "U09", "U12", "U13", "U17"}
+COVERAGE_ROTATING_UNIVERSAL_TYPES = [
+    "U01", "U02", "U03", "U04", "U05", "U10",
+    "U11", "U14", "U15", "U16", "U18", "U19",
+]
+COVERAGE_PREFERRED_MUTATION_IDS = {
+    "U01": "U01_SCOPE_OUTPUT_GAP",
+    "U02": "U02_UNDEFINED_ACTIVE",
+    "U03": "U03_CONFLICTING_SOURCES",
+    "U04": "U04_GRAIN_CONTRADICTION",
+    "U05": "U05_OUTPUT_WITHOUT_LINEAGE",
+    "U06": "U06_ARBITRARY_OPERATION_ORDER",
+    "U07": "U07_OVERLAPPING_PERIODS",
+    "U08": "U08_JOIN_CARDINALITY_GAP",
+    "U09": "U09_NONDETERMINISTIC_LAST",
+    "U10": "U10_CONFLICTING_ZERO_RULES",
+    "U11": "U11_TIMEZONE_AMBIGUITY",
+    "U12": "U12_AMBIGUOUS_PHYSICAL_TYPE",
+    "U13": "U13_PARTIAL_BATCH_PUBLISHED",
+    "U14": "U14_PARTIAL_FAILURE_RECOVERY_UNDEFINED",
+    "U15": "U15_REQUIRED_FIELD_WITHOUT_MIGRATION",
+    "U16": "U16_WATERMARK_EXCEEDS_SLA",
+    "U17": "U17_EXAMPLE_OUTSIDE_CONTRACT",
+    "U18": "U18_NO_PASS_FAIL_THRESHOLDS",
+    "U19": "U19_SENSITIVE_DEBUG_AND_BACKUP",
+}
+
+
+def write_error_catalog() -> None:
+    catalog = [
+        {
+            "mutation_id": item.mutation_id,
+            "error_type_id": item.error_type_id,
+            "source_type": item.source_type,
+            "difficulty": item.difficulty,
+            "title": item.title,
+            "problem": item.description,
+        }
+        for item in DOMAIN_MUTATIONS + TEMPLATE_MUTATIONS + UNIVERSAL_MUTATIONS + OTHER_MUTATIONS
+    ]
+    (ROOT / "error_catalog.json").write_text(
+        json.dumps(catalog, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+
+def applicable(mutations: list[Mutation], clean_text: str) -> list[Mutation]:
+    result = []
+    for item in mutations:
+        try:
+            mutated, evidence = item.apply(clean_text)
+        except (ValueError, IndexError):
+            continue
+        if mutated != clean_text and mutated.count(evidence) == 1:
+            result.append(item)
+    return result
+
+
+def applicable_by_type(mutations: list[Mutation], clean_text: str) -> dict[str, list[Mutation]]:
+    groups: dict[str, list[Mutation]] = {}
+    for item in applicable(mutations, clean_text):
+        groups.setdefault(item.error_type_id, []).append(item)
+    return groups
+
+
+def choose_variants(
+    groups: dict[str, list[Mutation]], count: int, rng: random.Random, usage: Counter[str]
+) -> list[Mutation]:
+    candidates = list(groups.values())
+    rng.shuffle(candidates)
+    candidates.sort(key=lambda variants: sum(usage[item.mutation_id] for item in variants))
+    if count > len(candidates):
+        raise ValueError("not enough distinct applicable error types")
+
+    selected = []
+    for variants in candidates[:count]:
+        minimum = min(usage[item.mutation_id] for item in variants)
+        selected.append(rng.choice([item for item in variants if usage[item.mutation_id] == minimum]))
+    return selected
+
+
+def choose_mutations(
+    count: int,
+    case_index: int,
+    rng: random.Random,
+    clean_text: str,
+    usage: Counter[str],
+) -> list[Mutation]:
+    if count == 0:
+        return []
+
+    domain = applicable_by_type(DOMAIN_MUTATIONS, clean_text)
+    universal = applicable_by_type(UNIVERSAL_MUTATIONS, clean_text)
+    template = applicable_by_type(TEMPLATE_MUTATIONS, clean_text)
+    add_template = count >= 4 and (case_index % 3 != 0 or count >= 24)
+    remaining = count - add_template
+    domain_count = min(
+        max(round(remaining * (0.28 + 0.06 * (case_index % 3))), remaining - len(universal), 0),
+        len(domain),
+        remaining,
+    )
+    selected = choose_variants(domain, domain_count, rng, usage)
+    selected += choose_variants(universal, remaining - domain_count, rng, usage)
+    if add_template:
+        selected += choose_variants(template, 1, rng, usage)
+    return selected
+
+
+def choose_coverage_mutations(
+    case_index: int,
+    clean_text: str,
+) -> list[Mutation]:
+    """Build cases 1..10 with five document-level observations per D/T/U type."""
+    groups: dict[str, list[Mutation]] = {}
+    for pool in (DOMAIN_MUTATIONS, TEMPLATE_MUTATIONS, UNIVERSAL_MUTATIONS):
+        groups.update(applicable_by_type(pool, clean_text))
+
+    required_types: list[str] = []
+    if case_index <= 5:
+        required_types.extend(f"D{number:02d}" for number in range(1, 9))
+        required_types.append("T01")
+    else:
+        required_types.extend(sorted(COVERAGE_SEPARATED_UNIVERSAL_TYPES))
+
+    for offset, error_type_id in enumerate(COVERAGE_ROTATING_UNIVERSAL_TYPES):
+        selected_cases = {((offset + step) % 10) + 1 for step in range(5)}
+        if case_index in selected_cases:
+            required_types.append(error_type_id)
+
+    selected: list[Mutation] = []
+    for type_position, error_type_id in enumerate(required_types):
+        variants = groups.get(error_type_id, [])
+        if not variants:
+            raise RuntimeError(f"case {case_index}: no applicable mutation for {error_type_id}")
+        preferred_id = COVERAGE_PREFERRED_MUTATION_IDS.get(error_type_id)
+        preferred = [item for item in variants if item.mutation_id == preferred_id]
+        if preferred_id and not preferred:
+            raise RuntimeError(
+                f"case {case_index}: preferred mutation {preferred_id} is not applicable"
+            )
+        selected.append(preferred[0] if preferred else variants[(case_index + type_position) % len(variants)])
+
+    selected.append(OTHER_MUTATIONS[case_index - 1])
+    return selected
+
+
+def main() -> None:
+    clean_files = sorted(CLEAN_DIR.glob("clean_*.md"))
+    if len(clean_files) != 10:
+        raise SystemExit(f"expected 10 clean documents, found {len(clean_files)}")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    write_error_catalog()
+
+    manifest_cases = []
+    mutation_usage: Counter[str] = Counter()
+
+    for case_index in range(1, 51):
+        clean_path = clean_files[(case_index - 1) // 5]
+        clean_text = clean_path.read_text(encoding="utf-8")
+        rng = random.Random(SEED * 100 + case_index)
+        if case_index <= 10:
+            legacy_selected = choose_mutations(
+                ERROR_COUNTS[case_index - 1], case_index, rng, clean_text, mutation_usage
+            )
+            mutation_usage.update(item.mutation_id for item in legacy_selected)
+            selected = choose_coverage_mutations(case_index, clean_text)
+            error_count = len(selected)
+        else:
+            error_count = ERROR_COUNTS[case_index - 1]
+            selected = choose_mutations(error_count, case_index, rng, clean_text, mutation_usage)
+        if len(selected) != error_count:
+            raise RuntimeError(f"selection mismatch for case {case_index}")
+        if case_index > 10:
+            mutation_usage.update(item.mutation_id for item in selected)
+
+        text = clean_text
+        findings = []
+
+        def mutation_phase(item: Mutation) -> int:
+            if item.error_type_id in {"D04", "D05"}:
+                return 1
+            return {1: 2, 3: 3, 2: 4, 4: 5}[item.source_type]
+
+        ordered = sorted(selected, key=mutation_phase)
+        for item in ordered:
+            text, evidence = item.apply(text)
+            findings.append(
+                {
+                    "error_type_id": item.error_type_id,
+                    "source_type": item.source_type,
+                    "difficulty": item.difficulty,
+                    "evidence_quote": evidence,
+                    "title": item.title,
+                    "problem": item.description,
+                }
+            )
+
+        for finding in findings:
+            occurrences = text.count(finding["evidence_quote"])
+            if occurrences != 1:
+                raise RuntimeError(
+                    f"case {case_index}: evidence occurs {occurrences} times: "
+                    f"{finding['evidence_quote']!r}; selected={[item.mutation_id for item in ordered]}"
+                )
+
+        document_id = f"case_{case_index:03d}"
+        md_path = OUT_DIR / f"{document_id}.md"
+        json_path = OUT_DIR / f"{document_id}.json"
+        md_path.write_text(text, encoding="utf-8")
+        metadata = {
+            "document_id": document_id,
+            "source_clean_document": clean_path.name,
+            "error_count": len(findings),
+            "errors": findings,
+        }
+        json_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        manifest_cases.append(
+            {
+                "document_id": document_id,
+                "source_clean_document": clean_path.name,
+                "error_count": len(findings),
+            }
+        )
+
+    manifest = {
+        "seed": SEED,
+        "error_count_distribution": {
+            str(count): sum(1 for case in manifest_cases if case["error_count"] == count)
+            for count in sorted({case["error_count"] for case in manifest_cases})
+        },
+        "cases": manifest_cases,
+    }
+    (ROOT / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()
